@@ -1,0 +1,346 @@
+import { useState, useRef, useEffect } from 'react'
+import { T, C } from '../lib/tokens'
+import { Modal, Badge, Avatar, SearchBar } from './UI'
+
+const uid = () => Math.random().toString(36).slice(2, 8)
+const fmtDate = iso => { if (!iso) return 'TBD'; const d = new Date(iso + 'T00:00:00'); return isNaN(d) ? iso : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) }
+const fmtTime = t => { if (!t) return ''; const [h, m] = t.split(':'); const hr = parseInt(h); return `${hr % 12 || 12}:${m} ${hr < 12 ? 'AM' : 'PM'}` }
+const todayLabel = () => new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
+const fmt$ = n => '$' + Number(n || 0).toLocaleString()
+
+// ── Dashboard ─────────────────────────────────────────────────────
+export function Dashboard({ data, setView }) {
+  const totalRevenue = data.invoices.reduce((s, i) => s + i.paid, 0)
+  const outstanding = data.invoices.reduce((s, i) => s + (i.amount - i.paid), 0)
+  const active = data.clients.filter(c => !c.archived && c.status !== 'done').length
+  const upcoming = data.bookings.filter(b => b.status === 'confirmed').length
+  return (
+    <div>
+      <div style={T.metricStrip}>
+        {[
+          { label: 'Revenue collected', value: fmt$(totalRevenue), sub: 'all time' },
+          { label: 'Outstanding', value: fmt$(outstanding), sub: `${data.invoices.filter(i => i.status !== 'paid').length} invoices` },
+          { label: 'Active clients', value: active, sub: `of ${data.clients.filter(c => !c.archived).length} total` },
+          { label: 'Sessions confirmed', value: upcoming, sub: 'upcoming' },
+        ].map((m, i) => (
+          <div key={m.label} style={T.metricCell(i === 3)}>
+            <div style={T.metricLabel}>{m.label}</div>
+            <div style={T.metricValue}>{m.value}</div>
+            <div style={T.metricSub}>{m.sub}</div>
+          </div>
+        ))}
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+        <div style={T.card}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
+            <div style={{ fontWeight: 500, fontSize: 14 }}>Recent clients</div>
+            <button style={{ ...T.btnGhost, color: C.muted, fontSize: 12 }} onClick={() => setView('clients')}>View all</button>
+          </div>
+          {data.clients.filter(c => !c.archived).slice(0, 5).map((c, i, arr) => (
+            <div key={c.id} style={{ ...T.dataRow, borderBottom: i === arr.length - 1 ? 'none' : `1px solid ${C.border}` }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
+                <Avatar name={c.name} size={32} />
+                <div>
+                  <div style={{ fontWeight: 500, fontSize: 13.5 }}>{c.name}</div>
+                  <div style={{ fontSize: 12, color: C.muted }}>{c.type} · {fmtDate(c.date)}</div>
+                </div>
+              </div>
+              <Badge type={c.status} label={c.status} />
+            </div>
+          ))}
+        </div>
+        <div style={T.card}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
+            <div style={{ fontWeight: 500, fontSize: 14 }}>Upcoming sessions</div>
+            <button style={{ ...T.btnGhost, color: C.muted, fontSize: 12 }} onClick={() => setView('calendar')}>Calendar</button>
+          </div>
+          {data.bookings.slice(0, 5).map((b, i, arr) => (
+            <div key={b.id} style={{ ...T.dataRow, borderBottom: i === arr.length - 1 ? 'none' : `1px solid ${C.border}` }}>
+              <div>
+                <div style={{ fontWeight: 500, fontSize: 13.5 }}>{b.client}</div>
+                <div style={{ fontSize: 12, color: C.muted }}>{fmtDate(b.date)} · {fmtTime(b.time)}</div>
+              </div>
+              <Badge type={b.status} label={b.status} />
+            </div>
+          ))}
+          {data.bookings.length === 0 && <div style={{ textAlign: 'center', padding: '24px 0', color: C.faint, fontSize: 13 }}>No sessions yet</div>}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Analytics ─────────────────────────────────────────────────────
+export function Analytics({ data }) {
+  const canvasRef = useRef(); const barRef = useRef()
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const charts = []
+    import('chart.js/auto').then(({ default: Chart }) => {
+      const gridColor = C.border
+      const baseOpts = { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { backgroundColor: C.text, titleColor: '#fff', bodyColor: 'rgba(255,255,255,0.7)', padding: 10, cornerRadius: 8 } } }
+      if (canvasRef.current) charts.push(new Chart(canvasRef.current, { type: 'line', data: { labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'], datasets: [{ data: [2100, 1800, 3400, 2600, 4200, 5100], borderColor: C.text, backgroundColor: 'rgba(17,17,16,0.04)', fill: true, tension: 0.4, borderWidth: 1.5, pointBackgroundColor: C.text, pointRadius: 3 }] }, options: { ...baseOpts, scales: { y: { grid: { color: gridColor }, border: { display: false }, ticks: { color: C.muted, callback: v => '$' + v / 1000 + 'k', font: { size: 11 } } }, x: { grid: { display: false }, border: { display: false }, ticks: { color: C.muted, font: { size: 11 } } } } } }))
+      if (barRef.current) { const stages = data.stages || []; const vals = stages.map(s => data.clients.filter(c => c.status === s.id).length); charts.push(new Chart(barRef.current, { type: 'bar', data: { labels: stages.map(s => s.label), datasets: [{ data: vals, backgroundColor: C.surface3, borderRadius: 6, barThickness: 28 }] }, options: { ...baseOpts, scales: { y: { grid: { color: gridColor }, border: { display: false }, ticks: { color: C.muted, font: { size: 11 }, stepSize: 1 } }, x: { grid: { display: false }, border: { display: false }, ticks: { color: C.muted, font: { size: 11 } } } } } })) }
+    })
+    return () => charts.forEach(ch => ch.destroy())
+  }, [])
+  const avg = data.clients.length ? Math.round(data.invoices.reduce((s, i) => s + i.amount, 0) / Math.max(data.clients.filter(c => !c.archived).length, 1)) : 0
+  const conv = data.clients.length ? Math.round(data.clients.filter(c => c.status !== 'inquiry').length / data.clients.length * 100) : 0
+  return (
+    <div>
+      <div style={{ ...T.metricStrip, gridTemplateColumns: 'repeat(3,1fr)', marginBottom: 20 }}>
+        {[{ label: 'Avg invoice value', value: fmt$(avg) }, { label: 'Conversion rate', value: conv + '%' }, { label: 'Total clients', value: data.clients.filter(c => !c.archived).length }].map((m, i) => (
+          <div key={m.label} style={T.metricCell(i === 2)}><div style={T.metricLabel}>{m.label}</div><div style={T.metricValue}>{m.value}</div></div>
+        ))}
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: 16 }}>
+        <div style={T.card}><div style={{ fontWeight: 500, fontSize: 14, marginBottom: 4 }}>Revenue trend</div><div style={{ fontSize: 12, color: C.muted, marginBottom: 18 }}>Last 6 months</div><div style={{ height: 230 }}><canvas ref={canvasRef} /></div></div>
+        <div style={T.card}><div style={{ fontWeight: 500, fontSize: 14, marginBottom: 4 }}>Clients by stage</div><div style={{ fontSize: 12, color: C.muted, marginBottom: 18 }}>Current pipeline</div><div style={{ height: 230 }}><canvas ref={barRef} /></div></div>
+      </div>
+    </div>
+  )
+}
+
+// ── Calendar ──────────────────────────────────────────────────────
+export function Calendar({ data, setData, toast }) {
+  const [cursor, setCursor] = useState(new Date(2026, 5, 1))
+  const [modal, setModal] = useState(false)
+  const [calView, setCalView] = useState('month')
+  const blank = { client: '', type: data.sessionTypes?.[0] || 'Family', date: '', time: '', location: '', notes: '' }
+  const [form, setForm] = useState(blank)
+  const y = cursor.getFullYear(), mo = cursor.getMonth()
+  const first = new Date(y, mo, 1).getDay(), days = new Date(y, mo + 1, 0).getDate()
+  const todayStr = new Date().toISOString().slice(0, 10)
+  const ds = d => `${y}-${String(mo + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`
+  const cells = [...Array(first).fill(null), ...Array.from({ length: days }, (_, i) => i + 1)]
+  const add = () => { if (!form.client.trim()) return; setData(d => ({ ...d, bookings: [...d.bookings, { id: uid(), ...form, status: 'pending' }] })); toast('Booking added'); setModal(false); setForm(blank) }
+  const toggle = id => { setData(d => ({ ...d, bookings: d.bookings.map(b => b.id === id ? { ...b, status: b.status === 'confirmed' ? 'pending' : 'confirmed' } : b) })); toast('Status updated') }
+  const del = id => { if (!confirm('Delete booking?')) return; setData(d => ({ ...d, bookings: d.bookings.filter(b => b.id !== id) })); toast('Deleted') }
+  const types = data.sessionTypes || ['Family', 'Maternity', 'Newborn', 'Portrait']
+  return (
+    <div>
+      <div style={T.pageHeader}>
+        <div><div style={T.pageTitle}>Calendar</div><div style={T.pageSub}>{data.bookings.length} sessions</div></div>
+        <div style={{ display: 'flex', gap: 10 }}>
+          <div style={{ display: 'inline-flex', background: C.surface2, borderRadius: 8, padding: 3, gap: 2 }}>
+            {[['month', 'Month'], ['list', 'List']].map(([v, l]) => <button key={v} style={{ padding: '5px 12px', borderRadius: 6, border: 'none', background: calView === v ? C.surface : 'transparent', color: C.text, fontWeight: calView === v ? 500 : 400, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }} onClick={() => setCalView(v)}>{l}</button>)}
+          </div>
+          <button style={T.btnPrimary} onClick={() => setModal(true)}>+ New booking</button>
+        </div>
+      </div>
+      {calView === 'month' ? (
+        <div style={T.card}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
+            <div style={{ fontFamily: "'DM Serif Display', Georgia, serif", fontSize: 18 }}>{cursor.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</div>
+            <div style={{ display: 'flex', gap: 6 }}>
+              <button style={T.btnSm} onClick={() => setCursor(new Date(y, mo - 1, 1))}>‹</button>
+              <button style={T.btnSm} onClick={() => setCursor(new Date(2026, 5, 1))}>Today</button>
+              <button style={T.btnSm} onClick={() => setCursor(new Date(y, mo + 1, 1))}>›</button>
+            </div>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: 1, marginBottom: 1 }}>
+            {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => <div key={d} style={{ fontSize: 10, fontWeight: 600, color: C.faint, textAlign: 'center', padding: '6px 0', letterSpacing: '0.05em', textTransform: 'uppercase' }}>{d}</div>)}
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: 1, background: C.border, border: `1px solid ${C.border}`, borderRadius: 8, overflow: 'hidden' }}>
+            {cells.map((d, i) => {
+              if (!d) return <div key={i} style={{ background: C.surface2, minHeight: 76 }} />
+              const dateStr = ds(d), evts = data.bookings.filter(b => b.date === dateStr), isToday = dateStr === todayStr
+              return (
+                <div key={i} style={{ background: isToday ? '#FAFAFA' : C.surface, minHeight: 76, padding: '7px 8px' }}>
+                  <div style={{ fontSize: 12, fontWeight: isToday ? 600 : 400, color: isToday ? C.text : C.muted }}>{d}</div>
+                  {evts.map(e => <div key={e.id} onClick={() => toggle(e.id)} style={{ fontSize: 10, fontWeight: 500, background: e.status === 'confirmed' ? C.text : C.surface3, color: e.status === 'confirmed' ? '#fff' : C.muted, borderRadius: 4, padding: '2px 5px', marginTop: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', cursor: 'pointer' }}>{e.client}</div>)}
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      ) : (
+        <div style={T.card}>
+          {[...data.bookings].sort((a, b) => a.date.localeCompare(b.date)).map((b, i) => (
+            <div key={b.id} style={{ ...T.dataRow, borderBottom: i === data.bookings.length - 1 ? 'none' : `1px solid ${C.border}` }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 13 }}>
+                <div style={{ width: 42, height: 42, borderRadius: 10, background: C.surface2, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <div style={{ fontSize: 9, fontWeight: 500, color: C.faint, textTransform: 'uppercase' }}>{b.date ? new Date(b.date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short' }) : ''}</div>
+                  <div style={{ fontSize: 16, fontWeight: 400, fontFamily: "'DM Serif Display', Georgia, serif", color: C.text, lineHeight: 1.1 }}>{b.date ? new Date(b.date + 'T00:00:00').getDate() : '?'}</div>
+                </div>
+                <div><div style={{ fontWeight: 500 }}>{b.client}</div><div style={{ fontSize: 12, color: C.muted }}>{b.type} · {b.location} · {fmtTime(b.time)}</div></div>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <Badge type={b.status} label={b.status} />
+                <button style={{ ...T.btnGhost, color: C.red }} onClick={() => del(b.id)}>×</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+      {modal && (
+        <Modal title="New booking" onClose={() => setModal(false)} footer={<><button style={T.btn} onClick={() => setModal(false)}>Cancel</button><button style={T.btnPrimary} onClick={add}>Add</button></>}>
+          <div style={T.formRow}>
+            <div style={T.formGroup}><label style={T.formLabel}>Client</label><input style={T.formInput} list="cl1" value={form.client} onChange={e => setForm({ ...form, client: e.target.value })} /><datalist id="cl1">{data.clients.map(c => <option key={c.id} value={c.name} />)}</datalist></div>
+            <div style={T.formGroup}><label style={T.formLabel}>Type</label><select style={T.formInput} value={form.type} onChange={e => setForm({ ...form, type: e.target.value })}>{types.map(t => <option key={t}>{t}</option>)}</select></div>
+          </div>
+          <div style={T.formRow}>
+            <div style={T.formGroup}><label style={T.formLabel}>Date</label><input style={T.formInput} type="date" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} /></div>
+            <div style={T.formGroup}><label style={T.formLabel}>Time</label><input style={T.formInput} type="time" value={form.time} onChange={e => setForm({ ...form, time: e.target.value })} /></div>
+          </div>
+          <div style={T.formGroup}><label style={T.formLabel}>Location</label><input style={T.formInput} value={form.location} onChange={e => setForm({ ...form, location: e.target.value })} /></div>
+          <div style={T.formGroup}><label style={T.formLabel}>Notes</label><textarea style={{ ...T.formInput, resize: 'none' }} rows={2} value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} /></div>
+        </Modal>
+      )}
+    </div>
+  )
+}
+
+// ── Invoices ──────────────────────────────────────────────────────
+export function Invoices({ data, setData, toast }) {
+  const [modal, setModal] = useState(false)
+  const blank = { client: '', amount: '', due: '', note: '' }
+  const [form, setForm] = useState(blank)
+  const add = () => { if (!form.client.trim() || !form.amount) return; setData(d => ({ ...d, invoices: [...d.invoices, { id: 'INV-' + String(d.invoices.length + 1).padStart(3, '0'), client: form.client, clientId: null, amount: parseFloat(form.amount), due: form.due, status: 'unpaid', paid: 0, note: form.note, paymentIntentId: null }] })); toast('Invoice created'); setModal(false); setForm(blank) }
+  const markPaid = id => { setData(d => ({ ...d, invoices: d.invoices.map(i => i.id === id ? { ...i, status: 'paid', paid: i.amount } : i) })); toast('Marked as paid') }
+  const del = id => { if (!confirm('Delete invoice?')) return; setData(d => ({ ...d, invoices: d.invoices.filter(i => i.id !== id) })); toast('Deleted') }
+  const total = data.invoices.reduce((s, i) => s + i.amount, 0)
+  const collected = data.invoices.reduce((s, i) => s + i.paid, 0)
+  return (
+    <div>
+      <div style={T.pageHeader}><div><div style={T.pageTitle}>Invoices</div><div style={T.pageSub}>{fmt$(collected)} collected · {fmt$(total - collected)} outstanding</div></div><button style={T.btnPrimary} onClick={() => setModal(true)}>+ New invoice</button></div>
+      <div style={T.card}>
+        {data.invoices.map((inv, i) => {
+          const pct = inv.amount > 0 ? Math.round(inv.paid / inv.amount * 100) : 0
+          const owing = inv.amount - inv.paid
+          return (
+            <div key={inv.id} style={{ ...T.dataRow, alignItems: 'flex-start', paddingTop: 16, paddingBottom: 16, borderBottom: i === data.invoices.length - 1 ? 'none' : `1px solid ${C.border}` }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 5 }}>
+                  <div style={{ fontWeight: 500 }}>{inv.id}</div>
+                  <div style={{ color: C.text }}>{inv.client}</div>
+                  <Badge type={inv.status} label={inv.status} />
+                </div>
+                <div style={{ fontSize: 12, color: C.muted }}>Due {fmtDate(inv.due)}{inv.note ? ` · ${inv.note}` : ''}</div>
+                <div style={{ width: 160 }}><div style={T.progress}><div style={{ height: '100%', borderRadius: 2, background: inv.status === 'paid' ? C.green : inv.status === 'partial' ? C.amber : C.border2, width: pct + '%', transition: 'width 0.4s' }} /></div></div>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginLeft: 24 }}>
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{ fontFamily: "'DM Serif Display', Georgia, serif", fontSize: 20, letterSpacing: '-0.3px' }}>{fmt$(inv.amount)}</div>
+                  {inv.status === 'partial' && <div style={{ fontSize: 11, color: C.muted }}>{fmt$(inv.paid)} paid</div>}
+                </div>
+                {inv.status !== 'paid' && owing > 0 && <button style={{ ...T.btnSm, color: C.green, borderColor: C.green }} onClick={() => markPaid(inv.id)}>Mark paid</button>}
+                <button style={{ ...T.btnGhost, color: C.faint }} onClick={() => del(inv.id)}>×</button>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+      {modal && (
+        <Modal title="New invoice" onClose={() => setModal(false)} footer={<><button style={T.btn} onClick={() => setModal(false)}>Cancel</button><button style={T.btnPrimary} onClick={add}>Create</button></>}>
+          <div style={T.formRow}>
+            <div style={T.formGroup}><label style={T.formLabel}>Client</label><input style={T.formInput} list="cl2" value={form.client} onChange={e => setForm({ ...form, client: e.target.value })} /><datalist id="cl2">{data.clients.map(c => <option key={c.id} value={c.name} />)}</datalist></div>
+            <div style={T.formGroup}><label style={T.formLabel}>Amount ($)</label><input style={T.formInput} type="number" value={form.amount} onChange={e => setForm({ ...form, amount: e.target.value })} /></div>
+          </div>
+          <div style={T.formGroup}><label style={T.formLabel}>Due date</label><input style={T.formInput} type="date" value={form.due} onChange={e => setForm({ ...form, due: e.target.value })} /></div>
+          <div style={T.formGroup}><label style={T.formLabel}>Note</label><input style={T.formInput} value={form.note} onChange={e => setForm({ ...form, note: e.target.value })} /></div>
+        </Modal>
+      )}
+    </div>
+  )
+}
+
+// ── Contracts ─────────────────────────────────────────────────────
+export function Contracts({ data, setData, toast }) {
+  const [modal, setModal] = useState(false)
+  const [viewModal, setViewModal] = useState(null)
+  const blank = { client: '', type: '', body: '' }
+  const [form, setForm] = useState(blank)
+  const add = () => { if (!form.client.trim()) return; setData(d => ({ ...d, contracts: [...d.contracts, { id: uid(), ...form, clientId: null, sent: todayLabel(), status: 'pending' }] })); toast('Contract created'); setModal(false); setForm(blank) }
+  const sign = id => { setData(d => ({ ...d, contracts: d.contracts.map(k => k.id === id ? { ...k, status: 'signed' } : k) })); toast('Signed') }
+  const del = id => { if (!confirm('Delete contract?')) return; setData(d => ({ ...d, contracts: d.contracts.filter(k => k.id !== id) })); toast('Deleted') }
+  return (
+    <div>
+      <div style={T.pageHeader}><div><div style={T.pageTitle}>Contracts</div><div style={T.pageSub}>{data.contracts.filter(k => k.status === 'signed').length} signed · {data.contracts.filter(k => k.status === 'pending').length} pending</div></div><button style={T.btnPrimary} onClick={() => setModal(true)}>+ New contract</button></div>
+      <div style={T.card}>
+        {data.contracts.map((k, i) => (
+          <div key={k.id} style={{ ...T.dataRow, borderBottom: i === data.contracts.length - 1 ? 'none' : `1px solid ${C.border}` }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 13 }}>
+              <div style={{ width: 40, height: 40, borderRadius: 10, background: k.status === 'signed' ? C.greenBg : C.surface2, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, color: k.status === 'signed' ? C.green : C.muted, flexShrink: 0 }}>{k.status === 'signed' ? '✓' : '✎'}</div>
+              <div><div style={{ fontWeight: 500 }}>{k.type || 'Contract'}</div><div style={{ fontSize: 12, color: C.muted }}>{k.client} · Sent {k.sent}</div></div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <Badge type={k.status} label={k.status} />
+              <button style={T.btnSm} onClick={() => setViewModal(k)}>View</button>
+              {k.status === 'pending' && <button style={{ ...T.btnSm, color: C.green, borderColor: C.green }} onClick={() => sign(k.id)}>Sign</button>}
+              <button style={{ ...T.btnGhost, color: C.faint }} onClick={() => del(k.id)}>×</button>
+            </div>
+          </div>
+        ))}
+      </div>
+      {modal && (
+        <Modal title="New contract" onClose={() => setModal(false)} wide footer={<><button style={T.btn} onClick={() => setModal(false)}>Cancel</button><button style={T.btnPrimary} onClick={add}>Create</button></>}>
+          <div style={T.formRow}>
+            <div style={T.formGroup}><label style={T.formLabel}>Client</label><input style={T.formInput} list="cl3" value={form.client} onChange={e => setForm({ ...form, client: e.target.value })} /><datalist id="cl3">{data.clients.map(c => <option key={c.id} value={c.name} />)}</datalist></div>
+            <div style={T.formGroup}><label style={T.formLabel}>Type</label><input style={T.formInput} placeholder="e.g. Photography Agreement" value={form.type} onChange={e => setForm({ ...form, type: e.target.value })} /></div>
+          </div>
+          <div style={T.formGroup}><label style={T.formLabel}>Contract body</label><textarea style={{ ...T.formInput, resize: 'vertical' }} rows={7} value={form.body} onChange={e => setForm({ ...form, body: e.target.value })} /></div>
+        </Modal>
+      )}
+      {viewModal && (
+        <Modal title={viewModal.type || 'Contract'} onClose={() => setViewModal(null)} wide footer={<><div style={{ fontSize: 12, color: C.muted }}>Sent {viewModal.sent}</div><div style={{ flex: 1 }} /><button style={T.btn} onClick={() => setViewModal(null)}>Close</button></>}>
+          <div style={{ marginBottom: 12 }}><Badge type={viewModal.status} label={viewModal.status} /></div>
+          <div style={{ background: C.surface2, borderRadius: 10, padding: '18px 20px', fontSize: 14, lineHeight: 1.8, color: C.text, whiteSpace: 'pre-wrap', fontWeight: 300 }}>{viewModal.body || 'No contract body.'}</div>
+        </Modal>
+      )}
+    </div>
+  )
+}
+
+// ── Inbox ─────────────────────────────────────────────────────────
+export function Inbox({ data, setData, toast }) {
+  const [activeId, setActiveId] = useState(data.messages[0]?.id || null)
+  const [draft, setDraft] = useState('')
+  const [newModal, setNewModal] = useState(false)
+  const [nf, setNf] = useState({ to: '', body: '' })
+  const active = data.messages.find(m => m.id === activeId)
+  const send = () => { if (!draft.trim()) return; setData(d => ({ ...d, messages: d.messages.map(m => m.id === activeId ? { ...m, thread: [...m.thread, { id: uid(), from: 'You', text: draft, time: 'Just now', out: true }], unread: false } : m) })); setDraft(''); toast('Sent') }
+  const markRead = id => setData(d => ({ ...d, messages: d.messages.map(m => m.id === id ? { ...m, unread: false } : m) }))
+  const sendNew = () => { if (!nf.to.trim()) return; const nm = { id: uid(), from: nf.to, thread: [{ id: uid(), from: 'You', text: nf.body, time: 'Just now', out: true }], unread: false }; setData(d => ({ ...d, messages: [nm, ...d.messages] })); setActiveId(nm.id); setNewModal(false); setNf({ to: '', body: '' }); toast('Sent') }
+  return (
+    <div>
+      <div style={T.pageHeader}><div><div style={T.pageTitle}>Inbox</div><div style={T.pageSub}>{data.messages.filter(m => m.unread).length} unread</div></div><button style={T.btnPrimary} onClick={() => setNewModal(true)}>+ Compose</button></div>
+      <div style={{ display: 'grid', gridTemplateColumns: '270px 1fr', border: `1px solid ${C.border}`, borderRadius: 12, overflow: 'hidden', minHeight: 500 }}>
+        <div style={{ borderRight: `1px solid ${C.border}`, overflowY: 'auto' }}>
+          {data.messages.map(m => (
+            <div key={m.id} onClick={() => { setActiveId(m.id); markRead(m.id) }} style={{ padding: '13px 16px', borderBottom: `1px solid ${C.border}`, cursor: 'pointer', background: activeId === m.id ? C.surface2 : C.surface }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
+                <div style={{ fontWeight: m.unread ? 600 : 400, fontSize: 13.5, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  {m.unread && <span style={{ display: 'inline-block', width: 6, height: 6, borderRadius: '50%', background: C.text, flexShrink: 0 }} />}
+                  {m.from}
+                </div>
+                <span style={{ fontSize: 11, color: C.faint }}>{m.thread[m.thread.length - 1]?.time}</span>
+              </div>
+              <div style={{ fontSize: 12, color: C.muted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.thread[m.thread.length - 1]?.text}</div>
+            </div>
+          ))}
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', background: C.surface }}>
+          {active ? (
+            <>
+              <div style={{ padding: '16px 22px', borderBottom: `1px solid ${C.border}` }}><div style={{ fontWeight: 500, fontSize: 14 }}>{active.from}</div></div>
+              <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', padding: '18px 22px', gap: 2 }}>
+                {active.thread.map(msg => <div key={msg.id} style={T.msgBubble(msg.out)}>{msg.text}<div style={{ fontSize: 10, opacity: 0.5, marginTop: 4, textAlign: msg.out ? 'right' : 'left' }}>{msg.time}</div></div>)}
+              </div>
+              <div style={{ padding: '14px 22px', borderTop: `1px solid ${C.border}`, display: 'flex', gap: 10 }}>
+                <textarea rows={2} style={{ ...T.formInput, flex: 1, resize: 'none', background: C.surface2 }} placeholder="Reply... (Ctrl+Enter)" value={draft} onChange={e => setDraft(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) send() }} />
+                <button style={{ ...T.btnPrimary, alignSelf: 'flex-end', padding: '8px 14px' }} onClick={send}>→</button>
+              </div>
+            </>
+          ) : <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 1, color: C.faint, fontSize: 13 }}>Select a conversation</div>}
+        </div>
+      </div>
+      {newModal && (
+        <Modal title="New message" onClose={() => setNewModal(false)} footer={<><button style={T.btn} onClick={() => setNewModal(false)}>Cancel</button><button style={T.btnPrimary} onClick={sendNew}>Send</button></>}>
+          <div style={T.formGroup}><label style={T.formLabel}>To</label><input style={T.formInput} list="cl4" value={nf.to} onChange={e => setNf({ ...nf, to: e.target.value })} /><datalist id="cl4">{data.clients.map(c => <option key={c.id} value={c.name} />)}</datalist></div>
+          <div style={T.formGroup}><label style={T.formLabel}>Message</label><textarea style={{ ...T.formInput, resize: 'none' }} rows={5} value={nf.body} onChange={e => setNf({ ...nf, body: e.target.value })} /></div>
+        </Modal>
+      )}
+    </div>
+  )
+}

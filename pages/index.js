@@ -1,0 +1,185 @@
+import { useState, useEffect, useMemo, useRef } from 'react'
+import Head from 'next/head'
+import { T, C } from '../lib/tokens'
+import { loadData, seed, STORAGE_KEY } from '../lib/data'
+import { Toast } from '../components/UI'
+import Projects from '../components/Projects'
+import Clients from '../components/Clients'
+import ContactFormSettings from '../components/ContactForm'
+import { Dashboard, Analytics, Calendar, Invoices, Contracts, Inbox } from '../components/Pages'
+
+const todayLabel = () => new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
+
+// ── Global search ─────────────────────────────────────────────────
+function GlobalSearch({ data, setView }) {
+  const [q, setQ] = useState('')
+  const [open, setOpen] = useState(false)
+  const ref = useRef()
+  useEffect(() => {
+    const h = e => { if (ref.current && !ref.current.contains(e.target)) setOpen(false) }
+    document.addEventListener('mousedown', h); return () => document.removeEventListener('mousedown', h)
+  }, [])
+  const results = useMemo(() => {
+    if (!q.trim()) return []
+    const lo = q.toLowerCase(); const r = []
+    data.clients.filter(c => !c.archived).forEach(c => { if (c.name.toLowerCase().includes(lo) || (c.email || '').toLowerCase().includes(lo)) r.push({ cat: 'Client', label: c.name, sub: `${c.type} · ${c.email || ''}`, view: 'clients' }) })
+    data.invoices.forEach(i => { if (i.client.toLowerCase().includes(lo) || i.id.toLowerCase().includes(lo)) r.push({ cat: 'Invoice', label: `${i.id} · ${i.client}`, sub: '$' + i.amount.toLocaleString(), view: 'invoices' }) })
+    data.bookings.forEach(b => { if (b.client.toLowerCase().includes(lo)) r.push({ cat: 'Booking', label: b.client, sub: b.date + ' · ' + b.location, view: 'calendar' }) })
+    return r.slice(0, 7)
+  }, [q, data])
+  return (
+    <div style={{ flex: 1, position: 'relative' }} ref={ref}>
+      <span style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', color: C.faint, fontSize: 14, pointerEvents: 'none' }}>⌕</span>
+      <input
+        style={{ ...T.formInput, paddingLeft: 32, paddingRight: q ? 32 : 12, background: C.surface2, fontSize: 13.5 }}
+        placeholder="Search clients, invoices, bookings..."
+        value={q} onChange={e => { setQ(e.target.value); setOpen(true) }} onFocus={() => setOpen(true)}
+      />
+      {q && (
+        <button onClick={() => { setQ(''); setOpen(false) }}
+          style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: C.faint, fontSize: 16, lineHeight: 1 }}>×</button>
+      )}
+      {open && results.length > 0 && (
+        <div style={{ position: 'absolute', top: 'calc(100% + 6px)', left: 0, right: 0, background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, boxShadow: '0 12px 40px rgba(0,0,0,0.1)', zIndex: 50, overflow: 'hidden' }}>
+          {results.map((r, i) => (
+            <div key={i} onClick={() => { setView(r.view); setOpen(false); setQ('') }}
+              style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 16px', borderBottom: i < results.length - 1 ? `1px solid ${C.border}` : 'none', cursor: 'pointer' }}
+              onMouseEnter={e => e.currentTarget.style.background = C.surface2}
+              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.08em', color: C.faint, fontWeight: 600, marginBottom: 1 }}>{r.cat}</div>
+                <div style={{ fontWeight: 500, fontSize: 13.5 }}>{r.label}</div>
+                <div style={{ fontSize: 12, color: C.muted }}>{r.sub}</div>
+              </div>
+              <span style={{ color: C.faint }}>→</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Sidebar ───────────────────────────────────────────────────────
+function Sidebar({ active, setActive, unread }) {
+  const nav1 = [
+    { id: 'dashboard', label: 'Dashboard' },
+    { id: 'analytics', label: 'Analytics' },
+    { id: 'projects', label: 'Projects' },
+    { id: 'clients', label: 'Clients' },
+  ]
+  const nav2 = [
+    { id: 'calendar', label: 'Calendar' },
+    { id: 'invoices', label: 'Invoices' },
+    { id: 'contracts', label: 'Contracts' },
+    { id: 'inbox', label: 'Inbox', badge: unread },
+    { id: 'contactform', label: 'Contact Form' },
+  ]
+  return (
+    <div style={T.sidebar}>
+      {/* Logo */}
+      <div style={{ padding: '24px 22px 18px', borderBottom: `1px solid ${C.border}` }}>
+        <div style={{ fontFamily: "'DM Serif Display', Georgia, serif", fontSize: 17, color: C.text, letterSpacing: '-0.2px', lineHeight: 1.2 }}>EHS Studio</div>
+        <div style={{ fontFamily: "'DM Serif Display', Georgia, serif", fontSize: 17, color: C.text, letterSpacing: '-0.2px' }}>Manager</div>
+        <div style={{ fontSize: 10, color: C.faint, marginTop: 3, letterSpacing: '0.06em', textTransform: 'uppercase' }}>Photography CRM</div>
+      </div>
+
+      <div style={{ flex: 1, padding: '8px 0', overflowY: 'auto' }}>
+        <div style={T.navSection}>Overview</div>
+        {nav1.map(n => (
+          <div key={n.id} style={T.navItem(active === n.id)} onClick={() => setActive(n.id)}
+            onMouseEnter={e => { if (active !== n.id) e.currentTarget.style.background = C.surface2 }}
+            onMouseLeave={e => { if (active !== n.id) e.currentTarget.style.background = 'transparent' }}>
+            {n.label}
+          </div>
+        ))}
+        <div style={T.navSection}>Workflow</div>
+        {nav2.map(n => (
+          <div key={n.id} style={T.navItem(active === n.id)} onClick={() => setActive(n.id)}
+            onMouseEnter={e => { if (active !== n.id) e.currentTarget.style.background = C.surface2 }}
+            onMouseLeave={e => { if (active !== n.id) e.currentTarget.style.background = 'transparent' }}>
+            <span style={{ flex: 1 }}>{n.label}</span>
+            {n.badge > 0 && <span style={T.navBadge}>{n.badge}</span>}
+          </div>
+        ))}
+      </div>
+
+      <div style={{ padding: '14px 16px', borderTop: `1px solid ${C.border}` }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 6px', borderRadius: 8, cursor: 'pointer' }}>
+          <div style={{ width: 30, height: 30, borderRadius: '50%', background: C.text, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 500 }}>EH</div>
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 500, color: C.text }}>Ellie Heartstrings</div>
+            <div style={{ fontSize: 11, color: C.faint }}>Pro plan</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Root ──────────────────────────────────────────────────────────
+export default function Home() {
+  const [view, setView] = useState('dashboard')
+  const [data, setData] = useState(loadData)
+  const [toastMsg, setToastMsg] = useState(null)
+  const toast = msg => setToastMsg(msg)
+
+  // Persist to localStorage
+  useEffect(() => {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)) } catch (e) {}
+  }, [data])
+
+  const props = { data, setData, toast, setView }
+  const unread = data.messages.filter(m => m.unread).length
+
+  const pageTitles = {
+    dashboard: ['Dashboard', todayLabel()],
+    analytics: ['Analytics', 'Business overview'],
+  }
+
+  const views = {
+    dashboard: <Dashboard {...props} />,
+    analytics: <Analytics {...props} />,
+    projects: <Projects {...props} />,
+    clients: <Clients {...props} sessionTypes={data.sessionTypes} />,
+    calendar: <Calendar {...props} />,
+    invoices: <Invoices {...props} />,
+    contracts: <Contracts {...props} />,
+    inbox: <Inbox {...props} />,
+    contactform: <ContactFormSettings {...props} />,
+  }
+
+  return (
+    <>
+      <Head>
+        <title>EHS Studio Manager</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>📷</text></svg>" />
+      </Head>
+      <div style={T.layout}>
+        <Sidebar active={view} setActive={setView} unread={unread} />
+        <div style={T.main}>
+          {/* Topbar */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 32 }}>
+            <GlobalSearch data={data} setView={setView} />
+            <button style={T.btn} onClick={() => { if (confirm('Reset to demo data?')) { setData(seed); toast('Data reset') } }}>Reset</button>
+          </div>
+
+          {/* Page title for dashboard/analytics */}
+          {pageTitles[view] && (
+            <div style={T.pageHeader}>
+              <div>
+                <div style={T.pageTitle}>{pageTitles[view][0]}</div>
+                <div style={T.pageSub}>{pageTitles[view][1]}</div>
+              </div>
+            </div>
+          )}
+
+          {views[view] || views.dashboard}
+        </div>
+
+        {toastMsg && <Toast msg={toastMsg} onDone={() => setToastMsg(null)} />}
+      </div>
+    </>
+  )
+}
