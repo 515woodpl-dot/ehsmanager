@@ -49,6 +49,7 @@ function CardModal({ client, stages, sessionTypes, data, setData, onClose, toast
   }
 
   return (
+    <>
     <div style={T.overlay} onClick={e => { if (e.target === e.currentTarget) onClose() }}>
       <div style={{ background: C.surface, borderRadius: 16, width: '100%', maxWidth: 900, maxHeight: '92vh', overflow: 'hidden', boxShadow: '0 20px 60px rgba(0,0,0,0.14)', display: 'flex', flexDirection: 'column' }}>
         {/* Header */}
@@ -212,7 +213,7 @@ function CardModal({ client, stages, sessionTypes, data, setData, onClose, toast
       </div>
     </div>
 
-    {/* Action modals rendered outside the card layout so they layer on top */}
+    {/* Action modals */}
     {activeModal === 'invoice' && <InvoiceModal client={client} data={data} setData={setData} toast={toast} onClose={() => setActiveModal(null)} />}
     {activeModal === 'contract' && <ContractModal client={client} data={data} setData={setData} toast={toast} onClose={() => setActiveModal(null)} />}
     {activeModal === 'quote' && <QuoteModal client={client} data={data} setData={setData} toast={toast} onClose={() => setActiveModal(null)} />}
@@ -220,6 +221,7 @@ function CardModal({ client, stages, sessionTypes, data, setData, onClose, toast
     {activeModal === 'session' && <SessionModal client={client} data={data} setData={setData} toast={toast} onClose={() => setActiveModal(null)} />}
     {activeModal === 'message' && <MessageModal client={client} data={data} setData={setData} toast={toast} onClose={() => setActiveModal(null)} />}
     {activeModal === 'gallery' && <GalleryModal client={client} data={data} setData={setData} toast={toast} onClose={() => setActiveModal(null)} />}
+    </>
   )
 }
 
@@ -231,6 +233,7 @@ function StageModal({ stages, onSave, onClose }) {
   const del = id => setLocal(local.filter(s => s.id !== id))
   const rename = (id, label) => setLocal(local.map(s => s.id === id ? { ...s, label } : s))
   return (
+    <>
     <div style={T.overlay} onClick={e => { if (e.target === e.currentTarget) onClose() }}>
       <div style={{ ...T.modal, maxWidth: 460 }}>
         <div style={T.modalHeader}>
