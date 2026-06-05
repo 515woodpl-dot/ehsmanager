@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react'
+import { InvoiceModal, QuoteModal, ContractModal, QuestionnaireModal, SessionModal, MessageModal, GalleryModal } from './ActionModals'
 import { T, C, badge } from '../lib/tokens'
 import { Modal, Badge, Avatar, Seg } from './UI'
 
@@ -25,6 +26,7 @@ function CardModal({ client, stages, sessionTypes, data, setData, onClose, toast
   const [editing, setEditing] = useState(false)
   const [form, setForm] = useState({ ...client })
   const [activeTab, setActiveTab] = useState('getstarted')
+  const [activeModal, setActiveModal] = useState(null) // invoice|contract|quote|questionnaire|session|message|gallery
 
   const clientInvoices = data.invoices.filter(i => i.clientId === client.id)
   const clientContracts = data.contracts.filter(k => k.clientId === client.id)
@@ -44,32 +46,6 @@ function CardModal({ client, stages, sessionTypes, data, setData, onClose, toast
     if (!confirm('Delete this project permanently?')) return
     setData(d => ({ ...d, clients: d.clients.filter(c => c.id !== client.id) }))
     toast('Project deleted'); onClose()
-  }
-
-  const createInvoice = () => {
-    const inv = { id: 'INV-' + String(data.invoices.length + 1).padStart(3, '0'), client: client.name, clientId: client.id, amount: 0, due: '', status: 'unpaid', paid: 0, note: '', paymentIntentId: null }
-    setData(d => ({ ...d, invoices: [...d.invoices, inv] }))
-    toast('Invoice created — edit it in Invoices')
-  }
-
-  const createContract = () => {
-    const k = { id: uid(), client: client.name, clientId: client.id, type: 'Photography Agreement', sent: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }), status: 'pending', body: '' }
-    setData(d => ({ ...d, contracts: [...d.contracts, k] }))
-    toast('Contract created — edit it in Contracts')
-  }
-
-  const createSession = () => {
-    const b = { id: uid(), client: client.name, clientId: client.id, type: client.type || 'Portrait', date: '', time: '', location: '', status: 'pending', notes: '' }
-    setData(d => ({ ...d, bookings: [...d.bookings, b] }))
-    toast('Session created — set the date in Calendar')
-  }
-
-  const createMessage = () => {
-    const existing = data.messages.find(m => m.clientId === client.id)
-    if (!existing) {
-      setData(d => ({ ...d, messages: [{ id: uid(), from: client.name, clientId: client.id, thread: [], unread: false }, ...d.messages] }))
-    }
-    toast('Go to Inbox to send a message')
   }
 
   return (
@@ -104,19 +80,19 @@ function CardModal({ client, stages, sessionTypes, data, setData, onClose, toast
             {activeTab === 'getstarted' && (
               <>
                 <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: C.faint, marginBottom: 10 }}>Send documents</div>
-                <ActionItem icon="$" title="Invoice" subtitle="Get paid for your services" onClick={createInvoice} color={C.green} />
-                <ActionItem icon="✎" title="Contract" subtitle="Request a signature" onClick={createContract} color={C.blue} />
-                <ActionItem icon="?" title="Questionnaire" subtitle="Learn about client needs" onClick={() => toast('Questionnaire coming soon')} color={C.purple} />
-                <ActionItem icon="📋" title="Quote" subtitle="Get client acceptance" onClick={() => toast('Quote coming soon')} color={C.amber} />
+                <ActionItem icon="$" title="Invoice" subtitle="Get paid for your services" onClick={() => setActiveModal('invoice')} color={C.green} />
+                <ActionItem icon="✎" title="Contract" subtitle="Request a signature" onClick={() => setActiveModal('contract')} color={C.blue} />
+                <ActionItem icon="?" title="Questionnaire" subtitle="Learn about client needs" onClick={() => setActiveModal('questionnaire')} color={C.purple} />
+                <ActionItem icon="📋" title="Quote" subtitle="Get client acceptance" onClick={() => setActiveModal('quote')} color={C.amber} />
 
                 <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: C.faint, margin: '18px 0 10px' }}>Schedule sessions</div>
-                <ActionItem icon="📅" title="Session" subtitle="Invite your client to a session" onClick={createSession} />
+                <ActionItem icon="📅" title="Session" subtitle="Invite your client to a session" onClick={() => setActiveModal('session')} />
 
                 <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: C.faint, margin: '18px 0 10px' }}>Conversations</div>
-                <ActionItem icon="✉" title="New message" subtitle="Write to your client" onClick={createMessage} />
+                <ActionItem icon="✉" title="New message" subtitle="Write to your client" onClick={() => setActiveModal('message')} />
 
                 <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: C.faint, margin: '18px 0 10px' }}>Gallery</div>
-                <ActionItem icon="🖼" title="Client Gallery" subtitle="Link photo collections" onClick={() => toast('Gallery linking coming soon')} />
+                <ActionItem icon="🖼" title="Client Gallery" subtitle="Link photo collections" onClick={() => setActiveModal('gallery')} />
               </>
             )}
 
@@ -235,6 +211,15 @@ function CardModal({ client, stages, sessionTypes, data, setData, onClose, toast
         </div>
       </div>
     </div>
+
+    {/* Action modals rendered outside the card layout so they layer on top */}
+    {activeModal === 'invoice' && <InvoiceModal client={client} data={data} setData={setData} toast={toast} onClose={() => setActiveModal(null)} />}
+    {activeModal === 'contract' && <ContractModal client={client} data={data} setData={setData} toast={toast} onClose={() => setActiveModal(null)} />}
+    {activeModal === 'quote' && <QuoteModal client={client} data={data} setData={setData} toast={toast} onClose={() => setActiveModal(null)} />}
+    {activeModal === 'questionnaire' && <QuestionnaireModal client={client} data={data} setData={setData} toast={toast} onClose={() => setActiveModal(null)} />}
+    {activeModal === 'session' && <SessionModal client={client} data={data} setData={setData} toast={toast} onClose={() => setActiveModal(null)} />}
+    {activeModal === 'message' && <MessageModal client={client} data={data} setData={setData} toast={toast} onClose={() => setActiveModal(null)} />}
+    {activeModal === 'gallery' && <GalleryModal client={client} data={data} setData={setData} toast={toast} onClose={() => setActiveModal(null)} />}
   )
 }
 
