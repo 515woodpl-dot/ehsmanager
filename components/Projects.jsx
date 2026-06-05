@@ -233,7 +233,6 @@ function StageModal({ stages, onSave, onClose }) {
   const del = id => setLocal(local.filter(s => s.id !== id))
   const rename = (id, label) => setLocal(local.map(s => s.id === id ? { ...s, label } : s))
   return (
-    <>
     <div style={T.overlay} onClick={e => { if (e.target === e.currentTarget) onClose() }}>
       <div style={{ ...T.modal, maxWidth: 460 }}>
         <div style={T.modalHeader}>
