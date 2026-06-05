@@ -162,7 +162,6 @@ export default function Home() {
           {/* Topbar */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 32 }}>
             <GlobalSearch data={data} setView={setView} />
-            <button style={T.btn} onClick={() => { if (confirm('Reset to demo data?')) { setData(seed); toast('Data reset') } }}>Reset</button>
           </div>
 
           {/* Page title for dashboard/analytics */}
