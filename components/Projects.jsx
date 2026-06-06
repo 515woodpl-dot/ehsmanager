@@ -541,3 +541,5 @@ export default function Projects({ data, setData, toast }) {
     </div>
   )
 }
+
+export { CardModal as CardModalExport }

@@ -3,6 +3,7 @@ import { T, C } from '../lib/tokens'
 import { Modal } from './UI'
 import { LineItemBuilder, calcTotal } from './LineItemBuilder'
 import { CONTRACT_TEMPLATE, fillContract, buildContractFields } from '../lib/contractTemplate'
+import ContractBuilder from './ContractBuilder'
 
 const uid = () => Math.random().toString(36).slice(2, 8)
 const fmt$ = n => '$' + Number(n || 0).toFixed(2)
@@ -134,62 +135,17 @@ export function QuoteModal({ client, data, setData, toast, onClose }) {
   )
 }
 
-// ── Contract Modal ────────────────────────────────────────────────
+// ── Contract Modal (1.8 — dynamic builder) ───────────────────────
 export function ContractModal({ client, data, setData, toast, onClose }) {
-  const clientBooking = data.bookings.find(b => b.clientId === client.id)
-  const clientInvoice = data.invoices.find(i => i.clientId === client.id)
-  const autoFields = buildContractFields(client, clientBooking, clientInvoice)
-  const [body, setBody] = useState(fillContract(CONTRACT_TEMPLATE, autoFields))
-  const [contractType, setContractType] = useState(`${client.type || 'Portrait'} Photography Agreement`)
-  const [tab, setTab] = useState('edit') // edit | preview
-
-  const save = () => {
-    const k = {
-      id: uid(), client: client.name, clientId: client.id,
-      type: contractType, sent: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-      status: 'pending', body,
-    }
+  const handleSave = (k) => {
     setData(d => ({ ...d, contracts: [...d.contracts, k] }))
     toast('Contract created'); onClose()
   }
-
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.22)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20, backdropFilter: 'blur(4px)' }} className="modal-wrap"
       onClick={e => { if (e.target === e.currentTarget) onClose() }}>
-      <div style={{ background: C.surface, borderRadius: 16, padding: 30, width: '100%', maxWidth: 760, maxHeight: '92vh', overflowY: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,0.14)' }} className="modal-inner">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-          <div style={T.modalTitle}>New Contract — {client.name}</div>
-          <button onClick={onClose} style={{ ...T.btnGhost, fontSize: 20, color: C.muted }}>×</button>
-        </div>
-
-        {/* Auto-fill notice */}
-        <div style={{ background: C.surface2, border: `1px solid ${C.border}`, borderRadius: 8, padding: '10px 14px', marginBottom: 18, fontSize: 12.5, color: C.muted, display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ fontSize: 15 }}>✦</span>
-          Fields auto-filled from client record, booking, and invoice. Edit anything below before saving.
-        </div>
-
-        <div style={{ ...T.formGroup, marginBottom: 16 }}>
-          <label style={T.formLabel}>Contract title</label>
-          <input style={T.formInput} value={contractType} onChange={e => setContractType(e.target.value)} />
-        </div>
-
-        {/* Tab toggle */}
-        <div style={{ display: 'inline-flex', background: C.surface2, borderRadius: 8, padding: 3, gap: 2, marginBottom: 14 }}>
-          {[['edit', 'Edit'], ['preview', 'Preview']].map(([v, l]) => (
-            <button key={v} onClick={() => setTab(v)} style={{ padding: '5px 14px', borderRadius: 6, border: 'none', background: tab === v ? C.surface : 'transparent', color: C.text, fontWeight: tab === v ? 500 : 400, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>{l}</button>
-          ))}
-        </div>
-
-        {tab === 'edit' ? (
-          <textarea style={{ ...T.formInput, resize: 'vertical', fontSize: 13, lineHeight: 1.7, fontFamily: 'monospace', minHeight: 420 }} value={body} onChange={e => setBody(e.target.value)} />
-        ) : (
-          <div style={{ background: C.surface2, borderRadius: 10, padding: '20px 24px', fontSize: 13.5, lineHeight: 1.85, color: C.text, whiteSpace: 'pre-wrap', minHeight: 420, fontWeight: 300 }}>{body}</div>
-        )}
-
-        <div style={T.modalFooter}>
-          <button style={T.btn} onClick={onClose}>Cancel</button>
-          <button style={T.btnPrimary} onClick={save}>Save contract</button>
-        </div>
+      <div style={{ background: C.surface, borderRadius: 16, padding: 30, width: '100%', maxWidth: 740, maxHeight: '92vh', display: 'flex', flexDirection: 'column', boxShadow: '0 20px 60px rgba(0,0,0,0.14)' }} className="modal-inner">
+        <ContractBuilder client={client} data={data} onSave={handleSave} onClose={onClose} />
       </div>
     </div>
   )

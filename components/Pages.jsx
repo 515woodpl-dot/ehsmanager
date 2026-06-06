@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { T, C } from '../lib/tokens'
 import { Modal, Badge, Avatar, SearchBar } from './UI'
+import ContractBuilder from './ContractBuilder'
 
 const uid = () => Math.random().toString(36).slice(2, 8)
 const fmtDate = iso => { if (!iso) return 'TBD'; const d = new Date(iso + 'T00:00:00'); return isNaN(d) ? iso : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) }
@@ -102,7 +103,7 @@ export function Analytics({ data }) {
 }
 
 // ── Calendar ──────────────────────────────────────────────────────
-export function Calendar({ data, setData, toast }) {
+export function Calendar({ data, setData, toast, openClientCard }) {
   const [cursor, setCursor] = useState(new Date(2026, 5, 1))
   const [modal, setModal] = useState(false)
   const [calView, setCalView] = useState('month')
@@ -148,7 +149,10 @@ export function Calendar({ data, setData, toast }) {
               return (
                 <div key={i} style={{ background: isToday ? '#FAFAFA' : C.surface, minHeight: 76, padding: '7px 8px' }}>
                   <div style={{ fontSize: 12, fontWeight: isToday ? 600 : 400, color: isToday ? C.text : C.muted }}>{d}</div>
-                  {evts.map(e => <div key={e.id} onClick={() => toggle(e.id)} style={{ fontSize: 10, fontWeight: 500, background: e.status === 'confirmed' ? C.text : C.surface3, color: e.status === 'confirmed' ? '#fff' : C.muted, borderRadius: 4, padding: '2px 5px', marginTop: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', cursor: 'pointer' }}>{e.client}</div>)}
+                  {evts.map(e => {
+                    const clientObj = data.clients.find(c => c.id === e.clientId || c.name === e.client)
+                    return <div key={e.id} onClick={() => clientObj ? openClientCard(clientObj) : toggle(e.id)} style={{ fontSize: 10, fontWeight: 500, background: e.status === 'confirmed' ? C.text : C.surface3, color: e.status === 'confirmed' ? '#fff' : C.muted, borderRadius: 4, padding: '2px 5px', marginTop: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', cursor: 'pointer' }} title={clientObj ? `Open ${e.client}'s project` : 'Click to toggle status'}>{e.client}</div>
+                  })}
                 </div>
               )
             })}
@@ -166,6 +170,7 @@ export function Calendar({ data, setData, toast }) {
                 <div><div style={{ fontWeight: 500 }}>{b.client}</div><div style={{ fontSize: 12, color: C.muted }}>{b.type} · {b.location} · {fmtTime(b.time)}</div></div>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                {(() => { const clientObj = data.clients.find(c => c.id === b.clientId || c.name === b.client); return clientObj ? <button style={T.btnSm} onClick={() => openClientCard(clientObj)}>Open project</button> : null })()}
                 <Badge type={b.status} label={b.status} />
                 <button style={{ ...T.btnGhost, color: C.red }} onClick={() => del(b.id)}>×</button>
               </div>
@@ -313,13 +318,17 @@ export function Contracts({ data, setData, toast }) {
         ))}
       </div>
       {modal && (
-        <Modal title="New contract" onClose={() => setModal(false)} wide footer={<><button style={T.btn} onClick={() => setModal(false)}>Cancel</button><button style={T.btnPrimary} onClick={add}>Create</button></>}>
-          <div style={T.formRow}>
-            <div style={T.formGroup}><label style={T.formLabel}>Client</label><input style={T.formInput} list="cl3" value={form.client} onChange={e => setForm({ ...form, client: e.target.value })} /><datalist id="cl3">{data.clients.map(c => <option key={c.id} value={c.name} />)}</datalist></div>
-            <div style={T.formGroup}><label style={T.formLabel}>Type</label><input style={T.formInput} placeholder="e.g. Photography Agreement" value={form.type} onChange={e => setForm({ ...form, type: e.target.value })} /></div>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.22)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20, backdropFilter: 'blur(4px)' }} className="modal-wrap"
+          onClick={e => { if (e.target === e.currentTarget) setModal(false) }}>
+          <div style={{ background: C.surface, borderRadius: 16, padding: 30, width: '100%', maxWidth: 740, maxHeight: '92vh', display: 'flex', flexDirection: 'column', boxShadow: '0 20px 60px rgba(0,0,0,0.14)' }} className="modal-inner">
+            <ContractBuilder
+              client={null}
+              data={data}
+              onSave={k => { setData(d => ({ ...d, contracts: [...d.contracts, k] })); toast('Contract created'); setModal(false) }}
+              onClose={() => setModal(false)}
+            />
           </div>
-          <div style={T.formGroup}><label style={T.formLabel}>Contract body</label><textarea style={{ ...T.formInput, resize: 'vertical' }} rows={7} value={form.body} onChange={e => setForm({ ...form, body: e.target.value })} /></div>
-        </Modal>
+        </div>
       )}
       {viewModal && (
         <Modal title={viewModal.type || 'Contract'} onClose={() => setViewModal(null)} wide footer={<><div style={{ fontSize: 12, color: C.muted }}>Sent {viewModal.sent}</div><div style={{ flex: 1 }} /><button style={T.btn} onClick={() => setViewModal(null)}>Close</button></>}>

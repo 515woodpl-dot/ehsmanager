@@ -162,6 +162,7 @@ export default function Home() {
   const [data, setData] = useState(loadData)
   const [toastMsg, setToastMsg] = useState(null)
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [calendarCardModal, setCalendarCardModal] = useState(null)
   const toast = msg => setToastMsg(msg)
 
   useEffect(() => {
@@ -181,7 +182,7 @@ export default function Home() {
     analytics: <Analytics {...props} />,
     projects: <Projects {...props} />,
     clients: <Clients {...props} sessionTypes={data.sessionTypes} />,
-    calendar: <Calendar {...props} />,
+    calendar: <Calendar {...props} openClientCard={c => setCalendarCardModal(c)} />,
     invoices: <Invoices {...props} />,
     contracts: <Contracts {...props} />,
     inbox: <Inbox {...props} />,
@@ -227,6 +228,7 @@ export default function Home() {
         </div>
 
         {toastMsg && <Toast msg={toastMsg} onDone={() => setToastMsg(null)} />}
+        {calendarCardModal && <CardModal client={calendarCardModal} stages={data.stages || []} sessionTypes={data.sessionTypes || []} data={data} setData={setData} onClose={() => setCalendarCardModal(null)} toast={toast} />}
       </div>
 
       <style>{`
