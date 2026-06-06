@@ -59,7 +59,7 @@ export function LineItemBuilder({ value, onChange }) {
       </button>
 
       {/* Totals section */}
-      <div style={{ display: 'flex', gap: 20 }}>
+      <div style={{ display: 'flex', gap: 20 }} className="line-item-totals">
         {/* Notes */}
         <div style={{ flex: 1 }}>
           <label style={T.formLabel}>Notes</label>

@@ -124,6 +124,10 @@ export default function ContactPage() {
           * { box-sizing: border-box; margin: 0; padding: 0; }
           body { font-family: 'DM Sans', sans-serif; background: #FAFAF9; color: #111110; -webkit-font-smoothing: antialiased; }
           input:focus, textarea:focus { border-color: #111110 !important; box-shadow: 0 0 0 3px rgba(17,17,16,0.08); }
+  @media (max-width: 600px) {
+    .form-row-2 { grid-template-columns: 1fr !important; }
+    .contact-checkbox-grid { grid-template-columns: 1fr !important; }
+  }
           ::placeholder { color: #B0AFAD; }
         `}</style>
       </Head>
@@ -150,7 +154,7 @@ export default function ContactPage() {
             </div>
 
             {/* Email + Phone */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 20 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 20 }} className="form-row-2">
               <div>
                 <label style={{ display: 'block', fontSize: 12, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#7F7E7C', marginBottom: 7 }}>
                   Email <span style={{ color: '#991F1F' }}>*</span>
@@ -173,7 +177,7 @@ export default function ContactPage() {
                 What kind of memories would you like captured? <span style={{ color: '#991F1F' }}>*</span>
               </label>
               <div style={{ fontSize: 12, color: '#B0AFAD', marginBottom: 10 }}>Select up to {maxChecked}</div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }} className="contact-checkbox-grid">
                 {(settings.checkboxOptions || []).map((opt, i) => {
                   const checked = form.services.includes(opt)
                   const disabled = !checked && form.services.length >= maxChecked

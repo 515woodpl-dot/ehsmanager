@@ -61,7 +61,7 @@ function GlobalSearch({ data, setView }) {
 }
 
 // ── Sidebar ───────────────────────────────────────────────────────
-function Sidebar({ active, setActive, unread }) {
+function Sidebar({ active, setActive, unread, open, onClose }) {
   const nav1 = [
     { id: 'dashboard', label: 'Dashboard' },
     { id: 'analytics', label: 'Analytics' },
@@ -75,45 +75,84 @@ function Sidebar({ active, setActive, unread }) {
     { id: 'inbox', label: 'Inbox', badge: unread },
     { id: 'contactform', label: 'Contact Form' },
   ]
+
+  const handleNav = (id) => { setActive(id); onClose() }
+
   return (
-    <div style={T.sidebar}>
-      {/* Logo */}
-      <div style={{ padding: '24px 22px 18px', borderBottom: `1px solid ${C.border}` }}>
-        <div style={{ fontFamily: "'DM Serif Display', Georgia, serif", fontSize: 17, color: C.text, letterSpacing: '-0.2px', lineHeight: 1.2 }}>EHS Studio</div>
-        <div style={{ fontFamily: "'DM Serif Display', Georgia, serif", fontSize: 17, color: C.text, letterSpacing: '-0.2px' }}>Manager</div>
-        <div style={{ fontSize: 10, color: C.faint, marginTop: 3, letterSpacing: '0.06em', textTransform: 'uppercase' }}>Photography CRM</div>
-      </div>
-
-      <div style={{ flex: 1, padding: '8px 0', overflowY: 'auto' }}>
-        <div style={T.navSection}>Overview</div>
-        {nav1.map(n => (
-          <div key={n.id} style={T.navItem(active === n.id)} onClick={() => setActive(n.id)}
-            onMouseEnter={e => { if (active !== n.id) e.currentTarget.style.background = C.surface2 }}
-            onMouseLeave={e => { if (active !== n.id) e.currentTarget.style.background = 'transparent' }}>
-            {n.label}
-          </div>
-        ))}
-        <div style={T.navSection}>Workflow</div>
-        {nav2.map(n => (
-          <div key={n.id} style={T.navItem(active === n.id)} onClick={() => setActive(n.id)}
-            onMouseEnter={e => { if (active !== n.id) e.currentTarget.style.background = C.surface2 }}
-            onMouseLeave={e => { if (active !== n.id) e.currentTarget.style.background = 'transparent' }}>
-            <span style={{ flex: 1 }}>{n.label}</span>
-            {n.badge > 0 && <span style={T.navBadge}>{n.badge}</span>}
-          </div>
-        ))}
-      </div>
-
-      <div style={{ padding: '14px 16px', borderTop: `1px solid ${C.border}` }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 6px', borderRadius: 8, cursor: 'pointer' }}>
-          <div style={{ width: 30, height: 30, borderRadius: '50%', background: C.text, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 500 }}>EH</div>
+    <>
+      {/* Mobile backdrop */}
+      {open && (
+        <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.3)', zIndex: 25, display: 'none' }} className="mobile-backdrop" />
+      )}
+      <div style={{
+        width: 220,
+        background: C.surface,
+        borderRight: `1px solid ${C.border}`,
+        display: 'flex',
+        flexDirection: 'column',
+        position: 'fixed',
+        top: 0, left: 0, bottom: 0,
+        zIndex: 30,
+        transition: 'transform 0.25s ease',
+      }}
+        className={`sidebar-nav${open ? ' sidebar-open' : ''}`}
+      >
+        {/* Logo */}
+        <div style={{ padding: '24px 22px 18px', borderBottom: `1px solid ${C.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <div>
-            <div style={{ fontSize: 13, fontWeight: 500, color: C.text }}>Ellie Heartstrings</div>
-            <div style={{ fontSize: 11, color: C.faint }}>Pro plan</div>
+            <div style={{ fontFamily: "'DM Serif Display', Georgia, serif", fontSize: 17, color: C.text, letterSpacing: '-0.2px', lineHeight: 1.2 }}>EHS Studio</div>
+            <div style={{ fontFamily: "'DM Serif Display', Georgia, serif", fontSize: 17, color: C.text, letterSpacing: '-0.2px' }}>Manager</div>
+            <div style={{ fontSize: 10, color: C.faint, marginTop: 3, letterSpacing: '0.06em', textTransform: 'uppercase' }}>Photography CRM</div>
+          </div>
+          {/* Mobile close button */}
+          <button onClick={onClose} className="mobile-close-btn" style={{ display: 'none', background: 'none', border: 'none', fontSize: 20, color: C.muted, cursor: 'pointer', padding: 4 }}>×</button>
+        </div>
+
+        <div style={{ flex: 1, padding: '8px 0', overflowY: 'auto' }}>
+          <div style={T.navSection}>Overview</div>
+          {nav1.map(n => (
+            <div key={n.id} style={T.navItem(active === n.id)} onClick={() => handleNav(n.id)}
+              onMouseEnter={e => { if (active !== n.id) e.currentTarget.style.background = C.surface2 }}
+              onMouseLeave={e => { if (active !== n.id) e.currentTarget.style.background = 'transparent' }}>
+              {n.label}
+            </div>
+          ))}
+          <div style={T.navSection}>Workflow</div>
+          {nav2.map(n => (
+            <div key={n.id} style={T.navItem(active === n.id)} onClick={() => handleNav(n.id)}
+              onMouseEnter={e => { if (active !== n.id) e.currentTarget.style.background = C.surface2 }}
+              onMouseLeave={e => { if (active !== n.id) e.currentTarget.style.background = 'transparent' }}>
+              <span style={{ flex: 1 }}>{n.label}</span>
+              {n.badge > 0 && <span style={T.navBadge}>{n.badge}</span>}
+            </div>
+          ))}
+        </div>
+
+        <div style={{ padding: '14px 16px', borderTop: `1px solid ${C.border}` }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 6px', borderRadius: 8, cursor: 'pointer' }}>
+            <div style={{ width: 30, height: 30, borderRadius: '50%', background: C.text, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 500 }}>EH</div>
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 500, color: C.text }}>Ellie Heartstrings</div>
+              <div style={{ fontSize: 11, color: C.faint }}>Pro plan</div>
+            </div>
           </div>
         </div>
       </div>
-    </div>
+
+      <style>{`
+        @media (max-width: 768px) {
+          .sidebar-nav {
+            transform: translateX(-100%);
+          }
+          .sidebar-nav.sidebar-open {
+            transform: translateX(0);
+            box-shadow: 4px 0 24px rgba(0,0,0,0.12);
+          }
+          .mobile-backdrop { display: block !important; }
+          .mobile-close-btn { display: block !important; }
+        }
+      `}</style>
+    </>
   )
 }
 
@@ -122,9 +161,9 @@ export default function Home() {
   const [view, setView] = useState('dashboard')
   const [data, setData] = useState(loadData)
   const [toastMsg, setToastMsg] = useState(null)
+  const [sidebarOpen, setSidebarOpen] = useState(false)
   const toast = msg => setToastMsg(msg)
 
-  // Persist to localStorage
   useEffect(() => {
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)) } catch (e) {}
   }, [data])
@@ -156,19 +195,29 @@ export default function Home() {
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>📷</text></svg>" />
       </Head>
-      <div style={T.layout}>
-        <Sidebar active={view} setActive={setView} unread={unread} />
-        <div style={T.main}>
+
+      <div style={{ display: 'flex', minHeight: '100vh', background: C.bg }}>
+        <Sidebar active={view} setActive={setView} unread={unread} open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+
+        <div className="layout-main" style={{ marginLeft: 220, flex: 1, padding: '36px 44px', minHeight: '100vh' }}>
           {/* Topbar */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 32 }}>
+          <div className="topbar-wrap" style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 32 }}>
+            {/* Hamburger — mobile only */}
+            <button
+              className="hamburger-btn"
+              onClick={() => setSidebarOpen(true)}
+              style={{ display: 'none', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 6px', fontSize: 20, color: C.text, lineHeight: 1, flexShrink: 0 }}
+            >
+              ☰
+            </button>
             <GlobalSearch data={data} setView={setView} />
           </div>
 
-          {/* Page title for dashboard/analytics */}
+          {/* Page title */}
           {pageTitles[view] && (
-            <div style={T.pageHeader}>
+            <div className="page-header-wrap" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 28 }}>
               <div>
-                <div style={T.pageTitle}>{pageTitles[view][0]}</div>
+                <div className="page-title-text" style={T.pageTitle}>{pageTitles[view][0]}</div>
                 <div style={T.pageSub}>{pageTitles[view][1]}</div>
               </div>
             </div>
@@ -179,6 +228,26 @@ export default function Home() {
 
         {toastMsg && <Toast msg={toastMsg} onDone={() => setToastMsg(null)} />}
       </div>
+
+      <style>{`
+        @media (max-width: 768px) {
+          .hamburger-btn { display: block !important; }
+          .layout-main {
+            margin-left: 0 !important;
+            padding: 16px !important;
+            padding-top: 72px !important;
+          }
+          .topbar-wrap {
+            position: fixed !important;
+            top: 0; left: 0; right: 0;
+            background: #fff;
+            border-bottom: 1px solid #EAEAEA;
+            padding: 12px 16px !important;
+            margin-bottom: 0 !important;
+            z-index: 15;
+          }
+        }
+      `}</style>
     </>
   )
 }

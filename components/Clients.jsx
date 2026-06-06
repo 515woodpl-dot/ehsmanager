@@ -105,7 +105,7 @@ export default function Clients({ data, setData, toast, sessionTypes }) {
 
   return (
     <div>
-      <div style={T.pageHeader}>
+      <div style={T.pageHeader} className="page-header-wrap">
         <div>
           <div style={T.pageTitle}>Clients</div>
           <div style={T.pageSub}>{filtered.length} clients</div>
@@ -172,7 +172,7 @@ export default function Clients({ data, setData, toast, sessionTypes }) {
       {addModal && (
         <Modal title="Add client" onClose={() => setAddModal(false)} wide
           footer={<><button style={T.btn} onClick={() => setAddModal(false)}>Cancel</button><button style={T.btnPrimary} onClick={add}>Add client</button></>}>
-          <div style={T.formRow}>
+          <div style={T.formRow} className="form-row-2">
             <div style={T.formGroup}><label style={T.formLabel}>Full name</label><input style={T.formInput} value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} autoFocus /></div>
             <div style={T.formGroup}><label style={T.formLabel}>Session type</label>
               <select style={T.formInput} value={form.type} onChange={e => setForm({ ...form, type: e.target.value })}>
@@ -180,7 +180,7 @@ export default function Clients({ data, setData, toast, sessionTypes }) {
               </select>
             </div>
           </div>
-          <div style={T.formRow}>
+          <div style={T.formRow} className="form-row-2">
             <div style={T.formGroup}><label style={T.formLabel}>Email</label><input style={T.formInput} type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} /></div>
             <div style={T.formGroup}><label style={T.formLabel}>Phone</label><input style={T.formInput} value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} /></div>
           </div>
@@ -193,7 +193,7 @@ export default function Clients({ data, setData, toast, sessionTypes }) {
       {editModal && (
         <Modal title="Edit client" onClose={() => setEditModal(null)} wide
           footer={<><button style={{ ...T.btn, color: C.red, borderColor: C.red }} onClick={() => { del(editModal.id); setEditModal(null) }}>Delete</button><div style={{ flex: 1 }} /><button style={T.btn} onClick={() => setEditModal(null)}>Cancel</button><button style={T.btnPrimary} onClick={save}>Save</button></>}>
-          <div style={T.formRow}>
+          <div style={T.formRow} className="form-row-2">
             <div style={T.formGroup}><label style={T.formLabel}>Full name</label><input style={T.formInput} value={editModal.name} onChange={e => setEditModal({ ...editModal, name: e.target.value })} /></div>
             <div style={T.formGroup}><label style={T.formLabel}>Status</label>
               <select style={T.formInput} value={editModal.status} onChange={e => setEditModal({ ...editModal, status: e.target.value })}>
@@ -201,11 +201,11 @@ export default function Clients({ data, setData, toast, sessionTypes }) {
               </select>
             </div>
           </div>
-          <div style={T.formRow}>
+          <div style={T.formRow} className="form-row-2">
             <div style={T.formGroup}><label style={T.formLabel}>Email</label><input style={T.formInput} value={editModal.email || ''} onChange={e => setEditModal({ ...editModal, email: e.target.value })} /></div>
             <div style={T.formGroup}><label style={T.formLabel}>Phone</label><input style={T.formInput} value={editModal.phone || ''} onChange={e => setEditModal({ ...editModal, phone: e.target.value })} /></div>
           </div>
-          <div style={T.formRow}>
+          <div style={T.formRow} className="form-row-2">
             <div style={T.formGroup}><label style={T.formLabel}>Session date</label><input style={T.formInput} type="date" value={editModal.date || ''} onChange={e => setEditModal({ ...editModal, date: e.target.value })} /></div>
             <div style={T.formGroup}><label style={T.formLabel}>Type</label>
               <select style={T.formInput} value={editModal.type} onChange={e => setEditModal({ ...editModal, type: e.target.value })}>

@@ -16,7 +16,7 @@ export function Dashboard({ data, setView }) {
   const upcoming = data.bookings.filter(b => b.status === 'confirmed').length
   return (
     <div>
-      <div style={T.metricStrip}>
+      <div style={T.metricStrip} className="metric-strip">
         {[
           { label: 'Revenue collected', value: fmt$(totalRevenue), sub: 'all time' },
           { label: 'Outstanding', value: fmt$(outstanding), sub: `${data.invoices.filter(i => i.status !== 'paid').length} invoices` },
@@ -30,7 +30,7 @@ export function Dashboard({ data, setView }) {
           </div>
         ))}
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }} className="two-col-grid">
         <div style={T.card}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
             <div style={{ fontWeight: 500, fontSize: 14 }}>Recent clients</div>
@@ -88,12 +88,12 @@ export function Analytics({ data }) {
   const conv = data.clients.length ? Math.round(data.clients.filter(c => c.status !== 'inquiry').length / data.clients.length * 100) : 0
   return (
     <div>
-      <div style={{ ...T.metricStrip, gridTemplateColumns: 'repeat(3,1fr)', marginBottom: 20 }}>
+      <div style={{ ...T.metricStrip, gridTemplateColumns: 'repeat(3,1fr)', marginBottom: 20 }} className="metric-strip">
         {[{ label: 'Avg invoice value', value: fmt$(avg) }, { label: 'Conversion rate', value: conv + '%' }, { label: 'Total clients', value: data.clients.filter(c => !c.archived).length }].map((m, i) => (
           <div key={m.label} style={T.metricCell(i === 2)}><div style={T.metricLabel}>{m.label}</div><div style={T.metricValue}>{m.value}</div></div>
         ))}
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: 16 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: 16 }} className="two-col-grid">
         <div style={T.card}><div style={{ fontWeight: 500, fontSize: 14, marginBottom: 4 }}>Revenue trend</div><div style={{ fontSize: 12, color: C.muted, marginBottom: 18 }}>Last 6 months</div><div style={{ height: 230 }}><canvas ref={canvasRef} /></div></div>
         <div style={T.card}><div style={{ fontWeight: 500, fontSize: 14, marginBottom: 4 }}>Clients by stage</div><div style={{ fontSize: 12, color: C.muted, marginBottom: 18 }}>Current pipeline</div><div style={{ height: 230 }}><canvas ref={barRef} /></div></div>
       </div>
@@ -119,7 +119,7 @@ export function Calendar({ data, setData, toast }) {
   const types = data.sessionTypes || ['Family', 'Maternity', 'Newborn', 'Portrait']
   return (
     <div>
-      <div style={T.pageHeader}>
+      <div style={T.pageHeader} className="page-header-wrap">
         <div><div style={T.pageTitle}>Calendar</div><div style={T.pageSub}>{data.bookings.length} sessions</div></div>
         <div style={{ display: 'flex', gap: 10 }}>
           <div style={{ display: 'inline-flex', background: C.surface2, borderRadius: 8, padding: 3, gap: 2 }}>
@@ -138,7 +138,7 @@ export function Calendar({ data, setData, toast }) {
               <button style={T.btnSm} onClick={() => setCursor(new Date(y, mo + 1, 1))}>›</button>
             </div>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: 1, marginBottom: 1 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: 1, marginBottom: 1 }} className="cal-head-grid">
             {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => <div key={d} style={{ fontSize: 10, fontWeight: 600, color: C.faint, textAlign: 'center', padding: '6px 0', letterSpacing: '0.05em', textTransform: 'uppercase' }}>{d}</div>)}
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: 1, background: C.border, border: `1px solid ${C.border}`, borderRadius: 8, overflow: 'hidden' }}>
@@ -194,16 +194,23 @@ export function Calendar({ data, setData, toast }) {
 // ── Invoices ──────────────────────────────────────────────────────
 export function Invoices({ data, setData, toast }) {
   const [modal, setModal] = useState(false)
+  const [payModal, setPayModal] = useState(null) // invoice being marked paid
+  const [payMethod, setPayMethod] = useState(null)
   const blank = { client: '', amount: '', due: '', note: '' }
   const [form, setForm] = useState(blank)
   const add = () => { if (!form.client.trim() || !form.amount) return; setData(d => ({ ...d, invoices: [...d.invoices, { id: 'INV-' + String(d.invoices.length + 1).padStart(3, '0'), client: form.client, clientId: null, amount: parseFloat(form.amount), due: form.due, status: 'unpaid', paid: 0, note: form.note, paymentIntentId: null }] })); toast('Invoice created'); setModal(false); setForm(blank) }
-  const markPaid = id => { setData(d => ({ ...d, invoices: d.invoices.map(i => i.id === id ? { ...i, status: 'paid', paid: i.amount } : i) })); toast('Marked as paid') }
+  const confirmPaid = () => {
+    if (!payMethod) { toast('Select a payment method'); return }
+    const now = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+    setData(d => ({ ...d, invoices: d.invoices.map(i => i.id === payModal.id ? { ...i, status: 'paid', paid: i.amount, paymentMethod: payMethod, paidAt: now } : i) }))
+    toast(`Marked as paid · ${payMethod}`); setPayModal(null); setPayMethod(null)
+  }
   const del = id => { if (!confirm('Delete invoice?')) return; setData(d => ({ ...d, invoices: d.invoices.filter(i => i.id !== id) })); toast('Deleted') }
   const total = data.invoices.reduce((s, i) => s + i.amount, 0)
   const collected = data.invoices.reduce((s, i) => s + i.paid, 0)
   return (
     <div>
-      <div style={T.pageHeader}><div><div style={T.pageTitle}>Invoices</div><div style={T.pageSub}>{fmt$(collected)} collected · {fmt$(total - collected)} outstanding</div></div><button style={T.btnPrimary} onClick={() => setModal(true)}>+ New invoice</button></div>
+      <div style={T.pageHeader} className="page-header-wrap"><div><div style={T.pageTitle}>Invoices</div><div style={T.pageSub}>{fmt$(collected)} collected · {fmt$(total - collected)} outstanding</div></div><button style={T.btnPrimary} onClick={() => setModal(true)}>+ New invoice</button></div>
       <div style={T.card}>
         {data.invoices.map((inv, i) => {
           const pct = inv.amount > 0 ? Math.round(inv.paid / inv.amount * 100) : 0
@@ -216,7 +223,7 @@ export function Invoices({ data, setData, toast }) {
                   <div style={{ color: C.text }}>{inv.client}</div>
                   <Badge type={inv.status} label={inv.status} />
                 </div>
-                <div style={{ fontSize: 12, color: C.muted }}>Due {fmtDate(inv.due)}{inv.note ? ` · ${inv.note}` : ''}</div>
+                <div style={{ fontSize: 12, color: C.muted }}>Due {fmtDate(inv.due)}{inv.note ? ` · ${inv.note}` : ''}{inv.paymentMethod ? ` · Paid via ${inv.paymentMethod}` : ''}{inv.paidAt ? ` · ${inv.paidAt}` : ''}</div>
                 <div style={{ width: 160 }}><div style={T.progress}><div style={{ height: '100%', borderRadius: 2, background: inv.status === 'paid' ? C.green : inv.status === 'partial' ? C.amber : C.border2, width: pct + '%', transition: 'width 0.4s' }} /></div></div>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginLeft: 24 }}>
@@ -224,7 +231,7 @@ export function Invoices({ data, setData, toast }) {
                   <div style={{ fontFamily: "'DM Serif Display', Georgia, serif", fontSize: 20, letterSpacing: '-0.3px' }}>{fmt$(inv.amount)}</div>
                   {inv.status === 'partial' && <div style={{ fontSize: 11, color: C.muted }}>{fmt$(inv.paid)} paid</div>}
                 </div>
-                {inv.status !== 'paid' && owing > 0 && <button style={{ ...T.btnSm, color: C.green, borderColor: C.green }} onClick={() => markPaid(inv.id)}>Mark paid</button>}
+                {inv.status !== 'paid' && owing > 0 && <button style={{ ...T.btnSm, color: C.green, borderColor: C.green }} onClick={() => { setPayModal(inv); setPayMethod(null) }}>Mark paid</button>}
                 <button style={{ ...T.btnGhost, color: C.faint }} onClick={() => del(inv.id)}>×</button>
               </div>
             </div>
@@ -233,12 +240,44 @@ export function Invoices({ data, setData, toast }) {
       </div>
       {modal && (
         <Modal title="New invoice" onClose={() => setModal(false)} footer={<><button style={T.btn} onClick={() => setModal(false)}>Cancel</button><button style={T.btnPrimary} onClick={add}>Create</button></>}>
-          <div style={T.formRow}>
+          <div style={T.formRow} className="form-row-2">
             <div style={T.formGroup}><label style={T.formLabel}>Client</label><input style={T.formInput} list="cl2" value={form.client} onChange={e => setForm({ ...form, client: e.target.value })} /><datalist id="cl2">{data.clients.map(c => <option key={c.id} value={c.name} />)}</datalist></div>
             <div style={T.formGroup}><label style={T.formLabel}>Amount ($)</label><input style={T.formInput} type="number" value={form.amount} onChange={e => setForm({ ...form, amount: e.target.value })} /></div>
           </div>
           <div style={T.formGroup}><label style={T.formLabel}>Due date</label><input style={T.formInput} type="date" value={form.due} onChange={e => setForm({ ...form, due: e.target.value })} /></div>
           <div style={T.formGroup}><label style={T.formLabel}>Note</label><input style={T.formInput} value={form.note} onChange={e => setForm({ ...form, note: e.target.value })} /></div>
+        </Modal>
+      )}
+
+      {/* 1.6 — Payment method modal */}
+      {payModal && (
+        <Modal title="How was this payment received?" onClose={() => { setPayModal(null); setPayMethod(null) }}
+          footer={<><button style={T.btn} onClick={() => { setPayModal(null); setPayMethod(null) }}>Cancel</button><button style={T.btnPrimary} onClick={confirmPaid}>Confirm payment</button></>}>
+          <div style={{ marginBottom: 16, padding: '12px 16px', background: C.surface2, borderRadius: 10, fontSize: 13 }}>
+            <div style={{ fontWeight: 500 }}>{payModal.id} · {payModal.client}</div>
+            <div style={{ color: C.muted, marginTop: 2 }}>Amount: <strong style={{ color: C.text }}>${payModal.amount.toLocaleString()}</strong></div>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {[
+              { value: 'Cash', label: 'Cash', desc: 'Payment received in cash' },
+              { value: 'Credit Card', label: 'Credit Card', desc: 'Manual card payment (not via Stripe)' },
+              { value: 'Gift / Complimentary', label: 'Gift / Complimentary', desc: 'No charge — gift or comp session' },
+            ].map(opt => (
+              <div key={opt.value} onClick={() => setPayMethod(opt.value)}
+                style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 16px', borderRadius: 10, border: `1.5px solid ${payMethod === opt.value ? C.text : C.border}`, background: payMethod === opt.value ? C.surface3 : C.surface, cursor: 'pointer', transition: 'all 0.12s' }}>
+                <div style={{ width: 20, height: 20, borderRadius: '50%', border: `2px solid ${payMethod === opt.value ? C.text : C.border2}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  {payMethod === opt.value && <div style={{ width: 10, height: 10, borderRadius: '50%', background: C.text }} />}
+                </div>
+                <div>
+                  <div style={{ fontWeight: 500, fontSize: 14 }}>{opt.label}</div>
+                  <div style={{ fontSize: 12, color: C.muted }}>{opt.desc}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div style={{ marginTop: 14, fontSize: 12, color: C.faint, padding: '10px 14px', background: C.surface2, borderRadius: 8 }}>
+            Stripe payments mark invoices as paid automatically via webhook — no manual step needed.
+          </div>
         </Modal>
       )}
     </div>
@@ -256,7 +295,7 @@ export function Contracts({ data, setData, toast }) {
   const del = id => { if (!confirm('Delete contract?')) return; setData(d => ({ ...d, contracts: d.contracts.filter(k => k.id !== id) })); toast('Deleted') }
   return (
     <div>
-      <div style={T.pageHeader}><div><div style={T.pageTitle}>Contracts</div><div style={T.pageSub}>{data.contracts.filter(k => k.status === 'signed').length} signed · {data.contracts.filter(k => k.status === 'pending').length} pending</div></div><button style={T.btnPrimary} onClick={() => setModal(true)}>+ New contract</button></div>
+      <div style={T.pageHeader} className="page-header-wrap"><div><div style={T.pageTitle}>Contracts</div><div style={T.pageSub}>{data.contracts.filter(k => k.status === 'signed').length} signed · {data.contracts.filter(k => k.status === 'pending').length} pending</div></div><button style={T.btnPrimary} onClick={() => setModal(true)}>+ New contract</button></div>
       <div style={T.card}>
         {data.contracts.map((k, i) => (
           <div key={k.id} style={{ ...T.dataRow, borderBottom: i === data.contracts.length - 1 ? 'none' : `1px solid ${C.border}` }}>
@@ -304,8 +343,8 @@ export function Inbox({ data, setData, toast }) {
   const sendNew = () => { if (!nf.to.trim()) return; const nm = { id: uid(), from: nf.to, thread: [{ id: uid(), from: 'You', text: nf.body, time: 'Just now', out: true }], unread: false }; setData(d => ({ ...d, messages: [nm, ...d.messages] })); setActiveId(nm.id); setNewModal(false); setNf({ to: '', body: '' }); toast('Sent') }
   return (
     <div>
-      <div style={T.pageHeader}><div><div style={T.pageTitle}>Inbox</div><div style={T.pageSub}>{data.messages.filter(m => m.unread).length} unread</div></div><button style={T.btnPrimary} onClick={() => setNewModal(true)}>+ Compose</button></div>
-      <div style={{ display: 'grid', gridTemplateColumns: '270px 1fr', border: `1px solid ${C.border}`, borderRadius: 12, overflow: 'hidden', minHeight: 500 }}>
+      <div style={T.pageHeader} className="page-header-wrap"><div><div style={T.pageTitle}>Inbox</div><div style={T.pageSub}>{data.messages.filter(m => m.unread).length} unread</div></div><button style={T.btnPrimary} onClick={() => setNewModal(true)}>+ Compose</button></div>
+      <div style={{ display: 'grid', gridTemplateColumns: '270px 1fr', border: `1px solid ${C.border}`, borderRadius: 12, overflow: 'hidden', minHeight: 500 }} className="inbox-grid-wrap">
         <div style={{ borderRight: `1px solid ${C.border}`, overflowY: 'auto' }}>
           {data.messages.map(m => (
             <div key={m.id} onClick={() => { setActiveId(m.id); markRead(m.id) }} style={{ padding: '13px 16px', borderBottom: `1px solid ${C.border}`, cursor: 'pointer', background: activeId === m.id ? C.surface2 : C.surface }}>

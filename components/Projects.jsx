@@ -51,7 +51,7 @@ function CardModal({ client, stages, sessionTypes, data, setData, onClose, toast
   return (
     <>
     <div style={T.overlay} onClick={e => { if (e.target === e.currentTarget) onClose() }}>
-      <div style={{ background: C.surface, borderRadius: 16, width: '100%', maxWidth: 900, maxHeight: '92vh', overflow: 'hidden', boxShadow: '0 20px 60px rgba(0,0,0,0.14)', display: 'flex', flexDirection: 'column' }}>
+      <div style={{ background: C.surface, borderRadius: 16, width: '100%', maxWidth: 900, maxHeight: '92vh', overflow: 'hidden', boxShadow: '0 20px 60px rgba(0,0,0,0.14)', display: 'flex', flexDirection: 'column' }} className="card-modal-inner">
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '20px 28px', borderBottom: `1px solid ${C.border}`, flexShrink: 0 }}>
           <Avatar name={client.name} size={42} />
@@ -64,10 +64,10 @@ function CardModal({ client, stages, sessionTypes, data, setData, onClose, toast
         </div>
 
         {/* Body */}
-        <div style={{ display: 'grid', gridTemplateColumns: '300px 1fr', flex: 1, overflow: 'hidden' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '300px 1fr', flex: 1, overflow: 'hidden' }} className="card-modal-body">
 
           {/* LEFT PANEL */}
-          <div style={{ borderRight: `1px solid ${C.border}`, padding: '22px 20px', overflowY: 'auto' }}>
+          <div style={{ borderRight: `1px solid ${C.border}`, padding: '22px 20px', overflowY: 'auto' }} className="card-modal-left">
             {/* Tabs */}
             <div style={{ display: 'flex', gap: 2, background: C.surface2, borderRadius: 8, padding: 3, marginBottom: 20 }}>
               {[{ id: 'getstarted', label: 'Get Started' }, { id: 'activity', label: 'Activity' }].map(tab => (
@@ -141,7 +141,7 @@ function CardModal({ client, stages, sessionTypes, data, setData, onClose, toast
 
           {/* RIGHT PANEL — Client details */}
           <div style={{ padding: '22px 26px', overflowY: 'auto' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }} className="page-header-wrap">
               <div style={{ fontFamily: "'DM Serif Display', Georgia, serif", fontSize: 17 }}>Client details</div>
               {!editing
                 ? <button style={T.btnSm} onClick={() => setEditing(true)}>Edit</button>
@@ -154,7 +154,7 @@ function CardModal({ client, stages, sessionTypes, data, setData, onClose, toast
 
             {editing ? (
               <>
-                <div style={T.formRow}>
+                <div style={T.formRow} className="form-row-2">
                   <div style={T.formGroup}><label style={T.formLabel}>Full name</label><input style={T.formInput} value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} /></div>
                   <div style={T.formGroup}><label style={T.formLabel}>Session type</label>
                     <select style={T.formInput} value={form.type} onChange={e => setForm({ ...form, type: e.target.value })}>
@@ -162,11 +162,11 @@ function CardModal({ client, stages, sessionTypes, data, setData, onClose, toast
                     </select>
                   </div>
                 </div>
-                <div style={T.formRow}>
+                <div style={T.formRow} className="form-row-2">
                   <div style={T.formGroup}><label style={T.formLabel}>Email</label><input style={T.formInput} type="email" value={form.email || ''} onChange={e => setForm({ ...form, email: e.target.value })} /></div>
                   <div style={T.formGroup}><label style={T.formLabel}>Phone</label><input style={T.formInput} value={form.phone || ''} onChange={e => setForm({ ...form, phone: e.target.value })} /></div>
                 </div>
-                <div style={T.formRow}>
+                <div style={T.formRow} className="form-row-2">
                   <div style={T.formGroup}><label style={T.formLabel}>Session date</label><input style={T.formInput} type="date" value={form.date || ''} onChange={e => setForm({ ...form, date: e.target.value })} /></div>
                   <div style={T.formGroup}><label style={T.formLabel}>Status</label>
                     <select style={T.formInput} value={form.status} onChange={e => setForm({ ...form, status: e.target.value })}>
@@ -283,11 +283,11 @@ function NewProjectModal({ stages, sessionTypes, onAdd, onClose, onAddType }) {
     <Modal title="New project" onClose={onClose}
       footer={<><button style={T.btn} onClick={onClose}>Cancel</button><button style={T.btnPrimary} onClick={submit}>Create project</button></>}>
       <div style={T.formGroup}><label style={T.formLabel}>Full name</label><input style={T.formInput} value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="Client name" autoFocus /></div>
-      <div style={T.formRow}>
+      <div style={T.formRow} className="form-row-2">
         <div style={T.formGroup}><label style={T.formLabel}>Email</label><input style={T.formInput} type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} placeholder="email@example.com" /></div>
         <div style={T.formGroup}><label style={T.formLabel}>Phone</label><input style={T.formInput} value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} placeholder="(555) 000-0000" /></div>
       </div>
-      <div style={T.formRow}>
+      <div style={T.formRow} className="form-row-2">
         <div style={T.formGroup}>
           <label style={T.formLabel}>Session type</label>
           {addingType ? (
@@ -331,7 +331,7 @@ function BoardView({ clients, stages, onCardClick, setData, toast }) {
   }
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: `repeat(${stages.length}, minmax(200px, 1fr))`, gap: 10, alignItems: 'start', overflowX: 'auto', paddingBottom: 8 }}>
+    <div style={{ display: 'grid', gridTemplateColumns: `repeat(${stages.length}, minmax(200px, 1fr))`, gap: 10, alignItems: 'start', overflowX: 'auto', paddingBottom: 8 }} className="kanban-board">
       {stages.map(stage => {
         const cards = clients.filter(c => c.status === stage.id)
         return (
@@ -482,7 +482,7 @@ export default function Projects({ data, setData, toast }) {
       </div>
 
       {/* Toolbar */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20, flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20, flexWrap: 'wrap' }} className="toolbar-wrap">
         {/* View toggle */}
         <Seg
           options={[{ value: 'board', label: 'Board' }, { value: 'list', label: 'List' }, { value: 'archive', label: `Archive${archivedClients.length > 0 ? ` (${archivedClients.length})` : ''}` }]}

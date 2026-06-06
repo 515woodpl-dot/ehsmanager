@@ -33,9 +33,9 @@ export function InvoiceModal({ client, data, setData, toast, onClose }) {
   }
 
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.22)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20, backdropFilter: 'blur(4px)' }}
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.22)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20, backdropFilter: 'blur(4px)' }} className="modal-wrap"
       onClick={e => { if (e.target === e.currentTarget) onClose() }}>
-      <div style={{ background: C.surface, borderRadius: 16, padding: 30, width: '100%', maxWidth: 780, maxHeight: '92vh', overflowY: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,0.14)' }}>
+      <div style={{ background: C.surface, borderRadius: 16, padding: 30, width: '100%', maxWidth: 780, maxHeight: '92vh', overflowY: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,0.14)' }} className="modal-inner">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
           <div style={T.modalTitle}>New Invoice — {client.name}</div>
           <button onClick={onClose} style={{ ...T.btnGhost, fontSize: 20, color: C.muted }}>×</button>
@@ -96,9 +96,9 @@ export function QuoteModal({ client, data, setData, toast, onClose }) {
   const clientQuotes = (data.quotes || []).filter(q => q.clientId === client.id)
 
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.22)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20, backdropFilter: 'blur(4px)' }}
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.22)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20, backdropFilter: 'blur(4px)' }} className="modal-wrap"
       onClick={e => { if (e.target === e.currentTarget) onClose() }}>
-      <div style={{ background: C.surface, borderRadius: 16, padding: 30, width: '100%', maxWidth: 780, maxHeight: '92vh', overflowY: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,0.14)' }}>
+      <div style={{ background: C.surface, borderRadius: 16, padding: 30, width: '100%', maxWidth: 780, maxHeight: '92vh', overflowY: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,0.14)' }} className="modal-inner">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
           <div style={T.modalTitle}>New Quote — {client.name}</div>
           <button onClick={onClose} style={{ ...T.btnGhost, fontSize: 20, color: C.muted }}>×</button>
@@ -154,9 +154,9 @@ export function ContractModal({ client, data, setData, toast, onClose }) {
   }
 
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.22)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20, backdropFilter: 'blur(4px)' }}
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.22)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20, backdropFilter: 'blur(4px)' }} className="modal-wrap"
       onClick={e => { if (e.target === e.currentTarget) onClose() }}>
-      <div style={{ background: C.surface, borderRadius: 16, padding: 30, width: '100%', maxWidth: 760, maxHeight: '92vh', overflowY: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,0.14)' }}>
+      <div style={{ background: C.surface, borderRadius: 16, padding: 30, width: '100%', maxWidth: 760, maxHeight: '92vh', overflowY: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,0.14)' }} className="modal-inner">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
           <div style={T.modalTitle}>New Contract — {client.name}</div>
           <button onClick={onClose} style={{ ...T.btnGhost, fontSize: 20, color: C.muted }}>×</button>
@@ -277,7 +277,7 @@ export function SessionModal({ client, data, setData, toast, onClose }) {
   return (
     <Modal title={`Schedule Session — ${client.name}`} onClose={onClose}
       footer={<><button style={T.btn} onClick={onClose}>Cancel</button><button style={T.btnPrimary} onClick={save}>Schedule session</button></>}>
-      <div style={T.formRow}>
+      <div style={T.formRow} className="form-row-2">
         <div style={T.formGroup}>
           <label style={T.formLabel}>Session type</label>
           <select style={T.formInput} value={form.type} onChange={e => setForm({ ...form, type: e.target.value })}>
@@ -289,7 +289,7 @@ export function SessionModal({ client, data, setData, toast, onClose }) {
           <input style={T.formInput} type="date" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} />
         </div>
       </div>
-      <div style={T.formRow}>
+      <div style={T.formRow} className="form-row-2">
         <div style={T.formGroup}>
           <label style={T.formLabel}>Time</label>
           <input style={T.formInput} type="time" value={form.time} onChange={e => setForm({ ...form, time: e.target.value })} />
