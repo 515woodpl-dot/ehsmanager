@@ -320,7 +320,7 @@ export function Contracts({ data, setData, toast }) {
       {modal && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.22)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20, backdropFilter: 'blur(4px)' }} className="modal-wrap"
           onClick={e => { if (e.target === e.currentTarget) setModal(false) }}>
-          <div style={{ background: C.surface, borderRadius: 16, padding: 30, width: '100%', maxWidth: 740, maxHeight: '92vh', display: 'flex', flexDirection: 'column', boxShadow: '0 20px 60px rgba(0,0,0,0.14)' }} className="modal-inner">
+          <div style={{ background: C.surface, borderRadius: 16, padding: 30, width: '100%', maxWidth: 740, maxHeight: '92vh', overflowY: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,0.14)' }} className="modal-inner">
             <ContractBuilder
               client={null}
               data={data}
