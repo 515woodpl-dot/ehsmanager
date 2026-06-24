@@ -1,132 +1,184 @@
-# EHS Studio Manager — Session Notes
-## Changes built: 1.4 (Action Modals)
+# EHS Studio Manager — Session Handoff
+## Use this to start a new chat with Claude
 
 ---
 
-## What was built
+## GitHub Repo
 
-### 1.4a — Invoice modal (full line-item builder)
-- Item name, description, qty, price per line
-- Add / remove unlimited items
-- Subtotal → discount (% or $) → tax (%) → total
-- Notes field ("Thank you for your business")
-- Due date picker
-- Shows previous invoices for same client
-- Creates and links invoice to client on save
+**https://github.com/515woodpl-dot/ehsmanager**
 
-### 1.4b — Contract modal (auto-fill from your real template)
-- Pre-fills: client name, email, session type, session date/time, location, total fee, retainer (50%), remaining amount, due date, effective date
-- Edit / Preview tab toggle
-- Editable before saving
-- Saves linked to client
-
-### 1.4c — Quote modal
-- Same line-item builder as invoice
-- Valid until date
-- Shows previous quotes; click any to reload it as a starting point
-- Saves to `quotes[]` linked to client
-
-### 1.4d — Questionnaire modal
-- Editable title
-- Default questions pre-loaded (How did you hear about us? etc.)
-- Add custom questions, set type: short text / long text / yes-no
-- Remove any question
-- Saves to `questionnaires[]` linked to client
-
-### 1.4e — Session modal
-- Session type (from your custom types)
-- Date (required), time, location
-- Notes for client
-- Live preview of scheduled session
-- Creates booking linked to client
-
-### 1.4f — Message modal
-- Shows last 3 messages in existing thread (if any)
-- Compose new message
-- Saves directly to Inbox thread for that client
-
-### 1.4g — Gallery modal
-- Paste gallery URL + optional label
-- Multiple links per client
-- Links saved to client record, open in new tab
+Username: `515woodpl-dot`
+Token: `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`
 
 ---
 
-## Deploy to server
+## Live URL
 
-```bash
-# On your local machine
-cd /path/to/project
-git add -A
-git commit -m "1.4 - Action modals: Invoice, Contract, Quote, Questionnaire, Session, Message, Gallery"
-git push origin main
+**https://manager.elliesheartstrings.com**
+Public contact form: **https://manager.elliesheartstrings.com/contact**
+Main website (separate app): **https://elliesheartstrings.com**
 
-# On the server
-ssh root@YOUR_DROPLET_IP
-cd /var/www/ehsmanager
-git fetch origin
-git reset --hard origin/main
-npm install
-npm run build
-pm2 restart studio-manager
+---
+
+## Server
+
+- **Digital Ocean droplet:** 165.227.198.183
+- **OS:** Ubuntu 24
+- **Main site:** port 3000 (PM2 process: `ellies`)
+- **Studio Manager:** port 3001 (PM2 process: `studio-manager`)
+- **Nginx:** reverse proxy with SSL via Let's Encrypt
+- **Deploy command:** `bash /var/www/ehsmanager/deploy.sh`
+
+---
+
+## Environment Variables
+
+Live in `/var/www/ehsmanager/.env.local` on the server (not in git):
+
+```
+NEXT_PUBLIC_SUPABASE_URL=https://jniqpltbpqukpanvardt.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpuaXFwbHRicHF1a3BhbnZhcmR0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIyNzM5NzMsImV4cCI6MjA5Nzg0OTk3M30.EkanvQ0Xed9e62VS5rxHsjTOPSoE8tYjg8wGydkpnz8
+SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpuaXFwbHRicHF1a3BhbnZhcmR0Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MjI3Mzk3MywiZXhwIjoyMDk3ODQ5OTczfQ.m-qNwy2W9rNTCS7ljA3S2SRUFUSw7XgBJhapFDIGRzA
+RESEND_API_KEY=re_YkAAkb6T_6QCNDm47NCrprB4yQ74WQY3V
+HEARTBEAT_SECRET=ehs-heartbeat-2026
 ```
 
 ---
 
-## Pending changes (locked, not yet built)
+## Tech Stack
 
-| ID | Description | Status |
-|----|-------------|--------|
-| 1.2 | Projects rebuild | ✅ Built |
-| 1.2.1 | Project modal tweaks, CSV import, icon sizing | ✅ Built |
-| 1.3 | Contact form + public /contact page | ✅ Built |
-| 1.4 | Action modals (Invoice, Contract, Quote, etc.) | ✅ Built |
-
----
-
-## Next session ideas to consider
-
-- **1.5** — Invoice PDF export (generate a printable/downloadable PDF from an invoice)
-- **1.6** — Client portal (public page where clients can view their contract, invoice, pay, fill questionnaire)
-- **1.7** — Email notifications (send invoice/contract to client email via SendGrid or Resend)
-- **1.8** — Dashboard notifications / reminders (upcoming sessions, overdue invoices)
-- **Stripe live keys** — swap test keys for live keys when ready to accept real payments
+- Next.js 14.2.3 (Pages Router)
+- React 18
+- Chart.js (analytics)
+- Stripe (API routes ready, no keys connected yet)
+- papaparse + xlsx (CSV/XLSX import)
+- **Supabase** (Postgres + Auth) — Phase 1 complete
+- **Resend** (transactional email) — Phase 3 complete
+- PM2 + Nginx on Digital Ocean
 
 ---
 
-## File structure reference
+## Supabase
+
+- **Project URL:** https://jniqpltbpqukpanvardt.supabase.co
+- **Schema:** already run — all tables created with RLS + auto-signup trigger
+- **Free tier note:** Supabase pauses after 1 week of inactivity. Heartbeat cron keeps it alive.
+
+---
+
+## Resend
+
+- **Sending from:** hello@elliesheartstrings.com
+- **Domain:** already verified (used for receiving on main site)
+- **2nd API key** used for studio manager (separate from main site key)
+
+---
+
+## File Structure
 
 ```
 ehsmanager/
 ├── components/
-│   ├── ActionModals.jsx     ← NEW — all 7 action modals
-│   ├── LineItemBuilder.jsx  ← NEW — shared invoice/quote line items
-│   ├── Projects.jsx         ← UPDATED — wired up action modals
+│   ├── ActionModals.jsx
 │   ├── Clients.jsx
 │   ├── ContactForm.jsx
-│   ├── Pages.jsx
+│   ├── ContractBuilder.jsx
+│   ├── LineItemBuilder.jsx
+│   ├── Pages.jsx             — Dashboard, Analytics, Calendar, Invoices, Contracts, Inbox
+│   ├── Projects.jsx
 │   └── UI.jsx
 ├── lib/
-│   ├── contractTemplate.js  ← NEW — Ellie's contract with auto-fill
-│   ├── data.js              ← UPDATED — added quotes, questionnaires
+│   ├── contractTemplate.js
+│   ├── data.js               — Seed data, localStorage helpers
+│   ├── db.js                 — Supabase data layer (all CRUD, localStorage fallback)
+│   ├── email.js              — Resend client + branded HTML email wrapper
 │   ├── stripe.js
+│   ├── supabase.js           — Supabase client singleton
 │   └── tokens.js
 ├── pages/
-│   ├── index.js
-│   ├── contact.js
-│   ├── _app.js
+│   ├── _app.js               — Auth-aware wrapper
+│   ├── index.js              — Main app
+│   ├── login.js              — Login/signup page
+│   ├── contact.js            — Public contact form
 │   └── api/
 │       ├── create-payment-intent.js
+│       ├── email-contract.js
+│       ├── email-invoice.js
+│       ├── email-lead.js
+│       ├── email-reminder.js
+│       ├── heartbeat.js
 │       └── webhook.js
-└── styles/
-    └── globals.css
+├── scripts/
+│   └── heartbeat.sh
+├── styles/
+│   └── globals.css
+├── supabase-schema.sql       — Run once in Supabase SQL editor
+├── deploy.sh
+└── SESSION-NOTES.md
 ```
 
 ---
 
-## Notes
+## Features Built
 
-- All data saved to `localStorage` under key `ehs-studio-v1`
-- Contract template lives in `lib/contractTemplate.js` — edit it there to update the default text
-- Stripe keys go in `.env.local` (copy from `.env.local.example`)
-- App runs on port 3001 in production (`npm start`)
+| Version | Feature |
+|---------|---------|
+| 1.0–1.8 | Full CRM: projects, clients, calendar, invoices, contracts, inbox, contact form, mobile |
+| 1.9 | Analytics real data, contract signature modal |
+| 2.0 | Supabase auth + database (Phase 1) |
+| 2.1 | Supabase heartbeat (API route + cron) |
+| 2.2 | Resend email: invoices, contracts, reminders, lead notifications (Phase 3) |
+
+---
+
+## First-Time Server Setup (THIS SESSION's code not yet deployed)
+
+```bash
+# 1. Deploy
+bash /var/www/ehsmanager/deploy.sh
+
+# 2. Set env vars
+nano /var/www/ehsmanager/.env.local
+# Paste the env vars from the Environment Variables section above
+
+# 3. Restart to pick up env vars
+cd /var/www/ehsmanager && pm2 restart studio-manager
+
+# 4. Heartbeat cron (one-time)
+chmod +x /var/www/ehsmanager/scripts/heartbeat.sh
+crontab -e
+# Add: 0 8 */3 * * /var/www/ehsmanager/scripts/heartbeat.sh >> /var/log/ehs-heartbeat.log 2>&1
+
+# 5. Run Supabase schema (one-time)
+# supabase.com → SQL Editor → paste supabase-schema.sql → Run
+```
+
+---
+
+## Known Issues
+
+- Gallery is URL-only (no file upload)
+- Contract signing stores typed name — no DocuSign-style service
+- No PDF export for invoices or contracts
+- Stripe not connected (routes exist, no keys)
+
+---
+
+## SaaS Roadmap
+
+| Phase | Status | Description |
+|-------|--------|-------------|
+| Phase 1 | ✅ Done | Supabase auth + database |
+| Phase 2 | Pending | Stripe Billing (subscriptions) + Stripe Connect (client payments) |
+| Phase 3 | ✅ Done | Resend email (invoices, contracts, reminders, lead notifications) |
+| Phase 4 | Pending | PDF export, onboarding flow, landing page |
+
+**Pricing:** Free ($0, 5 clients) / Pro ($19/mo) / Business ($39/mo, team)
+
+---
+
+## How to Start Next Session
+
+Paste this entire document and say:
+
+> "Here's my project context. I'm building EHS Studio Manager. The GitHub repo is https://github.com/515woodpl-dot/ehsmanager. I want to work on [whatever you want next]."
