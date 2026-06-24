@@ -77,6 +77,12 @@ export default function ContactPage() {
       type: settings.contactType || 'Lead',
     }
     saveData(lead, settings)
+    // Fire lead notification email (non-blocking)
+    fetch('/api/email-lead', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ lead }),
+    }).catch(() => {}) // silent fail — don't block the UX
     setTimeout(() => {
       setLoading(false)
       if (settings.afterSubmit === 'redirect' && settings.redirectUrl) {

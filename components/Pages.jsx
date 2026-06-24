@@ -273,6 +273,17 @@ export function Calendar({ data, setData, toast, openClientCard }) {
   const add = () => { if (!form.client.trim()) return; setData(d => ({ ...d, bookings: [...d.bookings, { id: uid(), ...form, status: 'pending' }] })); toast('Booking added'); setModal(false); setForm(blank) }
   const toggle = id => { setData(d => ({ ...d, bookings: d.bookings.map(b => b.id === id ? { ...b, status: b.status === 'confirmed' ? 'pending' : 'confirmed' } : b) })); toast('Status updated') }
   const del = id => { if (!confirm('Delete booking?')) return; setData(d => ({ ...d, bookings: d.bookings.filter(b => b.id !== id) })); toast('Deleted') }
+  const [sendingReminder, setSendingReminder] = useState(null)
+  const sendReminder = async (b) => {
+    const client = data.clients.find(c => c.id === b.clientId || c.name === b.client)
+    if (!client?.email) { toast('No email address for this client'); return }
+    setSendingReminder(b.id)
+    try {
+      const r = await fetch('/api/email-reminder', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ booking: b, clientEmail: client.email, clientName: client.name }) })
+      if (r.ok) { toast('Reminder sent to ' + client.email) } else { toast('Failed to send') }
+    } catch { toast('Failed to send') }
+    setSendingReminder(null)
+  }
   const types = data.sessionTypes || ['Family', 'Maternity', 'Newborn', 'Portrait']
   return (
     <div>
@@ -327,6 +338,7 @@ export function Calendar({ data, setData, toast, openClientCard }) {
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                 {(() => { const clientObj = data.clients.find(c => c.id === b.clientId || c.name === b.client); return clientObj ? <button style={T.btnSm} onClick={() => openClientCard(clientObj)}>Open project</button> : null })()}
+                <button style={T.btnSm} onClick={() => sendReminder(b)} disabled={sendingReminder === b.id}>{sendingReminder === b.id ? 'Sending...' : 'Remind'}</button>
                 <Badge type={b.status} label={b.status} />
                 <button style={{ ...T.btnGhost, color: C.red }} onClick={() => del(b.id)}>×</button>
               </div>
@@ -357,8 +369,19 @@ export function Invoices({ data, setData, toast }) {
   const [modal, setModal] = useState(false)
   const [payModal, setPayModal] = useState(null) // invoice being marked paid
   const [payMethod, setPayMethod] = useState(null)
+  const [sending, setSending] = useState(null) // invoiceId being emailed
   const blank = { client: '', amount: '', due: '', note: '' }
   const [form, setForm] = useState(blank)
+  const sendInvoice = async (inv) => {
+    const client = data.clients.find(c => c.id === inv.clientId || c.name === inv.client)
+    if (!client?.email) { toast('No email address for this client'); return }
+    setSending(inv.id)
+    try {
+      const r = await fetch('/api/email-invoice', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ invoice: inv, clientEmail: client.email, clientName: client.name }) })
+      if (r.ok) { toast('Invoice sent to ' + client.email) } else { toast('Failed to send email') }
+    } catch { toast('Failed to send email') }
+    setSending(null)
+  }
   const add = () => { if (!form.client.trim() || !form.amount) return; setData(d => ({ ...d, invoices: [...d.invoices, { id: 'INV-' + String(d.invoices.length + 1).padStart(3, '0'), client: form.client, clientId: null, amount: parseFloat(form.amount), due: form.due, status: 'unpaid', paid: 0, note: form.note, paymentIntentId: null }] })); toast('Invoice created'); setModal(false); setForm(blank) }
   const confirmPaid = () => {
     if (!payMethod) { toast('Select a payment method'); return }
@@ -393,6 +416,7 @@ export function Invoices({ data, setData, toast }) {
                   {inv.status === 'partial' && <div style={{ fontSize: 11, color: C.muted }}>{fmt$(inv.paid)} paid</div>}
                 </div>
                 {inv.status !== 'paid' && owing > 0 && <button style={{ ...T.btnSm, color: C.green, borderColor: C.green }} onClick={() => { setPayModal(inv); setPayMethod(null) }}>Mark paid</button>}
+                <button style={T.btnSm} onClick={() => sendInvoice(inv)} disabled={sending === inv.id}>{sending === inv.id ? 'Sending...' : 'Send'}</button>
                 <button style={{ ...T.btnGhost, color: C.faint }} onClick={() => del(inv.id)}>×</button>
               </div>
             </div>
@@ -451,8 +475,19 @@ export function Contracts({ data, setData, toast }) {
   const [viewModal, setViewModal] = useState(null)
   const [signModal, setSignModal] = useState(null)
   const [signName, setSignName] = useState('')
+  const [sending, setSending] = useState(null)
   const blank = { client: '', type: '', body: '' }
   const [form, setForm] = useState(blank)
+  const sendContract = async (k) => {
+    const client = data.clients.find(c => c.id === k.clientId || c.name === k.client)
+    if (!client?.email) { toast('No email address for this client'); return }
+    setSending(k.id)
+    try {
+      const r = await fetch('/api/email-contract', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contract: k, clientEmail: client.email, clientName: client.name }) })
+      if (r.ok) { toast('Contract sent to ' + client.email) } else { toast('Failed to send email') }
+    } catch { toast('Failed to send email') }
+    setSending(null)
+  }
   const add = () => { if (!form.client.trim()) return; setData(d => ({ ...d, contracts: [...d.contracts, { id: uid(), ...form, clientId: null, sent: todayLabel(), status: 'pending' }] })); toast('Contract created'); setModal(false); setForm(blank) }
   const confirmSign = () => {
     if (!signName.trim()) { toast('Please type your full name to sign'); return }
@@ -474,6 +509,7 @@ export function Contracts({ data, setData, toast }) {
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <Badge type={k.status} label={k.status} />
               <button style={T.btnSm} onClick={() => setViewModal(k)}>View</button>
+              <button style={T.btnSm} onClick={() => sendContract(k)} disabled={sending === k.id}>{sending === k.id ? 'Sending...' : 'Send'}</button>
               {k.status === 'pending' && <button style={{ ...T.btnSm, color: C.green, borderColor: C.green }} onClick={() => { setSignModal(k); setSignName('') }}>Sign</button>}
               {k.status === 'signed' && k.signedBy && <div style={{ fontSize: 11, color: C.muted }}>Signed by {k.signedBy} · {k.signedAt}</div>}
               <button style={{ ...T.btnGhost, color: C.faint }} onClick={() => del(k.id)}>×</button>
