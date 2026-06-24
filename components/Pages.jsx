@@ -71,32 +71,188 @@ export function Dashboard({ data, setView }) {
   )
 }
 
+// ── Analytics helpers ──────────────────────────────────────────────
+function buildRevenueByMonth(invoices) {
+  const now = new Date()
+  const months = []
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+    months.push({ label: d.toLocaleDateString('en-US', { month: 'short' }), year: d.getFullYear(), month: d.getMonth() })
+  }
+  return months.map(m => ({
+    label: m.label,
+    value: invoices
+      .filter(inv => {
+        if (!inv.due) return false
+        const d = new Date(inv.due)
+        return d.getFullYear() === m.year && d.getMonth() === m.month && inv.status === 'paid'
+      })
+      .reduce((s, inv) => s + (inv.paid || 0), 0)
+  }))
+}
+
+function buildSessionTypeBreakdown(clients, sessionTypes) {
+  return (sessionTypes || []).map(t => ({
+    label: t,
+    value: clients.filter(c => !c.archived && c.type === t).length
+  })).filter(x => x.value > 0)
+}
+
 // ── Analytics ─────────────────────────────────────────────────────
 export function Analytics({ data }) {
-  const canvasRef = useRef(); const barRef = useRef()
+  const canvasRef = useRef(); const barRef = useRef(); const typeRef = useRef()
+
+  // Compute real data outside effect so we can use it in deps
+  const revenueData = buildRevenueByMonth(data.invoices)
+  const stageData = { stages: data.stages || [], clients: data.clients }
+  const typeData = buildSessionTypeBreakdown(data.clients, data.sessionTypes)
+
   useEffect(() => {
     if (typeof window === 'undefined') return
     const charts = []
     import('chart.js/auto').then(({ default: Chart }) => {
       const gridColor = C.border
       const baseOpts = { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { backgroundColor: C.text, titleColor: '#fff', bodyColor: 'rgba(255,255,255,0.7)', padding: 10, cornerRadius: 8 } } }
-      if (canvasRef.current) charts.push(new Chart(canvasRef.current, { type: 'line', data: { labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'], datasets: [{ data: [2100, 1800, 3400, 2600, 4200, 5100], borderColor: C.text, backgroundColor: 'rgba(17,17,16,0.04)', fill: true, tension: 0.4, borderWidth: 1.5, pointBackgroundColor: C.text, pointRadius: 3 }] }, options: { ...baseOpts, scales: { y: { grid: { color: gridColor }, border: { display: false }, ticks: { color: C.muted, callback: v => '$' + v / 1000 + 'k', font: { size: 11 } } }, x: { grid: { display: false }, border: { display: false }, ticks: { color: C.muted, font: { size: 11 } } } } } }))
-      if (barRef.current) { const stages = data.stages || []; const vals = stages.map(s => data.clients.filter(c => c.status === s.id).length); charts.push(new Chart(barRef.current, { type: 'bar', data: { labels: stages.map(s => s.label), datasets: [{ data: vals, backgroundColor: C.surface3, borderRadius: 6, barThickness: 28 }] }, options: { ...baseOpts, scales: { y: { grid: { color: gridColor }, border: { display: false }, ticks: { color: C.muted, font: { size: 11 }, stepSize: 1 } }, x: { grid: { display: false }, border: { display: false }, ticks: { color: C.muted, font: { size: 11 } } } } } })) }
+
+      // Revenue trend — real paid invoice data grouped by month
+      if (canvasRef.current) {
+        const hasRevenue = revenueData.some(m => m.value > 0)
+        charts.push(new Chart(canvasRef.current, {
+          type: 'line',
+          data: {
+            labels: revenueData.map(m => m.label),
+            datasets: [{
+              data: revenueData.map(m => m.value),
+              borderColor: C.text,
+              backgroundColor: 'rgba(17,17,16,0.04)',
+              fill: true, tension: 0.4, borderWidth: 1.5,
+              pointBackgroundColor: C.text, pointRadius: 3
+            }]
+          },
+          options: {
+            ...baseOpts,
+            scales: {
+              y: {
+                grid: { color: gridColor }, border: { display: false },
+                ticks: { color: C.muted, callback: v => v >= 1000 ? '$' + (v / 1000).toFixed(1) + 'k' : '$' + v, font: { size: 11 } },
+                beginAtZero: true
+              },
+              x: { grid: { display: false }, border: { display: false }, ticks: { color: C.muted, font: { size: 11 } } }
+            }
+          }
+        }))
+      }
+
+      // Clients by stage — real pipeline data
+      if (barRef.current) {
+        const stages = stageData.stages
+        const vals = stages.map(s => stageData.clients.filter(c => c.status === s.id && !c.archived).length)
+        charts.push(new Chart(barRef.current, {
+          type: 'bar',
+          data: {
+            labels: stages.map(s => s.label),
+            datasets: [{ data: vals, backgroundColor: C.surface3, borderRadius: 6, barThickness: 28 }]
+          },
+          options: {
+            ...baseOpts,
+            scales: {
+              y: { grid: { color: gridColor }, border: { display: false }, ticks: { color: C.muted, font: { size: 11 }, stepSize: 1 }, beginAtZero: true },
+              x: { grid: { display: false }, border: { display: false }, ticks: { color: C.muted, font: { size: 11 } } }
+            }
+          }
+        }))
+      }
+
+      // Session types breakdown — doughnut
+      if (typeRef.current && typeData.length > 0) {
+        charts.push(new Chart(typeRef.current, {
+          type: 'doughnut',
+          data: {
+            labels: typeData.map(t => t.label),
+            datasets: [{
+              data: typeData.map(t => t.value),
+              backgroundColor: ['#111110', '#555', '#888', '#bbb', '#ddd'],
+              borderWidth: 0,
+              hoverOffset: 4
+            }]
+          },
+          options: {
+            ...baseOpts,
+            cutout: '68%',
+            plugins: {
+              ...baseOpts.plugins,
+              legend: { display: true, position: 'bottom', labels: { color: C.muted, font: { size: 11 }, boxWidth: 10, padding: 12 } }
+            }
+          }
+        }))
+      }
     })
     return () => charts.forEach(ch => ch.destroy())
-  }, [])
-  const avg = data.clients.length ? Math.round(data.invoices.reduce((s, i) => s + i.amount, 0) / Math.max(data.clients.filter(c => !c.archived).length, 1)) : 0
+  }, [data.invoices, data.clients, data.stages, data.sessionTypes])
+
+  const totalRevenue = data.invoices.reduce((s, i) => s + (i.paid || 0), 0)
+  const outstanding = data.invoices.reduce((s, i) => s + (i.amount - (i.paid || 0)), 0)
+  const activeClients = data.clients.filter(c => !c.archived)
+  const avg = activeClients.length ? Math.round(data.invoices.reduce((s, i) => s + i.amount, 0) / activeClients.length) : 0
   const conv = data.clients.length ? Math.round(data.clients.filter(c => c.status !== 'inquiry').length / data.clients.length * 100) : 0
+  const paidInvoices = data.invoices.filter(i => i.status === 'paid').length
+
   return (
     <div>
-      <div style={{ ...T.metricStrip, gridTemplateColumns: 'repeat(3,1fr)', marginBottom: 20 }} className="metric-strip">
-        {[{ label: 'Avg invoice value', value: fmt$(avg) }, { label: 'Conversion rate', value: conv + '%' }, { label: 'Total clients', value: data.clients.filter(c => !c.archived).length }].map((m, i) => (
-          <div key={m.label} style={T.metricCell(i === 2)}><div style={T.metricLabel}>{m.label}</div><div style={T.metricValue}>{m.value}</div></div>
+      <div style={{ ...T.metricStrip, gridTemplateColumns: 'repeat(4,1fr)', marginBottom: 20 }} className="metric-strip">
+        {[
+          { label: 'Total collected', value: fmt$(totalRevenue), sub: `${paidInvoices} paid invoices` },
+          { label: 'Outstanding', value: fmt$(outstanding), sub: `${data.invoices.filter(i => i.status !== 'paid').length} open` },
+          { label: 'Avg invoice value', value: fmt$(avg), sub: 'per client' },
+          { label: 'Conversion rate', value: conv + '%', sub: 'inquiry → booked' },
+        ].map((m, i) => (
+          <div key={m.label} style={T.metricCell(i === 3)}>
+            <div style={T.metricLabel}>{m.label}</div>
+            <div style={T.metricValue}>{m.value}</div>
+            {m.sub && <div style={T.metricSub}>{m.sub}</div>}
+          </div>
         ))}
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: 16 }} className="two-col-grid">
-        <div style={T.card}><div style={{ fontWeight: 500, fontSize: 14, marginBottom: 4 }}>Revenue trend</div><div style={{ fontSize: 12, color: C.muted, marginBottom: 18 }}>Last 6 months</div><div style={{ height: 230 }}><canvas ref={canvasRef} /></div></div>
-        <div style={T.card}><div style={{ fontWeight: 500, fontSize: 14, marginBottom: 4 }}>Clients by stage</div><div style={{ fontSize: 12, color: C.muted, marginBottom: 18 }}>Current pipeline</div><div style={{ height: 230 }}><canvas ref={barRef} /></div></div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: 16, marginBottom: 16 }} className="two-col-grid">
+        <div style={T.card}>
+          <div style={{ fontWeight: 500, fontSize: 14, marginBottom: 4 }}>Revenue collected</div>
+          <div style={{ fontSize: 12, color: C.muted, marginBottom: 18 }}>Paid invoices · last 6 months</div>
+          <div style={{ height: 230 }}><canvas ref={canvasRef} /></div>
+        </div>
+        <div style={T.card}>
+          <div style={{ fontWeight: 500, fontSize: 14, marginBottom: 4 }}>Clients by stage</div>
+          <div style={{ fontSize: 12, color: C.muted, marginBottom: 18 }}>Current pipeline</div>
+          <div style={{ height: 230 }}><canvas ref={barRef} /></div>
+        </div>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 16 }} className="two-col-grid">
+        <div style={T.card}>
+          <div style={{ fontWeight: 500, fontSize: 14, marginBottom: 4 }}>Session types</div>
+          <div style={{ fontSize: 12, color: C.muted, marginBottom: 18 }}>Active clients</div>
+          <div style={{ height: 200 }}>
+            {typeData.length > 0
+              ? <canvas ref={typeRef} />
+              : <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: C.faint, fontSize: 13 }}>No client data yet</div>}
+          </div>
+        </div>
+        <div style={T.card}>
+          <div style={{ fontWeight: 500, fontSize: 14, marginBottom: 16 }}>Invoice breakdown</div>
+          {data.invoices.length === 0
+            ? <div style={{ color: C.faint, fontSize: 13 }}>No invoices yet</div>
+            : data.invoices.map((inv, i, arr) => (
+              <div key={inv.id} style={{ ...T.dataRow, borderBottom: i === arr.length - 1 ? 'none' : `1px solid ${C.border}` }}>
+                <div>
+                  <div style={{ fontWeight: 500, fontSize: 13.5 }}>{inv.client}</div>
+                  <div style={{ fontSize: 12, color: C.muted }}>{inv.id} · Due {fmtDate(inv.due)}</div>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{ fontWeight: 500, fontSize: 13.5 }}>{fmt$(inv.amount)}</div>
+                  <Badge type={inv.status} label={inv.status} />
+                </div>
+              </div>
+            ))
+          }
+        </div>
       </div>
     </div>
   )
@@ -293,10 +449,17 @@ export function Invoices({ data, setData, toast }) {
 export function Contracts({ data, setData, toast }) {
   const [modal, setModal] = useState(false)
   const [viewModal, setViewModal] = useState(null)
+  const [signModal, setSignModal] = useState(null)
+  const [signName, setSignName] = useState('')
   const blank = { client: '', type: '', body: '' }
   const [form, setForm] = useState(blank)
   const add = () => { if (!form.client.trim()) return; setData(d => ({ ...d, contracts: [...d.contracts, { id: uid(), ...form, clientId: null, sent: todayLabel(), status: 'pending' }] })); toast('Contract created'); setModal(false); setForm(blank) }
-  const sign = id => { setData(d => ({ ...d, contracts: d.contracts.map(k => k.id === id ? { ...k, status: 'signed' } : k) })); toast('Signed') }
+  const confirmSign = () => {
+    if (!signName.trim()) { toast('Please type your full name to sign'); return }
+    const signedAt = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+    setData(d => ({ ...d, contracts: d.contracts.map(k => k.id === signModal.id ? { ...k, status: 'signed', signedBy: signName.trim(), signedAt } : k) }))
+    toast('Contract signed'); setSignModal(null); setSignName('')
+  }
   const del = id => { if (!confirm('Delete contract?')) return; setData(d => ({ ...d, contracts: d.contracts.filter(k => k.id !== id) })); toast('Deleted') }
   return (
     <div>
@@ -311,7 +474,8 @@ export function Contracts({ data, setData, toast }) {
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <Badge type={k.status} label={k.status} />
               <button style={T.btnSm} onClick={() => setViewModal(k)}>View</button>
-              {k.status === 'pending' && <button style={{ ...T.btnSm, color: C.green, borderColor: C.green }} onClick={() => sign(k.id)}>Sign</button>}
+              {k.status === 'pending' && <button style={{ ...T.btnSm, color: C.green, borderColor: C.green }} onClick={() => { setSignModal(k); setSignName('') }}>Sign</button>}
+              {k.status === 'signed' && k.signedBy && <div style={{ fontSize: 11, color: C.muted }}>Signed by {k.signedBy} · {k.signedAt}</div>}
               <button style={{ ...T.btnGhost, color: C.faint }} onClick={() => del(k.id)}>×</button>
             </div>
           </div>
@@ -331,9 +495,34 @@ export function Contracts({ data, setData, toast }) {
         </div>
       )}
       {viewModal && (
-        <Modal title={viewModal.type || 'Contract'} onClose={() => setViewModal(null)} wide footer={<><div style={{ fontSize: 12, color: C.muted }}>Sent {viewModal.sent}</div><div style={{ flex: 1 }} /><button style={T.btn} onClick={() => setViewModal(null)}>Close</button></>}>
-          <div style={{ marginBottom: 12 }}><Badge type={viewModal.status} label={viewModal.status} /></div>
+        <Modal title={viewModal.type || 'Contract'} onClose={() => setViewModal(null)} wide footer={<><div style={{ fontSize: 12, color: C.muted }}>Sent {viewModal.sent}{viewModal.signedAt ? ` · Signed ${viewModal.signedAt}` : ''}</div><div style={{ flex: 1 }} /><button style={T.btn} onClick={() => setViewModal(null)}>Close</button></>}>
+          <div style={{ marginBottom: 12, display: 'flex', gap: 8, alignItems: 'center' }}>
+            <Badge type={viewModal.status} label={viewModal.status} />
+            {viewModal.signedBy && <span style={{ fontSize: 12, color: C.muted }}>Signed by {viewModal.signedBy} · {viewModal.signedAt}</span>}
+          </div>
           <div style={{ background: C.surface2, borderRadius: 10, padding: '18px 20px', fontSize: 14, lineHeight: 1.8, color: C.text, whiteSpace: 'pre-wrap', fontWeight: 300 }}>{viewModal.body || 'No contract body.'}</div>
+        </Modal>
+      )}
+      {signModal && (
+        <Modal title="Sign contract" onClose={() => { setSignModal(null); setSignName('') }}
+          footer={<><button style={T.btn} onClick={() => { setSignModal(null); setSignName('') }}>Cancel</button><button style={T.btnPrimary} onClick={confirmSign}>Sign contract</button></>}>
+          <div style={{ marginBottom: 20, padding: '14px 16px', background: C.surface2, borderRadius: 10, fontSize: 13 }}>
+            <div style={{ fontWeight: 500 }}>{signModal.type || 'Contract'}</div>
+            <div style={{ color: C.muted, marginTop: 2 }}>{signModal.client} · Sent {signModal.sent}</div>
+          </div>
+          <div style={T.formGroup}>
+            <label style={T.formLabel}>Type your full legal name to sign</label>
+            <input style={{ ...T.formInput, fontSize: 18, fontFamily: "'DM Serif Display', Georgia, serif", letterSpacing: '0.01em' }}
+              placeholder="Your full name"
+              value={signName}
+              onChange={e => setSignName(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && confirmSign()}
+              autoFocus
+            />
+          </div>
+          <div style={{ marginTop: 14, fontSize: 12, color: C.faint, padding: '10px 14px', background: C.surface2, borderRadius: 8, lineHeight: 1.6 }}>
+            By typing your name above, you agree this constitutes a valid electronic signature and that you have read and agree to the terms of this contract.
+          </div>
         </Modal>
       )}
     </div>
