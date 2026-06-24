@@ -2,6 +2,8 @@ import { useState, useEffect, useMemo, useRef } from 'react'
 import Head from 'next/head'
 import { T, C } from '../lib/tokens'
 import { loadData, seed, STORAGE_KEY } from '../lib/data'
+import { supabase } from '../lib/supabase'
+import { loadUserData, saveSettings, upsertClient, deleteClient, upsertInvoice, deleteInvoice, upsertBooking, deleteBooking, upsertContract, deleteContract, upsertMessage } from '../lib/db'
 import { Toast } from '../components/UI'
 import Projects, { CardModalExport as CardModal } from '../components/Projects'
 import Clients from '../components/Clients'
@@ -61,7 +63,7 @@ function GlobalSearch({ data, setView }) {
 }
 
 // ── Sidebar ───────────────────────────────────────────────────────
-function Sidebar({ active, setActive, unread, open, onClose }) {
+function Sidebar({ active, setActive, unread, open, onClose, user, onSignOut }) {
   const nav1 = [
     { id: 'dashboard', label: 'Dashboard' },
     { id: 'analytics', label: 'Analytics' },
@@ -129,11 +131,13 @@ function Sidebar({ active, setActive, unread, open, onClose }) {
         </div>
 
         <div style={{ padding: '14px 16px', borderTop: `1px solid ${C.border}` }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 6px', borderRadius: 8, cursor: 'pointer' }}>
-            <div style={{ width: 30, height: 30, borderRadius: '50%', background: C.text, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 500 }}>EH</div>
-            <div>
-              <div style={{ fontSize: 13, fontWeight: 500, color: C.text }}>Ellie Heartstrings</div>
-              <div style={{ fontSize: 11, color: C.faint }}>Pro plan</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 6px', borderRadius: 8 }}>
+            <div style={{ width: 30, height: 30, borderRadius: '50%', background: C.text, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 500, flexShrink: 0 }}>
+              {user ? user.email.slice(0,2).toUpperCase() : 'EH'}
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 12, fontWeight: 500, color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user ? user.email : 'Ellie Heartstrings'}</div>
+              <button onClick={onSignOut} style={{ background: 'none', border: 'none', padding: 0, fontSize: 11, color: C.faint, cursor: 'pointer', fontFamily: 'inherit' }}>Sign out</button>
             </div>
           </div>
         </div>
@@ -163,11 +167,47 @@ export default function Home() {
   const [toastMsg, setToastMsg] = useState(null)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [calendarCardModal, setCalendarCardModal] = useState(null)
+  const [user, setUser] = useState(null)
+  const [dbReady, setDbReady] = useState(false)
   const toast = msg => setToastMsg(msg)
 
+  // ── Auth + initial DB load ──────────────────────────────────────
   useEffect(() => {
+    if (!supabase) { setDbReady(false); return }
+
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (!session) return
+      setUser(session.user)
+      const dbData = await loadUserData(session.user.id)
+      if (dbData) { setData(d => ({ ...d, ...dbData })); setDbReady(true) }
+    })
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'SIGNED_IN' && session) {
+        setUser(session.user)
+        const dbData = await loadUserData(session.user.id)
+        if (dbData) { setData(d => ({ ...d, ...dbData })); setDbReady(true) }
+      }
+      if (event === 'SIGNED_OUT') { setUser(null); setDbReady(false) }
+    })
+    return () => subscription.unsubscribe()
+  }, [])
+
+  // ── localStorage fallback (when no Supabase) ───────────────────
+  useEffect(() => {
+    if (dbReady) return  // DB is active — don't also write localStorage
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)) } catch (e) {}
-  }, [data])
+  }, [data, dbReady])
+
+  // ── Settings sync ──────────────────────────────────────────────
+  useEffect(() => {
+    if (!dbReady || !user) return
+    saveSettings(user.id, { stages: data.stages, sessionTypes: data.sessionTypes, formSettings: data.formSettings })
+  }, [data.stages, data.sessionTypes, data.formSettings, dbReady, user])
+
+  const handleSignOut = async () => {
+    if (supabase) await supabase.auth.signOut()
+  }
 
   const props = { data, setData, toast, setView }
   const unread = data.messages.filter(m => m.unread).length
@@ -198,7 +238,7 @@ export default function Home() {
       </Head>
 
       <div style={{ display: 'flex', minHeight: '100vh', background: C.bg }}>
-        <Sidebar active={view} setActive={setView} unread={unread} open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+        <Sidebar active={view} setActive={setView} unread={unread} open={sidebarOpen} onClose={() => setSidebarOpen(false)} user={user} onSignOut={handleSignOut} />
 
         <div className="layout-main" style={{ marginLeft: 220, flex: 1, padding: '36px 44px', minHeight: '100vh' }}>
           {/* Topbar */}
