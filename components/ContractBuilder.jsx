@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react'
 import { T, C } from '../lib/tokens'
 import { CONTRACT_TEMPLATE, fillContract } from '../lib/contractTemplate'
 
-const uid = () => Math.random().toString(36).slice(2, 8)
+const uid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => { const r = Math.random() * 16 | 0; return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16) })
 
 function Field({ label, children, hint }) {
   return (
@@ -23,30 +23,83 @@ function Section({ title, children }) {
   )
 }
 
-export default function ContractBuilder({ client, data, onSave, onClose }) {
-  const clientBooking = data?.bookings?.find(b => b.clientId === client?.id)
-  const clientInvoice = data?.invoices?.find(i => i.clientId === client?.id)
+// Find a client's most relevant booking (next upcoming, else most recent)
+function pickBooking(bookings = [], c) {
+  const mine = bookings.filter(b => b.clientId === c?.id || (c?.name && b.client === c.name))
+  if (!mine.length) return null
   const today = new Date().toISOString().slice(0, 10)
+  const upcoming = mine.filter(b => b.date >= today).sort((a, b) => a.date.localeCompare(b.date))
+  if (upcoming.length) return upcoming[0]
+  return [...mine].sort((a, b) => (b.date || '').localeCompare(a.date || ''))[0]
+}
 
-  const [fields, setFields] = useState({
-    contractTitle: `${client?.type || 'Portrait'} Photography Services Agreement`,
-    effectiveDate: today,
-    clientName: client?.name || '',
-    clientEmail: client?.email || '',
-    sessionType: client?.type || 'Portrait',
-    sessionDate: clientBooking?.date || client?.date || '',
-    sessionTime: clientBooking?.time || '',
-    location: clientBooking?.location || 'EHS Studio',
-    totalFee: clientInvoice?.amount ? String(clientInvoice.amount) : '',
-    retainerPct: '50',
-    remainingDueDate: clientInvoice?.due || '',
-    governingState: 'New Jersey',
-    photographerEmail: 'hello@elliesheartstrings.com',
-    photographerCity: 'Linden, NJ',
-  })
+// Find a client's most relevant invoice (latest unpaid/partial, else latest)
+function pickInvoice(invoices = [], c) {
+  const mine = invoices.filter(i => i.clientId === c?.id || (c?.name && i.client === c.name))
+  if (!mine.length) return null
+  const open = mine.filter(i => i.status !== 'paid')
+  return (open.length ? open : mine)[0]
+}
+
+// Build the full field set for a client (or blank defaults)
+function buildFields(c, data) {
+  const booking = c ? pickBooking(data?.bookings, c) : null
+  const invoice = c ? pickInvoice(data?.invoices, c) : null
+  const today = new Date().toISOString().slice(0, 10)
+  return {
+    fields: {
+      contractTitle: `${c?.type || 'Portrait'} Photography Services Agreement`,
+      effectiveDate: today,
+      clientName: c?.name || '',
+      clientEmail: c?.email || '',
+      sessionType: c?.type || 'Portrait',
+      sessionDate: booking?.date || c?.date || '',
+      sessionTime: booking?.time || '',
+      location: booking?.location || 'EHS Studio',
+      totalFee: invoice?.amount ? String(invoice.amount) : '',
+      retainerPct: '50',
+      remainingDueDate: invoice?.due || '',
+      governingState: 'New Jersey',
+      photographerEmail: 'hello@elliesheartstrings.com',
+      photographerCity: 'Linden, NJ',
+    },
+    sources: { booking, invoice },
+  }
+}
+
+export default function ContractBuilder({ client, data, onSave, onClose }) {
+  const initial = buildFields(client, data)
+  const [selectedClientId, setSelectedClientId] = useState(client?.id || '')
+  const [fields, setFields] = useState(initial.fields)
+  const [sources, setSources] = useState(initial.sources)
+  const [touched, setTouched] = useState(false) // has the user hand-edited?
 
   const [tab, setTab] = useState('fields')
-  const set = (k, v) => setFields(f => ({ ...f, [k]: v }))
+  const set = (k, v) => { setTouched(true); setFields(f => ({ ...f, [k]: v })) }
+
+  const activeClient = data?.clients?.find(c => c.id === selectedClientId) || client || null
+
+  const selectClient = (id) => {
+    if (touched && !confirm('Switching client will refill the form and overwrite your edits. Continue?')) return
+    setSelectedClientId(id)
+    const c = data?.clients?.find(x => x.id === id) || null
+    const next = buildFields(c, data)
+    setFields(next.fields)
+    setSources(next.sources)
+    setTouched(false)
+  }
+
+  // Human-readable summary of what auto-filled
+  const fillSummary = (() => {
+    if (!activeClient) return null
+    const bits = ['contact details']
+    if (sources.booking) {
+      const d = sources.booking.date ? new Date(sources.booking.date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : null
+      bits.push(d ? `session on ${d}` : 'session details')
+    }
+    if (sources.invoice) bits.push(`fee from invoice ${sources.invoice.number || sources.invoice.id}`)
+    return `Auto-filled ${bits.join(' · ')}`
+  })()
 
   const totalFee = parseFloat(fields.totalFee) || 0
   const retainerAmt = Math.round(totalFee * (parseFloat(fields.retainerPct) || 50) / 100 * 100) / 100
@@ -83,7 +136,7 @@ export default function ContractBuilder({ client, data, onSave, onClose }) {
     const k = {
       id: uid(),
       client: fields.clientName || 'Unknown',
-      clientId: client?.id || null,
+      clientId: activeClient?.id || null,
       type: fields.contractTitle,
       sent: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
       status: 'pending',
@@ -99,7 +152,7 @@ export default function ContractBuilder({ client, data, onSave, onClose }) {
     <div>
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-        <div style={T.modalTitle}>{client ? `Contract — ${client.name}` : 'New Contract'}</div>
+        <div style={T.modalTitle}>{activeClient ? `Contract — ${activeClient.name}` : 'New Contract'}</div>
         <button onClick={onClose} style={{ ...T.btnGhost, fontSize: 20, color: C.muted }}>×</button>
       </div>
 
@@ -112,6 +165,30 @@ export default function ContractBuilder({ client, data, onSave, onClose }) {
 
       {tab === 'fields' ? (
         <div>
+          {/* Client picker — auto-fills everything below */}
+          <div style={{ background: C.surface2, border: `1px solid ${C.border}`, borderRadius: 10, padding: '14px 16px', marginBottom: 20 }}>
+            <label style={{ display: 'block', fontSize: 11, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: C.muted, marginBottom: 6 }}>Client</label>
+            <select
+              style={{ ...T.formInput, fontSize: 13.5, background: C.surface }}
+              value={selectedClientId}
+              onChange={e => selectClient(e.target.value)}
+            >
+              <option value="">— Select a client to auto-fill —</option>
+              {(data?.clients || []).filter(c => !c.archived).map(c => (
+                <option key={c.id} value={c.id}>{c.name}{c.type ? ` · ${c.type}` : ''}</option>
+              ))}
+            </select>
+            {fillSummary && (
+              <div style={{ fontSize: 12, color: C.green, marginTop: 8, fontWeight: 500 }}>{fillSummary}</div>
+            )}
+            {selectedClientId && !sources.booking && (
+              <div style={{ fontSize: 11.5, color: C.faint, marginTop: 4 }}>No booking found — enter session date, time and location below.</div>
+            )}
+            {selectedClientId && !sources.invoice && (
+              <div style={{ fontSize: 11.5, color: C.faint, marginTop: 2 }}>No invoice found — enter the total fee below.</div>
+            )}
+          </div>
+
           {/* Contract title */}
           <Field label="Contract title">
             <input style={inp} value={fields.contractTitle} onChange={e => set('contractTitle', e.target.value)} />
