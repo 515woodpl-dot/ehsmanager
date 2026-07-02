@@ -59,7 +59,8 @@ create table if not exists clients (
 
 -- ── Invoices ─────────────────────────────────────────────────────
 create table if not exists invoices (
-  id                  text primary key,  -- e.g. INV-001
+  id                  uuid primary key default uuid_generate_v4(),
+  number              text,              -- per-tenant display number, e.g. INV-001
   user_id             uuid not null references profiles(id) on delete cascade,
   client_id           uuid references clients(id) on delete set null,
   client_name         text,

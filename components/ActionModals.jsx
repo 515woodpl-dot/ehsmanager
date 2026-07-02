@@ -5,7 +5,7 @@ import { LineItemBuilder, calcTotal } from './LineItemBuilder'
 import { CONTRACT_TEMPLATE, fillContract, buildContractFields } from '../lib/contractTemplate'
 import ContractBuilder from './ContractBuilder'
 
-const uid = () => Math.random().toString(36).slice(2, 8)
+const uid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => { const r = Math.random() * 16 | 0; return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16) })
 const fmt$ = n => '$' + Number(n || 0).toFixed(2)
 
 // ── Invoice Modal ─────────────────────────────────────────────────
@@ -23,7 +23,8 @@ export function InvoiceModal({ client, data, setData, toast, onClose }) {
       toast('Add at least one item'); return
     }
     const inv = {
-      id: 'INV-' + String(data.invoices.length + 1).padStart(3, '0'),
+      id: uid(),
+      number: 'INV-' + String(data.invoices.length + 1).padStart(3, '0'),
       client: client.name, clientId: client.id,
       amount: total, due, status: 'unpaid', paid: 0,
       note: lineData.notes || '', paymentIntentId: null,

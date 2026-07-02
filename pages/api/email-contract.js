@@ -1,7 +1,13 @@
-import { resend, FROM, emailWrap } from '../../lib/email'
+import { resend, fromFor, emailWrap } from '../../lib/email'
+import { requireUser } from '../../lib/api-auth'
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end()
+
+  const auth = await requireUser(req, res)
+  if (!auth) return
+  const bizName = auth.profile.business_name || 'My Studio'
+  const ownerName = (auth.profile.full_name || '').split(' ')[0] || bizName
 
   const { contract, clientEmail, clientName } = req.body
   if (!contract || !clientEmail) return res.status(400).json({ error: 'Missing fields' })
@@ -20,14 +26,15 @@ export default async function handler(req, res) {
     ${contract.body ? `<div class="box" style="font-size:13px;line-height:1.8;font-family:Arial,sans-serif;color:#444;white-space:pre-wrap;max-height:400px;overflow:auto;">${contract.body.substring(0, 2000)}${contract.body.length > 2000 ? '...' : ''}</div>` : ''}
 
     <p>If you have any questions about the contract terms, please reach out before signing.</p>
-    <p style="margin-top:24px;">Warmly,<br/><strong>Ellie</strong></p>
-  `)
+    <p style="margin-top:24px;">Warmly,<br/><strong>${ownerName}</strong></p>
+  `, bizName)
 
   try {
     const { data, error } = await resend.emails.send({
-      from: FROM,
+      from: fromFor(bizName),
+      reply_to: auth.profile.email || undefined,
       to: clientEmail,
-      subject: `Your ${contract.type || 'Photography Agreement'} — Ellie Heartstrings`,
+      subject: `Your ${contract.type || 'Photography Agreement'} — ${bizName}`,
       html,
     })
     if (error) return res.status(400).json({ error })

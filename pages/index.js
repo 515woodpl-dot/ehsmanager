@@ -3,7 +3,7 @@ import Head from 'next/head'
 import { T, C } from '../lib/tokens'
 import { loadData, seed, STORAGE_KEY } from '../lib/data'
 import { supabase } from '../lib/supabase'
-import { loadUserData, saveSettings, upsertClient, deleteClient, upsertInvoice, deleteInvoice, upsertBooking, deleteBooking, upsertContract, deleteContract, upsertMessage } from '../lib/db'
+import { loadUserData, saveSettings, syncCollections } from '../lib/db'
 import { Toast } from '../components/UI'
 import Projects, { CardModalExport as CardModal } from '../components/Projects'
 import Clients from '../components/Clients'
@@ -204,6 +204,25 @@ export default function Home() {
     if (!dbReady || !user) return
     saveSettings(user.id, { stages: data.stages, sessionTypes: data.sessionTypes, formSettings: data.formSettings })
   }, [data.stages, data.sessionTypes, data.formSettings, dbReady, user])
+
+  // ── Collection sync engine ─────────────────────────────────────
+  // Diffs current data vs last-synced snapshot and persists adds,
+  // edits, and deletes to Supabase. Debounced to batch rapid changes.
+  const snapshotRef = useRef(null)
+  useEffect(() => {
+    if (!dbReady || !user) { snapshotRef.current = null; return }
+    if (snapshotRef.current === null) {
+      // First run after DB load — take the baseline, don't sync
+      snapshotRef.current = data
+      return
+    }
+    const prev = snapshotRef.current
+    const timer = setTimeout(() => {
+      syncCollections(user.id, prev, data)
+      snapshotRef.current = data
+    }, 400)
+    return () => clearTimeout(timer)
+  }, [data, dbReady, user])
 
   const handleSignOut = async () => {
     if (supabase) await supabase.auth.signOut()

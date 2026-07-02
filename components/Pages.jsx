@@ -1,9 +1,10 @@
 import { useState, useRef, useEffect } from 'react'
 import { T, C } from '../lib/tokens'
+import { supabase } from '../lib/supabase'
 import { Modal, Badge, Avatar, SearchBar } from './UI'
 import ContractBuilder from './ContractBuilder'
 
-const uid = () => Math.random().toString(36).slice(2, 8)
+const uid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => { const r = Math.random() * 16 | 0; return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16) })
 const fmtDate = iso => { if (!iso) return 'TBD'; const d = new Date(iso + 'T00:00:00'); return isNaN(d) ? iso : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) }
 const fmtTime = t => { if (!t) return ''; const [h, m] = t.split(':'); const hr = parseInt(h); return `${hr % 12 || 12}:${m} ${hr < 12 ? 'AM' : 'PM'}` }
 const todayLabel = () => new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
@@ -240,10 +241,10 @@ export function Analytics({ data }) {
           {data.invoices.length === 0
             ? <div style={{ color: C.faint, fontSize: 13 }}>No invoices yet</div>
             : data.invoices.map((inv, i, arr) => (
-              <div key={inv.id} style={{ ...T.dataRow, borderBottom: i === arr.length - 1 ? 'none' : `1px solid ${C.border}` }}>
+              <div key={inv.number || inv.id} style={{ ...T.dataRow, borderBottom: i === arr.length - 1 ? 'none' : `1px solid ${C.border}` }}>
                 <div>
                   <div style={{ fontWeight: 500, fontSize: 13.5 }}>{inv.client}</div>
-                  <div style={{ fontSize: 12, color: C.muted }}>{inv.id} · Due {fmtDate(inv.due)}</div>
+                  <div style={{ fontSize: 12, color: C.muted }}>{inv.number || inv.id} · Due {fmtDate(inv.due)}</div>
                 </div>
                 <div style={{ textAlign: 'right' }}>
                   <div style={{ fontWeight: 500, fontSize: 13.5 }}>{fmt$(inv.amount)}</div>
@@ -279,7 +280,8 @@ export function Calendar({ data, setData, toast, openClientCard }) {
     if (!client?.email) { toast('No email address for this client'); return }
     setSendingReminder(b.id)
     try {
-      const r = await fetch('/api/email-reminder', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ booking: b, clientEmail: client.email, clientName: client.name }) })
+      const { data: { session } } = await supabase.auth.getSession()
+      const r = await fetch('/api/email-reminder', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token || ''}` }, body: JSON.stringify({ booking: b, clientEmail: client.email, clientName: client.name }) })
       if (r.ok) { toast('Reminder sent to ' + client.email) } else { toast('Failed to send') }
     } catch { toast('Failed to send') }
     setSendingReminder(null)
@@ -377,12 +379,13 @@ export function Invoices({ data, setData, toast }) {
     if (!client?.email) { toast('No email address for this client'); return }
     setSending(inv.id)
     try {
-      const r = await fetch('/api/email-invoice', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ invoice: inv, clientEmail: client.email, clientName: client.name }) })
+      const { data: { session } } = await supabase.auth.getSession()
+      const r = await fetch('/api/email-invoice', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token || ''}` }, body: JSON.stringify({ invoice: inv, clientEmail: client.email, clientName: client.name }) })
       if (r.ok) { toast('Invoice sent to ' + client.email) } else { toast('Failed to send email') }
     } catch { toast('Failed to send email') }
     setSending(null)
   }
-  const add = () => { if (!form.client.trim() || !form.amount) return; setData(d => ({ ...d, invoices: [...d.invoices, { id: 'INV-' + String(d.invoices.length + 1).padStart(3, '0'), client: form.client, clientId: null, amount: parseFloat(form.amount), due: form.due, status: 'unpaid', paid: 0, note: form.note, paymentIntentId: null }] })); toast('Invoice created'); setModal(false); setForm(blank) }
+  const add = () => { if (!form.client.trim() || !form.amount) return; setData(d => ({ ...d, invoices: [...d.invoices, { id: uid(), number: 'INV-' + String(d.invoices.length + 1).padStart(3, '0'), client: form.client, clientId: null, amount: parseFloat(form.amount), due: form.due, status: 'unpaid', paid: 0, note: form.note, paymentIntentId: null }] })); toast('Invoice created'); setModal(false); setForm(blank) }
   const confirmPaid = () => {
     if (!payMethod) { toast('Select a payment method'); return }
     const now = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
@@ -400,10 +403,10 @@ export function Invoices({ data, setData, toast }) {
           const pct = inv.amount > 0 ? Math.round(inv.paid / inv.amount * 100) : 0
           const owing = inv.amount - inv.paid
           return (
-            <div key={inv.id} style={{ ...T.dataRow, alignItems: 'flex-start', paddingTop: 16, paddingBottom: 16, borderBottom: i === data.invoices.length - 1 ? 'none' : `1px solid ${C.border}` }}>
+            <div key={inv.number || inv.id} style={{ ...T.dataRow, alignItems: 'flex-start', paddingTop: 16, paddingBottom: 16, borderBottom: i === data.invoices.length - 1 ? 'none' : `1px solid ${C.border}` }}>
               <div style={{ flex: 1 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 5 }}>
-                  <div style={{ fontWeight: 500 }}>{inv.id}</div>
+                  <div style={{ fontWeight: 500 }}>{inv.number || inv.id}</div>
                   <div style={{ color: C.text }}>{inv.client}</div>
                   <Badge type={inv.status} label={inv.status} />
                 </div>
@@ -483,7 +486,8 @@ export function Contracts({ data, setData, toast }) {
     if (!client?.email) { toast('No email address for this client'); return }
     setSending(k.id)
     try {
-      const r = await fetch('/api/email-contract', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contract: k, clientEmail: client.email, clientName: client.name }) })
+      const { data: { session } } = await supabase.auth.getSession()
+      const r = await fetch('/api/email-contract', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token || ''}` }, body: JSON.stringify({ contract: k, clientEmail: client.email, clientName: client.name }) })
       if (r.ok) { toast('Contract sent to ' + client.email) } else { toast('Failed to send email') }
     } catch { toast('Failed to send email') }
     setSending(null)

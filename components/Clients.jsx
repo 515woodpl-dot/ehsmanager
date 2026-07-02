@@ -2,7 +2,7 @@ import { useState, useRef } from 'react'
 import { T, C } from '../lib/tokens'
 import { Modal, Badge, Avatar, SearchBar } from './UI'
 
-const uid = () => Math.random().toString(36).slice(2, 8)
+const uid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => { const r = Math.random() * 16 | 0; return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16) })
 const fmtDate = iso => { if (!iso) return 'TBD'; const d = new Date(iso + 'T00:00:00'); return isNaN(d) ? iso : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) }
 
 function parseCSV(text) {

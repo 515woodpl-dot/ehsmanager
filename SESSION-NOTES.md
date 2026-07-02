@@ -8,7 +8,7 @@
 **https://github.com/515woodpl-dot/ehsmanager**
 
 Username: `515woodpl-dot`
-Token: `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`
+Token: `<GITHUB_TOKEN — see your password manager>`
 
 ---
 
@@ -37,10 +37,10 @@ Live in `/var/www/ehsmanager/.env.local` on the server (not in git):
 
 ```
 NEXT_PUBLIC_SUPABASE_URL=https://jniqpltbpqukpanvardt.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpuaXFwbHRicHF1a3BhbnZhcmR0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIyNzM5NzMsImV4cCI6MjA5Nzg0OTk3M30.EkanvQ0Xed9e62VS5rxHsjTOPSoE8tYjg8wGydkpnz8
-SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpuaXFwbHRicHF1a3BhbnZhcmR0Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MjI3Mzk3MywiZXhwIjoyMDk3ODQ5OTczfQ.m-qNwy2W9rNTCS7ljA3S2SRUFUSw7XgBJhapFDIGRzA
-RESEND_API_KEY=re_YkAAkb6T_6QCNDm47NCrprB4yQ74WQY3V
-HEARTBEAT_SECRET=ehs-heartbeat-2026
+NEXT_PUBLIC_SUPABASE_ANON_KEY=<see /var/www/ehsmanager/.env.local on server>
+SUPABASE_SERVICE_ROLE_KEY=<see /var/www/ehsmanager/.env.local on server>
+RESEND_API_KEY=<RESEND_API_KEY — see .env.local on server>
+HEARTBEAT_SECRET=<HEARTBEAT_SECRET — see .env.local on server>
 ```
 
 ---
@@ -161,6 +161,17 @@ crontab -e
 - Contract signing stores typed name — no DocuSign-style service
 - No PDF export for invoices or contracts
 - Stripe not connected (routes exist, no keys)
+- Tenant emails send from the verified elliesheartstrings.com address (display name is per-tenant); per-tenant domain verification is a future Phase 2/4 item
+- SECURITY: old secrets exist in git history — rotate GitHub token, Supabase service role key, and Resend key (see below)
+
+## v2.3 SaaS Hardening (this session)
+
+- .env.local removed from git; secrets scrubbed from this doc
+- Diff-sync engine: all CRUD (clients, invoices, bookings, contracts, quotes, questionnaires, messages) now persists to Supabase automatically (pages/index.js + lib/db.js syncCollections)
+- Entity IDs are real UUIDs (crypto.randomUUID)
+- Invoices: uuid primary key + per-tenant INV-xxx display number (run supabase-migration-001.sql if schema was already created)
+- Public contact form is server-side: /api/public-form GET (settings) + POST (lead → DB + owner email). Requires STUDIO_OWNER_USER_ID env var (your Supabase user id, from Supabase → Authentication → Users after signup)
+- Email routes (/api/email-invoice|contract|reminder) require a Supabase session token and use tenant branding from profiles (business_name, full_name, reply-to owner email)
 
 ---
 

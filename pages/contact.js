@@ -1,10 +1,12 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Head from 'next/head'
 import { STORAGE_KEY, DEFAULT_FORM_SETTINGS } from '../lib/data'
 
-const uid = () => Math.random().toString(36).slice(2, 8)
+const uid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => { const r = Math.random() * 16 | 0; return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16) })
 
-function loadSettings() {
+// Form settings now come from the server (per-studio); localStorage kept
+// only as an instant-render fallback while the fetch is in flight.
+function loadSettingsFallback() {
   if (typeof window === 'undefined') return DEFAULT_FORM_SETTINGS
   try {
     const s = localStorage.getItem(STORAGE_KEY)
@@ -13,32 +15,14 @@ function loadSettings() {
   return DEFAULT_FORM_SETTINGS
 }
 
-function saveData(lead, settings) {
-  if (typeof window === 'undefined') return
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    const data = raw ? JSON.parse(raw) : {}
-    const leads = data.leads || []
-    leads.unshift(lead)
-    const clients = data.clients || []
-    clients.push({
-      id: lead.id,
-      name: lead.name,
-      email: lead.email,
-      phone: lead.phone,
-      type: lead.services?.[0] || 'Family',
-      status: 'inquiry',
-      date: '',
-      notes: lead.message || '',
-      archived: false,
-      contactType: settings.contactType || 'Lead',
-    })
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...data, leads, clients }))
-  } catch (e) {}
-}
-
 export default function ContactPage() {
-  const [settings] = useState(loadSettings)
+  const [settings, setSettings] = useState(loadSettingsFallback)
+  useEffect(() => {
+    fetch('/api/public-form')
+      .then(r => r.ok ? r.json() : null)
+      .then(j => { if (j?.settings) setSettings(j.settings) })
+      .catch(() => {})
+  }, [])
   const [form, setForm] = useState({ name: '', email: '', phone: '', services: [], message: '' })
   const [errors, setErrors] = useState({})
   const [submitted, setSubmitted] = useState(false)
@@ -76,21 +60,21 @@ export default function ContactPage() {
       submittedAt: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
       type: settings.contactType || 'Lead',
     }
-    saveData(lead, settings)
-    // Fire lead notification email (non-blocking)
-    fetch('/api/email-lead', {
+    fetch('/api/public-form', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ lead }),
-    }).catch(() => {}) // silent fail — don't block the UX
-    setTimeout(() => {
-      setLoading(false)
-      if (settings.afterSubmit === 'redirect' && settings.redirectUrl) {
-        window.location.href = settings.redirectUrl
-      } else {
-        setSubmitted(true)
-      }
-    }, 600)
+    })
+      .then(r => {
+        setLoading(false)
+        if (!r.ok) { setErrors({ submit: 'Something went wrong — please try again.' }); return }
+        if (settings.afterSubmit === 'redirect' && settings.redirectUrl) {
+          window.location.href = settings.redirectUrl
+        } else {
+          setSubmitted(true)
+        }
+      })
+      .catch(() => { setLoading(false); setErrors({ submit: 'Something went wrong — please try again.' }) })
   }
 
   const inp = (field) => ({
@@ -205,6 +189,7 @@ export default function ContactPage() {
             </div>
 
             {/* Submit */}
+            {errors.submit && <div style={{ fontSize: 13, color: '#991F1F', marginBottom: 12, textAlign: 'center' }}>{errors.submit}</div>}
             <button type="submit" disabled={loading}
               style={{ width: '100%', padding: '13px', borderRadius: 10, border: 'none', background: loading ? '#555' : '#111110', color: '#fff', fontSize: 15, fontWeight: 500, cursor: loading ? 'not-allowed' : 'pointer', letterSpacing: '-0.1px', transition: 'background 0.15s' }}>
               {loading ? 'Sending...' : (settings.buttonLabel || 'Submit')}

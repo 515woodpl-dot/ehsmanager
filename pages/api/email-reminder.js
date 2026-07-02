@@ -1,7 +1,13 @@
-import { resend, FROM, emailWrap } from '../../lib/email'
+import { resend, fromFor, emailWrap } from '../../lib/email'
+import { requireUser } from '../../lib/api-auth'
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end()
+
+  const auth = await requireUser(req, res)
+  if (!auth) return
+  const bizName = auth.profile.business_name || 'My Studio'
+  const ownerName = (auth.profile.full_name || '').split(' ')[0] || bizName
 
   const { booking, clientEmail, clientName } = req.body
   if (!booking || !clientEmail) return res.status(400).json({ error: 'Missing fields' })
@@ -26,12 +32,13 @@ export default async function handler(req, res) {
 
     ${booking.notes ? `<p><strong>Session notes:</strong> ${booking.notes}</p>` : ''}
 
-    <p style="margin-top:24px;">See you soon!<br/><strong>Ellie</strong></p>
-  `)
+    <p style="margin-top:24px;">See you soon!<br/><strong>${ownerName}</strong></p>
+  `, bizName)
 
   try {
     const { data, error } = await resend.emails.send({
-      from: FROM,
+      from: fromFor(bizName),
+      reply_to: auth.profile.email || undefined,
       to: clientEmail,
       subject: `Session reminder — ${fmtDate(booking.date)}`,
       html,
