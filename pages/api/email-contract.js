@@ -21,6 +21,7 @@ export default async function handler(req, res) {
 
   const { contract, clientEmail, clientName } = req.body
   if (!contract || !clientEmail) return res.status(400).json({ error: 'Missing fields' })
+  if (!resend) return res.status(500).json({ error: 'Email service is not configured' })
   const signUrl = contract.id
     ? `${process.env.NEXT_PUBLIC_APP_URL || 'https://manager.elliesheartstrings.com'}/sign/${createContractToken(contract.id)}`
     : null

@@ -27,7 +27,7 @@ export function Modal({ title, onClose, children, footer, wide, extraWide }) {
 
 export function Seg({ options, value, onChange }) {
   return (
-    <div style={{ display: 'inline-flex', background: C.surface2, borderRadius: 8, padding: 3, gap: 2 }}>
+    <div className="seg-control" style={{ display: 'inline-flex', background: C.surface2, borderRadius: 8, padding: 3, gap: 2 }}>
       {options.map(o => (
         <button key={o.value} onClick={() => onChange(o.value)}
           style={{ padding: '5px 12px', borderRadius: 6, border: 'none', background: value === o.value ? C.surface : 'transparent', color: C.text, fontWeight: value === o.value ? 500 : 400, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>

@@ -94,9 +94,7 @@ function Sidebar({ active, setActive, unread, open, onClose, user, onSignOut }) 
   return (
     <>
       {/* Mobile backdrop */}
-      {open && (
-        <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.3)', zIndex: 25, display: 'none' }} className="mobile-backdrop" />
-      )}
+      <div onClick={onClose} className={`mobile-backdrop${open ? ' mobile-backdrop-open' : ''}`} />
       <div style={{
         width: 220,
         background: C.surface,
@@ -157,14 +155,34 @@ function Sidebar({ active, setActive, unread, open, onClose, user, onSignOut }) 
       <style>{`
         @media (max-width: 768px) {
           .sidebar-nav {
-            transform: translateX(-100%);
+            backface-visibility: hidden;
+            transform: translate3d(-100%, 0, 0);
+            will-change: transform;
           }
           .sidebar-nav.sidebar-open {
-            transform: translateX(0);
+            transform: translate3d(0, 0, 0);
             box-shadow: 4px 0 24px rgba(0,0,0,0.12);
           }
-          .mobile-backdrop { display: block !important; }
+          .mobile-backdrop {
+            background: rgba(17, 17, 16, 0.28);
+            display: block !important;
+            inset: 0;
+            opacity: 0;
+            pointer-events: none;
+            position: fixed;
+            transition: opacity 0.2s ease, visibility 0.2s ease;
+            visibility: hidden;
+            z-index: 25;
+          }
+          .mobile-backdrop.mobile-backdrop-open {
+            opacity: 1;
+            pointer-events: auto;
+            visibility: visible;
+          }
           .mobile-close-btn { display: block !important; }
+        }
+        @media (min-width: 769px) {
+          .mobile-backdrop { display: none; }
         }
       `}</style>
     </>
@@ -181,6 +199,12 @@ export default function Home() {
   const [user, setUser] = useState(null)
   const [dbReady, setDbReady] = useState(false)
   const toast = msg => setToastMsg(msg)
+
+  useEffect(() => {
+    if (typeof document === 'undefined') return
+    document.body.style.overflow = sidebarOpen ? 'hidden' : ''
+    return () => { document.body.style.overflow = '' }
+  }, [sidebarOpen])
 
   const setActiveView = (nextView) => {
     const safeView = VALID_VIEWS.has(nextView) ? nextView : 'dashboard'

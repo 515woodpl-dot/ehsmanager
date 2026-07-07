@@ -11,6 +11,7 @@ export default async function handler(req, res) {
 
   const { invoice, clientEmail, clientName } = req.body
   if (!invoice || !clientEmail) return res.status(400).json({ error: 'Missing fields' })
+  if (!resend) return res.status(500).json({ error: 'Email service is not configured' })
 
   const pct = invoice.amount > 0 ? Math.round((invoice.paid / invoice.amount) * 100) : 0
   const owing = invoice.amount - invoice.paid

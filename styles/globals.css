@@ -23,6 +23,11 @@
   --blue: #1A3D9E; --blue-bg: #EDF1FB;
   --purple: #4C3594; --purple-bg: #F0ECFB;
   --sidebar-w: 220px;
+  --brand-blush: #E8D7CF;
+  --brand-sage: #D8E7DD;
+  --brand-cream: #E8E0C8;
+  --brand-blue: #DCE2F3;
+  --brand-lavender: #E7DDF0;
 }
 
 html, body { height: 100%; }
@@ -147,10 +152,18 @@ textarea:focus-visible,
 
   /* Kanban: horizontal scroll */
   .kanban-board {
-    grid-template-columns: repeat(4, 280px) !important;
+    display: flex !important;
+    gap: 12px !important;
+    grid-template-columns: none !important;
     overflow-x: auto !important;
     padding-bottom: 12px;
     -webkit-overflow-scrolling: touch;
+    scroll-padding: 16px;
+    scroll-snap-type: x proximity;
+  }
+  .kanban-board > div {
+    flex: 0 0 min(84vw, 320px) !important;
+    scroll-snap-align: start;
   }
 
   /* Inbox: stack */
@@ -194,8 +207,33 @@ textarea:focus-visible,
 
   /* Toolbar wraps */
   .toolbar-wrap {
-    flex-wrap: wrap !important;
-    gap: 8px !important;
+    align-items: stretch !important;
+    display: grid !important;
+    gap: 10px !important;
+    grid-template-columns: 1fr !important;
+    width: 100%;
+  }
+  .toolbar-wrap > * {
+    flex-shrink: 1 !important;
+    width: 100% !important;
+  }
+  .toolbar-wrap > div:empty {
+    display: none !important;
+  }
+  .toolbar-wrap select,
+  .toolbar-wrap button,
+  .toolbar-wrap .seg-control {
+    min-height: 42px !important;
+    width: 100% !important;
+  }
+  .seg-control {
+    display: grid !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  }
+  .seg-control button {
+    justify-content: center;
+    padding-left: 8px !important;
+    padding-right: 8px !important;
   }
 
   /* Line item builder */
@@ -242,6 +280,10 @@ textarea:focus-visible,
     align-items: flex-start !important;
     flex-wrap: wrap;
     gap: 8px !important;
+  }
+  .project-list-main > div:last-child {
+    min-width: 0;
+    overflow-wrap: anywhere;
   }
 
   .calendar-month-grid,
@@ -343,16 +385,37 @@ textarea:focus-visible,
 
   /* Kanban: horizontal scroll */
   .kanban-board {
-    grid-template-columns: repeat(4, 260px) !important;
+    display: flex !important;
+    gap: 12px !important;
+    grid-template-columns: none !important;
     overflow-x: auto !important;
     -webkit-overflow-scrolling: touch;
+  }
+  .kanban-board > div {
+    flex: 0 0 min(84vw, 320px) !important;
   }
 
   /* Toolbar wraps */
   .toolbar-wrap {
-    flex-wrap: wrap !important;
+    align-items: stretch !important;
+    display: grid !important;
+    gap: 10px !important;
+    grid-template-columns: 1fr !important;
+    width: 100%;
   }
-  .toolbar-wrap > * { flex-shrink: 0; }
+  .toolbar-wrap > * {
+    flex-shrink: 1 !important;
+    width: 100% !important;
+  }
+  .toolbar-wrap > div:empty {
+    display: none !important;
+  }
+  .toolbar-wrap select,
+  .toolbar-wrap button,
+  .toolbar-wrap .seg-control {
+    min-height: 42px !important;
+    width: 100% !important;
+  }
 
   /* Inbox: stack vertically */
   .inbox-grid-wrap {
@@ -391,6 +454,30 @@ textarea:focus-visible,
   [role="button"]:hover {
     -webkit-tap-highlight-color: rgba(0,0,0,0);
   }
+}
+
+.calendar-month-cell-booked {
+  box-shadow: inset 0 0 0 2px var(--brand-blush);
+  position: relative;
+}
+
+.calendar-month-cell-booked::after {
+  background: var(--brand-blush);
+  border-radius: 999px;
+  content: '';
+  height: 5px;
+  position: absolute;
+  right: 7px;
+  top: 7px;
+  width: 5px;
+}
+
+.calendar-month-cell-today {
+  box-shadow: inset 0 0 0 1px var(--text);
+}
+
+.calendar-month-cell-booked.calendar-month-cell-today {
+  box-shadow: inset 0 0 0 2px var(--brand-blush), inset 0 0 0 4px #fff;
 }
 
 .contract-body-render p {

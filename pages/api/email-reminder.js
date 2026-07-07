@@ -11,6 +11,7 @@ export default async function handler(req, res) {
 
   const { booking, clientEmail, clientName } = req.body
   if (!booking || !clientEmail) return res.status(400).json({ error: 'Missing fields' })
+  if (!resend) return res.status(500).json({ error: 'Email service is not configured' })
 
   const fmtDate = iso => iso ? new Date(iso + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }) : 'TBD'
   const fmtTime = t => { if (!t) return ''; const [h, m] = t.split(':'); const hr = parseInt(h); return `${hr % 12 || 12}:${m} ${hr < 12 ? 'AM' : 'PM'}` }

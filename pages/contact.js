@@ -65,9 +65,13 @@ export default function ContactPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ lead }),
     })
-      .then(r => {
+      .then(async r => {
         setLoading(false)
-        if (!r.ok) { setErrors({ submit: 'Something went wrong — please try again.' }); return }
+        if (!r.ok) {
+          const payload = await r.json().catch(() => null)
+          setErrors({ submit: payload?.error || 'Something went wrong — please try again.' })
+          return
+        }
         if (settings.afterSubmit === 'redirect' && settings.redirectUrl) {
           window.location.href = settings.redirectUrl
         } else {
@@ -116,22 +120,46 @@ export default function ContactPage() {
           button, input, textarea, label { -webkit-tap-highlight-color: rgba(0,0,0,0); touch-action: manipulation; }
           input:focus, textarea:focus { border-color: #111110 !important; box-shadow: 0 0 0 3px rgba(17,17,16,0.08); }
           @media (max-width: 600px) {
+            html,
+            body,
+            #__next {
+              min-width: 0 !important;
+              width: 100% !important;
+            }
             .contact-page-shell {
-              padding: 28px 14px 48px !important;
+              justify-content: flex-start !important;
+              min-height: 100dvh !important;
+              padding: 24px 12px 44px !important;
               align-items: stretch !important;
+            }
+            .contact-page-wrap {
+              max-width: none !important;
+              min-width: 0 !important;
+            }
+            .contact-page-subtitle {
+              font-size: 14px !important;
+              line-height: 1.55 !important;
+              padding: 0 4px !important;
             }
             .contact-page-title {
               font-size: 30px !important;
+              line-height: 1.05 !important;
             }
             .contact-form-card {
               border-radius: 14px !important;
-              padding: 24px 18px !important;
+              box-shadow: 0 8px 28px rgba(0,0,0,0.05) !important;
+              padding: 22px 16px !important;
+              width: 100% !important;
             }
             .form-row-2 { grid-template-columns: 1fr !important; gap: 18px !important; }
             .contact-checkbox-grid { grid-template-columns: 1fr !important; }
             .contact-choice {
               align-items: flex-start !important;
               padding: 12px !important;
+              width: 100%;
+            }
+            .contact-choice span {
+              line-height: 1.35 !important;
             }
             .contact-submit {
               min-height: 48px !important;
@@ -146,13 +174,13 @@ export default function ContactPage() {
       </Head>
 
       <div className="contact-page-shell" style={{ minHeight: '100vh', background: '#FAFAF9', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '60px 20px 80px' }}>
-        <div style={{ width: '100%', maxWidth: 560 }}>
+        <div className="contact-page-wrap" style={{ width: '100%', maxWidth: 560 }}>
           {/* Header */}
           <div style={{ marginBottom: 40, textAlign: 'center' }}>
             <div className="contact-page-title" style={{ fontFamily: "'DM Serif Display', Georgia, serif", fontSize: 36, fontWeight: 400, letterSpacing: '-0.6px', lineHeight: 1.1, color: '#111110', marginBottom: 10 }}>
               {settings.formTitle || "Let's connect"}
             </div>
-            <div style={{ fontSize: 15, color: '#7F7E7C', fontWeight: 300 }}>Fill out the form below and we'll be in touch soon.</div>
+            <div className="contact-page-subtitle" style={{ fontSize: 15, color: '#7F7E7C', fontWeight: 300 }}>Fill out the form below and we'll be in touch soon.</div>
           </div>
 
           <form className="contact-form-card" onSubmit={handleSubmit} style={{ background: '#fff', borderRadius: 16, padding: '36px 40px', border: '1px solid #EAEAEA', boxShadow: '0 4px 24px rgba(0,0,0,0.06)' }}>

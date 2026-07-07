@@ -113,6 +113,8 @@ function buildSessionTypeBreakdown(clients, sessionTypes) {
   })).filter(x => x.value > 0)
 }
 
+const sessionTypePastels = ['#E8D7CF', '#D8E7DD', '#E8E0C8', '#DCE2F3', '#E7DDF0', '#F2DDDA', '#D7E7E8']
+
 // ── Analytics ─────────────────────────────────────────────────────
 export function Analytics({ data }) {
   const canvasRef = useRef(); const barRef = useRef(); const typeRef = useRef()
@@ -186,8 +188,9 @@ export function Analytics({ data }) {
             labels: typeData.map(t => t.label),
             datasets: [{
               data: typeData.map(t => t.value),
-              backgroundColor: ['#111110', '#555', '#888', '#bbb', '#ddd'],
-              borderWidth: 0,
+              backgroundColor: typeData.map((_, i) => sessionTypePastels[i % sessionTypePastels.length]),
+              borderColor: '#fff',
+              borderWidth: 2,
               hoverOffset: 4
             }]
           },
@@ -329,9 +332,10 @@ export function Calendar({ data, setData, toast, openClientCard }) {
             {cells.map((d, i) => {
               if (!d) return <div key={i} className="calendar-month-cell calendar-month-cell-empty" style={{ background: C.surface2, minHeight: 76 }} />
               const dateStr = ds(d), evts = data.bookings.filter(b => b.date === dateStr), isToday = dateStr === todayStr
+              const hasBooking = evts.length > 0
               return (
-                <div key={i} className="calendar-month-cell" style={{ background: isToday ? '#FAFAFA' : C.surface, minHeight: 76, padding: '7px 8px' }}>
-                  <div style={{ fontSize: 12, fontWeight: isToday ? 600 : 400, color: isToday ? C.text : C.muted }}>{d}</div>
+                <div key={i} className={`calendar-month-cell${hasBooking ? ' calendar-month-cell-booked' : ''}${isToday ? ' calendar-month-cell-today' : ''}`} style={{ background: hasBooking ? '#FFF8F5' : isToday ? '#FAFAFA' : C.surface, minHeight: 76, padding: '7px 8px' }}>
+                  <div style={{ fontSize: 12, fontWeight: hasBooking || isToday ? 700 : 400, color: hasBooking ? '#7A3B2E' : isToday ? C.text : C.muted }}>{d}</div>
                   {evts.map(e => {
                     const clientObj = data.clients.find(c => c.id === e.clientId || c.name === e.client)
                     return <div key={e.id} onClick={() => clientObj ? openClientCard(clientObj) : toggle(e.id)} style={{ fontSize: 10, fontWeight: 500, background: e.status === 'confirmed' ? C.text : C.surface3, color: e.status === 'confirmed' ? '#fff' : C.muted, borderRadius: 4, padding: '2px 5px', marginTop: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', cursor: 'pointer' }} title={clientObj ? `Open ${e.client}'s project` : 'Click to toggle status'}>{e.client}</div>
