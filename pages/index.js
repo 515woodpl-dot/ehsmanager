@@ -11,6 +11,17 @@ import ContactFormSettings from '../components/ContactForm'
 import { Dashboard, Analytics, Calendar, Invoices, Contracts, Inbox } from '../components/Pages'
 
 const todayLabel = () => new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
+const VIEW_STORAGE_KEY = 'ehs-studio-active-view'
+const VALID_VIEWS = new Set(['dashboard', 'analytics', 'projects', 'clients', 'calendar', 'invoices', 'contracts', 'inbox', 'contactform'])
+
+function getInitialView() {
+  if (typeof window === 'undefined') return 'dashboard'
+  const params = new URLSearchParams(window.location.search)
+  const fromUrl = params.get('view')
+  if (VALID_VIEWS.has(fromUrl)) return fromUrl
+  const fromStorage = window.localStorage.getItem(VIEW_STORAGE_KEY)
+  return VALID_VIEWS.has(fromStorage) ? fromStorage : 'dashboard'
+}
 
 // ── Global search ─────────────────────────────────────────────────
 function GlobalSearch({ data, setView }) {
@@ -162,7 +173,7 @@ function Sidebar({ active, setActive, unread, open, onClose, user, onSignOut }) 
 
 // ── Root ──────────────────────────────────────────────────────────
 export default function Home() {
-  const [view, setView] = useState('dashboard')
+  const [view, setView] = useState(getInitialView)
   const [data, setData] = useState(loadData)
   const [toastMsg, setToastMsg] = useState(null)
   const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -170,6 +181,26 @@ export default function Home() {
   const [user, setUser] = useState(null)
   const [dbReady, setDbReady] = useState(false)
   const toast = msg => setToastMsg(msg)
+
+  const setActiveView = (nextView) => {
+    const safeView = VALID_VIEWS.has(nextView) ? nextView : 'dashboard'
+    setView(safeView)
+    if (typeof window === 'undefined') return
+    window.localStorage.setItem(VIEW_STORAGE_KEY, safeView)
+    const url = new URL(window.location.href)
+    url.searchParams.set('view', safeView)
+    window.history.replaceState({}, '', url)
+  }
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    window.localStorage.setItem(VIEW_STORAGE_KEY, view)
+    const url = new URL(window.location.href)
+    if (url.searchParams.get('view') !== view) {
+      url.searchParams.set('view', view)
+      window.history.replaceState({}, '', url)
+    }
+  }, [view])
 
   // ── Auth + initial DB load ──────────────────────────────────────
   useEffect(() => {
@@ -228,7 +259,7 @@ export default function Home() {
     if (supabase) await supabase.auth.signOut()
   }
 
-  const props = { data, setData, toast, setView }
+  const props = { data, setData, toast, setView: setActiveView }
   const unread = data.messages.filter(m => m.unread).length
 
   const pageTitles = {
@@ -257,7 +288,7 @@ export default function Home() {
       </Head>
 
       <div style={{ display: 'flex', minHeight: '100vh', background: C.bg }}>
-        <Sidebar active={view} setActive={setView} unread={unread} open={sidebarOpen} onClose={() => setSidebarOpen(false)} user={user} onSignOut={handleSignOut} />
+        <Sidebar active={view} setActive={setActiveView} unread={unread} open={sidebarOpen} onClose={() => setSidebarOpen(false)} user={user} onSignOut={handleSignOut} />
 
         <div className="layout-main" style={{ marginLeft: 220, flex: 1, padding: '36px 44px', minHeight: '100vh' }}>
           {/* Topbar */}
@@ -270,7 +301,7 @@ export default function Home() {
             >
               ☰
             </button>
-            <GlobalSearch data={data} setView={setView} />
+            <GlobalSearch data={data} setView={setActiveView} />
           </div>
 
           {/* Page title */}

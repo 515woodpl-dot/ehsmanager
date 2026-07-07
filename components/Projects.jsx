@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { InvoiceModal, QuoteModal, ContractModal, QuestionnaireModal, SessionModal, MessageModal, GalleryModal } from './ActionModals'
 import { T, C, badge } from '../lib/tokens'
 import { Modal, Badge, Avatar, Seg } from './UI'
@@ -25,6 +25,8 @@ function ActionItem({ icon, title, subtitle, onClick, color = C.text }) {
 function CardModal({ client, stages, sessionTypes, data, setData, onClose, toast }) {
   const [editing, setEditing] = useState(false)
   const [form, setForm] = useState({ ...client })
+  const [liveNotes, setLiveNotes] = useState(client.notes || '')
+  const [notesSavedAt, setNotesSavedAt] = useState('')
   const [activeTab, setActiveTab] = useState('getstarted')
   const [activeModal, setActiveModal] = useState(null) // invoice|contract|quote|questionnaire|session|message|gallery
 
@@ -33,9 +35,28 @@ function CardModal({ client, stages, sessionTypes, data, setData, onClose, toast
   const clientBookings = data.bookings.filter(b => b.clientId === client.id)
 
   const save = () => {
-    setData(d => ({ ...d, clients: d.clients.map(c => c.id === client.id ? { ...form } : c) }))
+    setData(d => ({ ...d, clients: d.clients.map(c => c.id === client.id ? { ...form, notes: liveNotes } : c) }))
     toast('Client updated'); setEditing(false)
   }
+
+  useEffect(() => {
+    setForm({ ...client })
+    setLiveNotes(client.notes || '')
+    setNotesSavedAt('')
+  }, [client])
+
+  useEffect(() => {
+    if (liveNotes === (client.notes || '')) return
+    const timer = setTimeout(() => {
+      setData(d => ({
+        ...d,
+        clients: d.clients.map(c => c.id === client.id ? { ...c, notes: liveNotes } : c),
+      }))
+      setForm(f => ({ ...f, notes: liveNotes }))
+      setNotesSavedAt(new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }))
+    }, 450)
+    return () => clearTimeout(timer)
+  }, [client.id, client.notes, liveNotes, setData])
 
   const archive = () => {
     setData(d => ({ ...d, clients: d.clients.map(c => c.id === client.id ? { ...c, archived: true } : c) }))
@@ -174,7 +195,6 @@ function CardModal({ client, stages, sessionTypes, data, setData, onClose, toast
                     </select>
                   </div>
                 </div>
-                <div style={T.formGroup}><label style={T.formLabel}>Notes</label><textarea style={{ ...T.formInput, resize: 'none' }} rows={3} value={form.notes || ''} onChange={e => setForm({ ...form, notes: e.target.value })} /></div>
               </>
             ) : (
               <div>
@@ -191,14 +211,24 @@ function CardModal({ client, stages, sessionTypes, data, setData, onClose, toast
                     <div style={{ fontSize: 13.5, fontWeight: 400, textAlign: 'right', maxWidth: '60%' }}>{f.value}</div>
                   </div>
                 ))}
-                {client.notes && (
-                  <div style={{ marginTop: 14 }}>
-                    <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: C.faint, marginBottom: 6 }}>Notes</div>
-                    <div style={{ fontSize: 13.5, color: C.text, lineHeight: 1.6, fontWeight: 300 }}>{client.notes}</div>
-                  </div>
-                )}
               </div>
             )}
+
+            <div style={{ marginTop: 18 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', marginBottom: 7 }}>
+                <label style={T.formLabel}>Client notes</label>
+                <span style={{ fontSize: 11, color: C.faint }}>
+                  {notesSavedAt ? `Autosaved ${notesSavedAt}` : 'Autosaves while typing'}
+                </span>
+              </div>
+              <textarea
+                style={{ ...T.formInput, resize: 'vertical', minHeight: 110 }}
+                rows={5}
+                value={liveNotes}
+                onChange={e => setLiveNotes(e.target.value)}
+                placeholder="Private client notes, preferences, follow-ups, payment reminders..."
+              />
+            </div>
 
             {/* Danger zone */}
             <div style={{ marginTop: 32, paddingTop: 20, borderTop: `1px solid ${C.border}` }}>
@@ -375,17 +405,18 @@ function ListView({ clients, stages, onCardClick }) {
       {clients.length === 0 && <div style={{ textAlign: 'center', padding: '32px 0', color: C.faint, fontSize: 13 }}>No projects found</div>}
       {clients.map((c, i) => (
         <div key={c.id} onClick={() => onCardClick(c)}
+          className="project-list-row"
           style={{ ...T.dataRow, borderBottom: i === clients.length - 1 ? 'none' : `1px solid ${C.border}`, cursor: 'pointer' }}
           onMouseEnter={e => e.currentTarget.style.background = C.surface2}
           onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div className="project-list-main" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <div style={{ ...T.avatar(36) }}>{c.name.split(' ').slice(0, 2).map(w => w[0]).join('').toUpperCase()}</div>
             <div>
               <div style={{ fontWeight: 500, fontSize: 14 }}>{c.name}</div>
               <div style={{ fontSize: 12, color: C.muted }}>{c.email || '—'} · {c.phone || '—'}</div>
             </div>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+          <div className="project-list-meta" style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
             <div style={{ fontSize: 12, color: C.muted }}>{c.type}</div>
             <div style={{ fontSize: 12, color: C.muted }}>{fmtDate(c.date)}</div>
             <Badge type={c.status} label={stages.find(s => s.id === c.status)?.label || c.status} />
@@ -474,7 +505,7 @@ export default function Projects({ data, setData, toast }) {
   return (
     <div>
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+      <div className="projects-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
         <div>
           <div style={T.pageTitle}>Projects</div>
           <div style={T.pageSub}>{activeClients.length} active · {archivedClients.length} archived</div>
@@ -491,7 +522,7 @@ export default function Projects({ data, setData, toast }) {
 
         {/* Search */}
         {view !== 'archive' && (
-          <div style={{ position: 'relative', width: 200 }}>
+          <div className="project-search-wrap" style={{ position: 'relative', width: 200 }}>
             <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: C.faint, fontSize: 13, pointerEvents: 'none' }}>⌕</span>
             <input style={{ ...T.formInput, paddingLeft: 28, paddingRight: search ? 28 : 12, background: C.surface2, height: 36 }}
               placeholder="Search projects..." value={search} onChange={e => setSearch(e.target.value)} />

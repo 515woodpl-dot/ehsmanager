@@ -23,6 +23,19 @@ function Section({ title, children }) {
   )
 }
 
+function ContractPreview({ body }) {
+  return (
+    <div className="contract-body-render">
+      {String(body || '').split('\n').map((line, index) => {
+        const trimmed = line.trim()
+        if (!trimmed) return <div key={index} className="contract-body-space" />
+        const isHeading = /^\d+\.\s+/.test(trimmed) || trimmed === 'Signatures'
+        return <p key={index} className={isHeading ? 'contract-body-heading' : ''}>{line}</p>
+      })}
+    </div>
+  )
+}
+
 // Find a client's most relevant booking (next upcoming, else most recent)
 function pickBooking(bookings = [], c) {
   const mine = bookings.filter(b => b.clientId === c?.id || (c?.name && b.client === c.name))
@@ -262,8 +275,8 @@ export default function ContractBuilder({ client, data, onSave, onClose }) {
           </Section>
         </div>
       ) : (
-        <div style={{ background: C.surface2, borderRadius: 10, padding: '20px 24px', fontSize: 13, lineHeight: 1.85, color: C.text, whiteSpace: 'pre-wrap', fontWeight: 300, border: `1px solid ${C.border}`, maxHeight: 420, overflowY: 'auto' }}>
-          {previewText}
+        <div style={{ background: C.surface2, borderRadius: 10, padding: '20px 24px', fontSize: 13, lineHeight: 1.85, color: C.text, fontWeight: 300, border: `1px solid ${C.border}`, maxHeight: 420, overflowY: 'auto' }}>
+          <ContractPreview body={previewText} />
         </div>
       )}
 

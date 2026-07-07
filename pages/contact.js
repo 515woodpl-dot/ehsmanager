@@ -111,28 +111,51 @@ export default function ContactPage() {
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="true" />
         <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500&family=DM+Serif+Display&display=swap" rel="stylesheet" />
         <style>{`
-          * { box-sizing: border-box; margin: 0; padding: 0; }
+          * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: rgba(0,0,0,0); }
           body { font-family: 'DM Sans', sans-serif; background: #FAFAF9; color: #111110; -webkit-font-smoothing: antialiased; }
+          button, input, textarea, label { -webkit-tap-highlight-color: rgba(0,0,0,0); touch-action: manipulation; }
           input:focus, textarea:focus { border-color: #111110 !important; box-shadow: 0 0 0 3px rgba(17,17,16,0.08); }
-  @media (max-width: 600px) {
-    .form-row-2 { grid-template-columns: 1fr !important; }
-    .contact-checkbox-grid { grid-template-columns: 1fr !important; }
-  }
+          @media (max-width: 600px) {
+            .contact-page-shell {
+              padding: 28px 14px 48px !important;
+              align-items: stretch !important;
+            }
+            .contact-page-title {
+              font-size: 30px !important;
+            }
+            .contact-form-card {
+              border-radius: 14px !important;
+              padding: 24px 18px !important;
+            }
+            .form-row-2 { grid-template-columns: 1fr !important; gap: 18px !important; }
+            .contact-checkbox-grid { grid-template-columns: 1fr !important; }
+            .contact-choice {
+              align-items: flex-start !important;
+              padding: 12px !important;
+            }
+            .contact-submit {
+              min-height: 48px !important;
+            }
+            input,
+            textarea {
+              font-size: 16px !important;
+            }
+          }
           ::placeholder { color: #B0AFAD; }
         `}</style>
       </Head>
 
-      <div style={{ minHeight: '100vh', background: '#FAFAF9', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '60px 20px 80px' }}>
+      <div className="contact-page-shell" style={{ minHeight: '100vh', background: '#FAFAF9', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '60px 20px 80px' }}>
         <div style={{ width: '100%', maxWidth: 560 }}>
           {/* Header */}
           <div style={{ marginBottom: 40, textAlign: 'center' }}>
-            <div style={{ fontFamily: "'DM Serif Display', Georgia, serif", fontSize: 36, fontWeight: 400, letterSpacing: '-0.6px', lineHeight: 1.1, color: '#111110', marginBottom: 10 }}>
+            <div className="contact-page-title" style={{ fontFamily: "'DM Serif Display', Georgia, serif", fontSize: 36, fontWeight: 400, letterSpacing: '-0.6px', lineHeight: 1.1, color: '#111110', marginBottom: 10 }}>
               {settings.formTitle || "Let's connect"}
             </div>
             <div style={{ fontSize: 15, color: '#7F7E7C', fontWeight: 300 }}>Fill out the form below and we'll be in touch soon.</div>
           </div>
 
-          <form onSubmit={handleSubmit} style={{ background: '#fff', borderRadius: 16, padding: '36px 40px', border: '1px solid #EAEAEA', boxShadow: '0 4px 24px rgba(0,0,0,0.06)' }}>
+          <form className="contact-form-card" onSubmit={handleSubmit} style={{ background: '#fff', borderRadius: 16, padding: '36px 40px', border: '1px solid #EAEAEA', boxShadow: '0 4px 24px rgba(0,0,0,0.06)' }}>
 
             {/* Full Name */}
             <div style={{ marginBottom: 20 }}>
@@ -172,7 +195,7 @@ export default function ContactPage() {
                   const checked = form.services.includes(opt)
                   const disabled = !checked && form.services.length >= maxChecked
                   return (
-                    <label key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 8, border: `1px solid ${checked ? '#111110' : '#EAEAEA'}`, cursor: disabled ? 'not-allowed' : 'pointer', background: checked ? '#F8F8F7' : '#fff', opacity: disabled ? 0.5 : 1, transition: 'all 0.12s' }}>
+                    <label key={i} className="contact-choice" style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 8, border: `1px solid ${checked ? '#111110' : '#EAEAEA'}`, cursor: disabled ? 'not-allowed' : 'pointer', background: checked ? '#F8F8F7' : '#fff', opacity: disabled ? 0.5 : 1, transition: 'all 0.12s' }}>
                       <input type="checkbox" checked={checked} onChange={() => !disabled && toggleService(opt)} style={{ width: 15, height: 15, cursor: disabled ? 'not-allowed' : 'pointer' }} />
                       <span style={{ fontSize: 13.5, color: '#111110', fontWeight: checked ? 500 : 400 }}>{opt}</span>
                     </label>
@@ -190,7 +213,7 @@ export default function ContactPage() {
 
             {/* Submit */}
             {errors.submit && <div style={{ fontSize: 13, color: '#991F1F', marginBottom: 12, textAlign: 'center' }}>{errors.submit}</div>}
-            <button type="submit" disabled={loading}
+            <button type="submit" disabled={loading} className="contact-submit"
               style={{ width: '100%', padding: '13px', borderRadius: 10, border: 'none', background: loading ? '#555' : '#111110', color: '#fff', fontSize: 15, fontWeight: 500, cursor: loading ? 'not-allowed' : 'pointer', letterSpacing: '-0.1px', transition: 'background 0.15s' }}>
               {loading ? 'Sending...' : (settings.buttonLabel || 'Submit')}
             </button>

@@ -10,6 +10,20 @@ const fmtTime = t => { if (!t) return ''; const [h, m] = t.split(':'); const hr 
 const todayLabel = () => new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
 const fmt$ = n => '$' + Number(n || 0).toLocaleString()
 
+function ContractBody({ body }) {
+  const lines = String(body || 'No contract body.').split('\n')
+  return (
+    <div className="contract-body-render">
+      {lines.map((line, index) => {
+        const trimmed = line.trim()
+        if (!trimmed) return <div key={index} className="contract-body-space" />
+        const isHeading = /^\d+\.\s+/.test(trimmed) || trimmed === 'Signatures'
+        return <p key={index} className={isHeading ? 'contract-body-heading' : ''}>{line}</p>
+      })}
+    </div>
+  )
+}
+
 // ── Dashboard ─────────────────────────────────────────────────────
 export function Dashboard({ data, setView }) {
   const totalRevenue = data.invoices.reduce((s, i) => s + i.paid, 0)
@@ -311,12 +325,12 @@ export function Calendar({ data, setData, toast, openClientCard }) {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: 1, marginBottom: 1 }} className="cal-head-grid">
             {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => <div key={d} style={{ fontSize: 10, fontWeight: 600, color: C.faint, textAlign: 'center', padding: '6px 0', letterSpacing: '0.05em', textTransform: 'uppercase' }}>{d}</div>)}
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: 1, background: C.border, border: `1px solid ${C.border}`, borderRadius: 8, overflow: 'hidden' }}>
+          <div className="calendar-month-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: 1, background: C.border, border: `1px solid ${C.border}`, borderRadius: 8, overflow: 'hidden' }}>
             {cells.map((d, i) => {
-              if (!d) return <div key={i} style={{ background: C.surface2, minHeight: 76 }} />
+              if (!d) return <div key={i} className="calendar-month-cell calendar-month-cell-empty" style={{ background: C.surface2, minHeight: 76 }} />
               const dateStr = ds(d), evts = data.bookings.filter(b => b.date === dateStr), isToday = dateStr === todayStr
               return (
-                <div key={i} style={{ background: isToday ? '#FAFAFA' : C.surface, minHeight: 76, padding: '7px 8px' }}>
+                <div key={i} className="calendar-month-cell" style={{ background: isToday ? '#FAFAFA' : C.surface, minHeight: 76, padding: '7px 8px' }}>
                   <div style={{ fontSize: 12, fontWeight: isToday ? 600 : 400, color: isToday ? C.text : C.muted }}>{d}</div>
                   {evts.map(e => {
                     const clientObj = data.clients.find(c => c.id === e.clientId || c.name === e.client)
@@ -540,7 +554,9 @@ export function Contracts({ data, setData, toast }) {
             <Badge type={viewModal.status} label={viewModal.status} />
             {viewModal.signedBy && <span style={{ fontSize: 12, color: C.muted }}>Signed by {viewModal.signedBy} · {viewModal.signedAt}</span>}
           </div>
-          <div style={{ background: C.surface2, borderRadius: 10, padding: '18px 20px', fontSize: 14, lineHeight: 1.8, color: C.text, whiteSpace: 'pre-wrap', fontWeight: 300 }}>{viewModal.body || 'No contract body.'}</div>
+          <div style={{ background: C.surface2, borderRadius: 10, padding: '18px 20px', fontSize: 14, lineHeight: 1.8, color: C.text, fontWeight: 300 }}>
+            <ContractBody body={viewModal.body} />
+          </div>
         </Modal>
       )}
       {signModal && (
