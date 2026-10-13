@@ -23,9 +23,17 @@ The public booking page is at `/booking`; the production host is
 
 ## Email (Resend) and payments (Stripe)
 
-Set `INTEGRATIONS_ENCRYPTION_KEY` (`openssl rand -base64 32`), apply
-[`supabase-migration-003-integrations.sql`](supabase-migration-003-integrations.sql),
-then open **Integrations** in the app:
+Set `INTEGRATIONS_ENCRYPTION_KEY` (`openssl rand -base64 32`), then apply
+[`supabase-migration-003-integrations.sql`](supabase-migration-003-integrations.sql)
+to the PIBASE project. Use `migration-apply`, not the owner SQL tab, because the
+SQL tab rejects the GRANT/REVOKE statements:
+
+```bash
+docker compose run --rm -T gateway migration-apply PROJECT_ID 0003_integrations \
+  < supabase-migration-003-integrations.sql
+```
+
+Then open **Integrations** in the app:
 
 - **Resend**: API key, a from address on a domain verified in Resend, and an
   optional reply-to. Use **Test connection** to send yourself a test email.
@@ -35,8 +43,9 @@ then open **Integrations** in the app:
   `checkout.session.completed` and `checkout.session.async_payment_succeeded`.
 
 Keys are encrypted with AES-256-GCM before they are stored in the
-`integration_secrets` table, which has no RLS policies, so only the server's
-service key can read it. Keys are never returned to the browser.
+`integration_secrets` table. The migration enables RLS with no policies and
+revokes the project's `p_<id>_anon` and `p_<id>_authenticated` grants, so only
+the server's PIBASE service key can read it. Keys are never returned to the browser.
 
 Once Stripe is connected, invoice emails include a **Pay** button and the
 Invoices page has a **Pay link** button. Clients pay on Stripe Checkout, and the
