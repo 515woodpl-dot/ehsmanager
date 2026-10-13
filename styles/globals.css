@@ -529,3 +529,9 @@ textarea:focus-visible,
 .cd-signature-date { font-size: 13px; color: var(--cd-text); }
 @media (max-width: 600px) { .contract-document { padding: 28px 18px 30px; font-size: 14.5px; } .cd-title { font-size: 19px; } .cd-body h3, .cd-signatures h3 { font-size: 17px; margin-top: 34px; } .cd-summary dl { gap: 14px 32px; } }
 @media print { .contract-document { max-width: none; padding: 0; font-size: 11pt; } }
+
+/* Signature pad (client signing page and Admin → Branding). */
+.signature-pad { position: relative; height: 150px; border: 1px dashed #c9c9c9; border-radius: 8px; background: #fcfcfc; }
+.signature-pad canvas { width: 100%; height: 100%; display: block; touch-action: none; cursor: crosshair; }
+.signature-pad-hint { position: absolute; left: 16px; bottom: 12px; color: #aaa; font-size: 13px; pointer-events: none; }
+.signature-pad-clear { position: absolute; right: 10px; top: 10px; border: 1px solid #ddd; background: #fff; border-radius: 6px; padding: 4px 10px; font: inherit; font-size: 12px; cursor: pointer; }

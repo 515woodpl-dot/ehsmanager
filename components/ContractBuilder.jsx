@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react'
 import { T, C } from '../lib/tokens'
 import { CONTRACT_TEMPLATE, fillContract } from '../lib/contractTemplate'
 import ContractDocument from './ContractDocument'
+import { useBranding } from './Branding'
 
 const uid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => { const r = Math.random() * 16 | 0; return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16) })
 
@@ -69,6 +70,7 @@ function buildFields(c, data) {
 }
 
 export default function ContractBuilder({ client, data, onSave, onClose }) {
+  const branding = useBranding()
   const initial = buildFields(client, data)
   const [selectedClientId, setSelectedClientId] = useState(client?.id || '')
   const [fields, setFields] = useState(initial.fields)
@@ -281,7 +283,7 @@ export default function ContractBuilder({ client, data, onSave, onClose }) {
         </div>
       ) : (
         <div style={{ background: C.surface2, borderRadius: 10, padding: 12, border: `1px solid ${C.border}`, maxHeight: '65vh', overflowY: 'auto' }}>
-          <ContractDocument body={previewText} />
+          <ContractDocument body={previewText} studioSignatureImage={branding?.signature?.url} />
         </div>
       )}
 

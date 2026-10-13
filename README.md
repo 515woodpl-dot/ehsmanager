@@ -53,6 +53,15 @@ webhook marks the invoice paid or partial.
 
 Without Resend, use the contract's copyable signing link.
 
+## Branding (logo, contract cover photo, signature)
+
+Apply [`supabase-migration-004-branding.sql`](supabase-migration-004-branding.sql)
+with `migration-apply`, then open **Branding** in the app to upload your logo
+and contract cover photo and to draw your studio signature once. The signature
+appears as the studio's signature on every contract, and clients draw (or type)
+their own when they sign. Images are resized in the browser, checked on the
+server, and kept in the server-only `studio_assets` table.
+
 ## Deploy update to server
 
 ```bash

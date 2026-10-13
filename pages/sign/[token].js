@@ -1,10 +1,8 @@
-import fs from 'fs'
-import path from 'path'
 import { useState } from 'react'
 import Head from 'next/head'
 import { createServiceClient } from '../../lib/pibase'
 import { verifyContractToken } from '../../lib/signingTokens'
-import { safeImageUrl } from '../../lib/booking'
+import { loadBranding } from '../../lib/brandAssets'
 import ContractDocument, { parseContract } from '../../components/ContractDocument'
 import SignaturePad from '../../components/SignaturePad'
 
@@ -109,7 +107,7 @@ export default function SignContractPage({ token, contract, brand }) {
         </section>
 
         <section className="sc-card sc-contract">
-          <ContractDocument body={contract.body} signedBy={signed ? signedBy : ''} signedAt={signedAt} signatureImage={signatureImage} showSummary={false} clientSignatureSlot={signed ? null : signForm} />
+          <ContractDocument body={contract.body} signedBy={signed ? signedBy : ''} signedAt={signedAt} signatureImage={signatureImage} studioSignatureImage={brand.signatureImage} showSummary={false} clientSignatureSlot={signed ? null : signForm} />
         </section>
 
         <footer className="sc-footer">{studio}</footer>
@@ -144,10 +142,6 @@ export default function SignContractPage({ token, contract, brand }) {
         .sc-tabs { display: inline-flex; border: 1px solid #ddd; border-radius: 999px; padding: 3px; margin-bottom: 12px; }
         .sc-tabs button { border: 0; background: none; border-radius: 999px; padding: 6px 16px; font: inherit; font-size: 13px; cursor: pointer; color: #555; }
         .sc-tabs button.active { background: #1f1f1f; color: #fff; }
-        .signature-pad { position: relative; height: 150px; border: 1px dashed #c9c9c9; border-radius: 8px; background: #fcfcfc; }
-        .signature-pad canvas { width: 100%; height: 100%; display: block; touch-action: none; cursor: crosshair; }
-        .signature-pad-hint { position: absolute; left: 16px; bottom: 12px; color: #aaa; font-size: 13px; pointer-events: none; }
-        .signature-pad-clear { position: absolute; right: 10px; top: 10px; border: 1px solid #ddd; background: #fff; border-radius: 6px; padding: 4px 10px; font: inherit; font-size: 12px; cursor: pointer; }
         .sc-typed { height: 150px; display: flex; align-items: center; padding: 0 20px; border: 1px dashed #c9c9c9; border-radius: 8px; font-family: 'Mrs Saint Delafield', cursive; font-size: 54px; color: #111; overflow: hidden; white-space: nowrap; }
         .sc-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 18px 0 14px; }
         .sc-fields label { display: grid; gap: 6px; }
@@ -180,14 +174,6 @@ export default function SignContractPage({ token, contract, brand }) {
   )
 }
 
-const BRAND_FILES = { cover: ['contract-cover.jpg', 'contract-cover.webp', 'contract-cover.png'], logo: ['logo.png', 'logo.webp', 'logo.jpg', 'logo.svg'] }
-function brandAsset(envValue, names) {
-  const configured = safeImageUrl(envValue)
-  if (configured) return configured
-  const found = names.find(name => fs.existsSync(path.join(process.cwd(), 'public', 'brand', name)))
-  return found ? `/brand/${found}` : ''
-}
-
 export async function getServerSideProps({ params, res }) {
   res.setHeader('Cache-Control', 'private, no-store')
   const parsed = verifyContractToken(params.token)
@@ -207,11 +193,7 @@ export async function getServerSideProps({ params, res }) {
   return {
     props: {
       token: params.token,
-      brand: {
-        studioName: profile?.business_name || '',
-        coverUrl: brandAsset(process.env.CONTRACT_COVER_URL, BRAND_FILES.cover),
-        logoUrl: brandAsset(process.env.STUDIO_LOGO_URL, BRAND_FILES.logo),
-      },
+      brand: { studioName: profile?.business_name || '', ...await loadBranding(db, data.user_id) },
       contract: {
         id: data.id,
         client: data.client_name || '',

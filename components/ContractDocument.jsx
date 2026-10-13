@@ -79,7 +79,7 @@ export function SignatureBlock({ name, image, signedOn, children }) {
   )
 }
 
-export default function ContractDocument({ body, signedBy, signedAt, signatureImage, showSummary = true, clientSignatureSlot }) {
+export default function ContractDocument({ body, signedBy, signedAt, signatureImage, studioSignatureImage, showSummary = true, clientSignatureSlot }) {
   const { meta, content, signers, hasSignatures } = parseContract(body)
   const blocks = []
   let bullets = []
@@ -115,7 +115,7 @@ export default function ContractDocument({ body, signedBy, signedAt, signatureIm
           {signedBy || !clientSignatureSlot
             ? <SignatureBlock name={signedBy || signers.client} image={signatureImage} signedOn={signedBy ? signedAt : ''} />
             : <SignatureBlock name={signers.client}>{clientSignatureSlot}</SignatureBlock>}
-          <SignatureBlock name={signers.studio} signedOn={meta.issueDate} />
+          <SignatureBlock name={signers.studio} image={studioSignatureImage} signedOn={meta.issueDate} />
         </section>
       )}
     </article>

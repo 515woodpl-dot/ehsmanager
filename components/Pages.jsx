@@ -4,6 +4,7 @@ import { pibase } from '../lib/pibase'
 import { Modal, Badge, Avatar, SearchBar } from './UI'
 import ContractBuilder from './ContractBuilder'
 import ContractDocument from './ContractDocument'
+import { useBranding } from './Branding'
 
 const uid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => { const r = Math.random() * 16 | 0; return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16) })
 const fmtDate = iso => { if (!iso) return 'TBD'; const d = new Date(iso + 'T00:00:00'); return isNaN(d) ? iso : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) }
@@ -541,6 +542,7 @@ export function Invoices({ data, setData, toast }) {
 
 // ── Contracts ─────────────────────────────────────────────────────
 export function Contracts({ data, setData, toast }) {
+  const branding = useBranding()
   const [modal, setModal] = useState(false)
   const [viewModal, setViewModal] = useState(null)
   const [signModal, setSignModal] = useState(null)
@@ -625,7 +627,7 @@ export function Contracts({ data, setData, toast }) {
             {viewModal.signedBy && <span style={{ fontSize: 12, color: C.muted }}>Signed by {viewModal.signedBy} · {viewModal.signedAt}</span>}
           </div>
           <div style={{ background: C.surface2, borderRadius: 10, padding: 12 }}>
-            <ContractDocument body={viewModal.body} signedBy={viewModal.signedBy} signedAt={viewModal.signedAt} signatureImage={viewModal.fields?.signatureImage} />
+            <ContractDocument body={viewModal.body} signedBy={viewModal.signedBy} signedAt={viewModal.signedAt} signatureImage={viewModal.fields?.signatureImage} studioSignatureImage={branding?.signature?.url} />
           </div>
         </Modal>
       )}
