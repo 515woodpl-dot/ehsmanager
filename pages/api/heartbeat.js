@@ -11,6 +11,13 @@
  * Optional secret to prevent abuse:
  *   HEARTBEAT_SECRET — if set, caller must pass ?secret=<value>
  */
+import crypto from 'crypto'
+
+const sameSecret = (given, expected) => {
+  const a = Buffer.from(String(given || '')), b = Buffer.from(expected)
+  return a.length === b.length && crypto.timingSafeEqual(a, b)
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' })
@@ -18,7 +25,7 @@ export default async function handler(req, res) {
 
   // Optional secret check
   const secret = process.env.HEARTBEAT_SECRET
-  if (secret && req.query.secret !== secret) {
+  if (secret && !sameSecret(req.headers['x-heartbeat-secret'] || req.query.secret, secret)) {
     return res.status(401).json({ error: 'Unauthorized' })
   }
 
@@ -54,9 +61,10 @@ export default async function handler(req, res) {
       ts: new Date().toISOString(),
     })
   } catch (err) {
+    console.error('[heartbeat]', err)
     return res.status(500).json({
       ok: false,
-      error: err.message,
+      error: 'Database is unreachable',
       ts: new Date().toISOString(),
     })
   }

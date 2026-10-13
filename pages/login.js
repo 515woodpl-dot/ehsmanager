@@ -4,6 +4,10 @@ import { useRouter } from 'next/router'
 import { pibase } from '../lib/pibase'
 import { T, C } from '../lib/tokens'
 
+// Self-service signup is off unless explicitly enabled. Also disable signups
+// in PIBASE auth settings: hiding the tab does not block the auth API.
+const SIGNUP_ENABLED = process.env.NEXT_PUBLIC_ALLOW_SIGNUP === 'true'
+
 export default function Login() {
   const router = useRouter()
   const [tab, setTab]       = useState('login')  // login | signup
@@ -25,9 +29,10 @@ export default function Login() {
   }
 
   const handleSignup = async () => {
+    if (!SIGNUP_ENABLED) return
     if (!pibase) { setError('PIBASE is not configured.'); return }
     if (!email || !password || !name) { setError('All fields required'); return }
-    if (password.length < 6) { setError('Password must be at least 6 characters'); return }
+    if (password.length < 10) { setError('Password must be at least 10 characters'); return }
     setLoading(true); setError(null)
     const { error } = await pibase.auth.signUp({
       email, password,
@@ -65,7 +70,7 @@ export default function Login() {
 
             {/* Tabs */}
             <div style={{ display: 'flex', marginBottom: 28, background: C.surface2, borderRadius: 10, padding: 3 }}>
-              {[['login', 'Log in'], ['signup', 'Create account']].map(([t, l]) => (
+              {[['login', 'Log in'], ...(SIGNUP_ENABLED ? [['signup', 'Create account']] : [])].map(([t, l]) => (
                 <button key={t} onClick={() => { setTab(t); setError(null); setSuccess(null) }}
                   style={{ flex: 1, padding: '8px 0', borderRadius: 8, border: 'none', background: tab === t ? C.surface : 'transparent', color: C.text, fontWeight: tab === t ? 500 : 400, fontSize: 13.5, cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.12s' }}>
                   {l}
@@ -99,7 +104,7 @@ export default function Login() {
 
             <div style={{ ...T.formGroup, marginBottom: 24 }}>
               <label style={T.formLabel}>Password</label>
-              <input style={T.formInput} type="password" placeholder={tab === 'signup' ? 'Min. 6 characters' : '••••••••'} value={password} onChange={e => setPass(e.target.value)} onKeyDown={handleKey} />
+              <input style={T.formInput} type="password" placeholder={tab === 'signup' ? 'Min. 10 characters' : '••••••••'} value={password} onChange={e => setPass(e.target.value)} onKeyDown={handleKey} />
             </div>
 
             <button

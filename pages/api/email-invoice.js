@@ -1,8 +1,7 @@
-import { resend, fromFor, emailWrap } from '../../lib/email'
+import { emailWrap, escapeHtml, sendStudioEmail } from '../../lib/email'
 import { requireUser } from '../../lib/api-auth'
-
-const escapeHtml = value => String(value ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;')
-  .replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;')
+import { stripeConfigFor } from '../../lib/integrations'
+import { balanceCents, payUrlFor } from '../../lib/payments'
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end()
@@ -24,7 +23,9 @@ export default async function handler(req, res) {
   const invoice = { ...row, client: row.client_name, lineItems: Array.isArray(row.line_items) ? row.line_items : row.line_items?.items || [] }
   const clientEmail = client.email
   const clientName = client.name
-  if (!resend) return res.status(500).json({ error: 'Email service is not configured' })
+  const payUrl = invoice.status !== 'paid' && balanceCents(invoice) > 0 && await stripeConfigFor(auth.db, auth.user.id)
+    ? payUrlFor(invoice.id)
+    : null
 
   const pct = invoice.amount > 0 ? Math.round((invoice.paid / invoice.amount) * 100) : 0
   const owing = invoice.amount - invoice.paid
@@ -48,26 +49,23 @@ export default async function handler(req, res) {
       ${lineItemsHtml}
       <div class="box-row"><span class="label">Invoice</span><span class="value">${escapeHtml(invoice.number || invoice.id)}</span></div>
       <div class="box-row"><span class="label">Due date</span><span class="value">${fmtDate(invoice.due)}</span></div>
-      <div class="box-row"><span class="label">Status</span><span class="value">${statusLabel}</span></div>
+      <div class="box-row"><span class="label">Status</span><span class="value">${escapeHtml(statusLabel)}</span></div>
       ${invoice.note ? `<div class="box-row"><span class="label">Note</span><span class="value">${escapeHtml(invoice.note)}</span></div>` : ''}
     </div>
+
+    ${payUrl ? `<a href="${escapeHtml(payUrl)}" class="btn">Pay ${fmt(owing)} securely</a>` : ''}
 
     <p>If you have any questions about this invoice, please don't hesitate to reach out.</p>
     <p>Thank you for choosing ${escapeHtml(bizName)}.</p>
     <p style="margin-top:24px;">Warmly,<br/><strong>${escapeHtml(ownerName)}</strong></p>
   `, bizName)
 
-  try {
-    const { data, error } = await resend.emails.send({
-      from: fromFor(bizName),
-      reply_to: auth.profile.email || undefined,
-      to: clientEmail,
-      subject: `Invoice ${invoice.number || invoice.id} from ${bizName}`,
-      html,
-    })
-    if (error) return res.status(400).json({ error })
-    return res.status(200).json({ id: data.id })
-  } catch (err) {
-    return res.status(500).json({ error: err.message })
-  }
+  const result = await sendStudioEmail(auth.db, auth.user.id, {
+    businessName: bizName,
+    replyTo: auth.profile.email || auth.user.email,
+    to: clientEmail,
+    subject: `Invoice ${invoice.number || invoice.id} from ${bizName}`,
+    html,
+  })
+  return res.status(result.status).json(result.body)
 }

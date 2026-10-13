@@ -7,6 +7,7 @@ export default function ContactFormSettings({ data, setData, toast }) {
   const [newOption, setNewOption] = useState('')
 
   const save = () => {
+    if (form.afterSubmit === 'redirect' && !/^https?:\/\/[^\s]+$/i.test(form.redirectUrl || '')) { toast('Redirect URL must start with https://'); return }
     setData(d => ({ ...d, formSettings: { ...form } }))
     toast('Form settings saved')
   }

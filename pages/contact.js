@@ -4,6 +4,11 @@ import { STORAGE_KEY, DEFAULT_FORM_SETTINGS } from '../lib/data'
 
 const uid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => { const r = Math.random() * 16 | 0; return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16) })
 
+// Only follow http(s) redirects; a `javascript:` URL here would run script.
+const safeRedirect = value => {
+  try { const url = new URL(String(value || '')); return ['https:', 'http:'].includes(url.protocol) ? url.toString() : '' } catch { return '' }
+}
+
 // Form settings now come from the server (per-studio); localStorage kept
 // only as an instant-render fallback while the fetch is in flight.
 function loadSettingsFallback() {
@@ -73,8 +78,8 @@ export default function ContactPage() {
           setErrors({ submit: payload?.error || 'Something went wrong — please try again.' })
           return
         }
-        if (settings.afterSubmit === 'redirect' && settings.redirectUrl) {
-          window.location.href = settings.redirectUrl
+        if (settings.afterSubmit === 'redirect' && safeRedirect(settings.redirectUrl)) {
+          window.location.href = safeRedirect(settings.redirectUrl)
         } else {
           setSubmitted(true)
         }

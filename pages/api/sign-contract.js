@@ -1,8 +1,11 @@
 import { createServiceClient } from '../../lib/pibase'
 import { verifyContractToken } from '../../lib/signingTokens'
+import { clientIp, rateLimit } from '../../lib/rateLimit'
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
+
+  if (!rateLimit(req, res, { key: 'sign-contract', limit: 10, windowMs: 10 * 60 * 1000 })) return
 
   const db = createServiceClient()
   if (!db) return res.status(500).json({ error: 'Database not configured' })
@@ -10,7 +13,10 @@ export default async function handler(req, res) {
   const { token, signerName, signerEmail } = req.body || {}
   const parsed = verifyContractToken(token)
   if (!parsed) return res.status(400).json({ error: 'Invalid signing link' })
-  if (!String(signerName || '').trim()) return res.status(400).json({ error: 'Signer name is required' })
+  const name = String(signerName || '').trim().slice(0, 160)
+  const email = String(signerEmail || '').trim().slice(0, 254)
+  if (!name) return res.status(400).json({ error: 'Signer name is required' })
+  if (email && !/^[^\s@<>"]+@[^\s@<>"]+\.[^\s@<>"]+$/.test(email)) return res.status(400).json({ error: 'Enter a valid email' })
 
   const { data: current, error: lookupError } = await db
     .from('contracts')
@@ -25,9 +31,17 @@ export default async function handler(req, res) {
     .from('contracts')
     .update({
       status: 'signed',
-      signed_by: String(signerName).trim(),
+      signed_by: name,
       signed_at: signedAt,
-      fields: { ...(current?.fields || {}), signerEmail: signerEmail || null, signedVia: 'public_link' },
+      // Evidence trail for the electronic signature.
+      fields: {
+        ...(current?.fields || {}),
+        signerEmail: email || null,
+        signedVia: 'public_link',
+        signedAtIso: new Date().toISOString(),
+        signerIp: clientIp(req),
+        signerUserAgent: String(req.headers['user-agent'] || '').slice(0, 300),
+      },
     })
     .eq('id', parsed.contractId)
     .eq('status', 'pending')

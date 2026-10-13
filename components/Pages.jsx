@@ -436,9 +436,20 @@ export function Invoices({ data, setData, toast }) {
     try {
       const { data: { session } } = await pibase.auth.getSession()
       const r = await fetch('/api/email-invoice', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token || ''}` }, body: JSON.stringify({ invoice: inv, clientEmail: client.email, clientName: client.name }) })
-      if (r.ok) { toast('Invoice sent to ' + client.email) } else { toast('Failed to send email') }
+      const payload = await r.json().catch(() => ({}))
+      if (r.ok) { toast('Invoice sent to ' + client.email) } else { toast(payload.error || 'Failed to send email') }
     } catch { toast('Failed to send email') }
     setSending(null)
+  }
+  const copyPayLink = async (inv) => {
+    try {
+      const { data: { session } } = await pibase.auth.getSession()
+      const r = await fetch('/api/invoice-pay-link', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token || ''}` }, body: JSON.stringify({ invoiceId: inv.id }) })
+      const payload = await r.json().catch(() => ({}))
+      if (!r.ok || !payload.url) { toast(payload.error || 'Unable to create payment link'); return }
+      try { await navigator.clipboard.writeText(payload.url); toast('Payment link copied') }
+      catch { window.prompt('Copy this payment link for your client:', payload.url) }
+    } catch { toast('Unable to create payment link') }
   }
   const add = () => { const client = data.clients.find(c => c.name === form.client); if (!client) { toast('Select an existing client'); return }; if (!(Number(form.amount) > 0)) { toast('Enter a positive amount'); return }; setData(d => ({ ...d, invoices: [...d.invoices, { id: uid(), number: 'INV-' + String(d.invoices.length + 1).padStart(3, '0'), client: form.client, clientId: client.id, amount: Number(form.amount), due: form.due, status: 'unpaid', paid: 0, note: form.note, paymentIntentId: null }] })); toast('Invoice created'); setModal(false); setForm(blank) }
   const confirmPaid = () => {
@@ -474,6 +485,7 @@ export function Invoices({ data, setData, toast }) {
                   {inv.status === 'partial' && <div style={{ fontSize: 11, color: C.muted }}>{fmt$(inv.paid)} paid</div>}
                 </div>
                 {inv.status !== 'paid' && owing > 0 && <button style={{ ...T.btnSm, color: C.green, borderColor: C.green }} onClick={() => { setPayModal(inv); setPayMethod(null) }}>Mark paid</button>}
+                {inv.status !== 'paid' && owing > 0 && <button style={T.btnSm} onClick={() => copyPayLink(inv)}>Pay link</button>}
                 <button style={T.btnSm} onClick={() => sendInvoice(inv)} disabled={sending === inv.id}>{sending === inv.id ? 'Sending...' : 'Send'}</button>
                 <button style={{ ...T.btnGhost, color: C.faint }} onClick={() => del(inv.id)}>×</button>
               </div>

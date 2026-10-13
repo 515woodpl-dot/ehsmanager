@@ -1,12 +1,9 @@
 import { createServiceClient } from '../../lib/pibase'
-import { resend, FROM, emailWrap } from '../../lib/email'
+import { emailWrap, escapeHtml, sendStudioEmail } from '../../lib/email'
+import { rateLimit } from '../../lib/rateLimit'
 
-const escapeHtml = (value = '') => String(value)
-  .replace(/&/g, '&amp;')
-  .replace(/</g, '&lt;')
-  .replace(/>/g, '&gt;')
-  .replace(/"/g, '&quot;')
-  .replace(/'/g, '&#039;')
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+const EMAIL = /^[^\s@<>"]+@[^\s@<>"]+\.[^\s@<>"]+$/
 
 /**
  * Public contact form endpoint.
@@ -23,8 +20,8 @@ export default async function handler(req, res) {
     const db = createServiceClient()
     if (!db) return res.status(500).json({ error: 'Database not configured' })
 
-    const studioId = (req.method === 'GET' ? req.query.s : req.body?.studio) || process.env.STUDIO_OWNER_USER_ID
-    if (!studioId) return res.status(400).json({ error: 'No studio configured' })
+    const studioId = String((req.method === 'GET' ? req.query.s : req.body?.studio) || process.env.STUDIO_OWNER_USER_ID || '')
+    if (!UUID.test(studioId)) return res.status(400).json({ error: 'No studio configured' })
 
     // ── GET: form settings ─────────────────────────────────────────
     if (req.method === 'GET') {
@@ -42,6 +39,8 @@ export default async function handler(req, res) {
 
     // ── POST: submit a lead ────────────────────────────────────────
     if (req.method === 'POST') {
+      // Each submission writes two rows and emails the studio; cap per-IP volume.
+      if (!rateLimit(req, res, { key: 'public-form', limit: 5, windowMs: 10 * 60 * 1000 })) return
       const { lead } = req.body || {}
       if (!lead?.name || !lead?.email) return res.status(400).json({ error: 'Name and email required' })
 
@@ -49,11 +48,12 @@ export default async function handler(req, res) {
       const clean = s => typeof s === 'string' ? s.slice(0, 500).trim() : ''
       const safeLead = {
         name: clean(lead.name),
-        email: clean(lead.email),
-        phone: clean(lead.phone),
+        email: clean(lead.email).slice(0, 254),
+        phone: clean(lead.phone).slice(0, 40),
         interest: Array.isArray(lead.services) ? lead.services.slice(0, 5).map(clean).filter(Boolean).join(', ') : clean(lead.interest),
         message: typeof lead.message === 'string' ? lead.message.slice(0, 3000).trim() : '',
       }
+      if (!safeLead.name || !EMAIL.test(safeLead.email)) return res.status(400).json({ error: 'Enter a valid name and email' })
 
       // 1. Save lead row
       const { error: leadErr } = await db.from('leads').insert({
@@ -81,7 +81,7 @@ export default async function handler(req, res) {
       // 3. Notify the studio owner by email (best-effort)
       try {
         const { data: profile } = await db.from('profiles').select('email, business_name').eq('id', studioId).single()
-        if (resend && profile?.email) {
+        if (profile?.email) {
           const fmtDate = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })
           const html = emailWrap(`
             <h1>New Inquiry</h1>
@@ -97,13 +97,14 @@ export default async function handler(req, res) {
             <a href="${escapeHtml(process.env.NEXT_PUBLIC_APP_URL || 'https://manager.elliesheartstrings.com')}" class="btn">Open Studio Manager</a>
             <p style="margin-top:20px;font-size:13px;color:#9B9B98;">This lead has been added to your client list.</p>
           `, profile.business_name)
-          await resend.emails.send({
-            from: FROM,
+          const result = await sendStudioEmail(db, studioId, {
+            businessName: profile.business_name,
+            replyTo: safeLead.email,
             to: profile.email,
-            reply_to: safeLead.email,
-            subject: `New inquiry from ${safeLead.name}`,
+            subject: `New inquiry from ${safeLead.name.replace(/[\r\n]+/g, ' ')}`,
             html,
           })
+          if (result.status !== 200) console.error('[public-form] lead notification not sent', result.body.error)
         }
       } catch (e) { console.error('[public-form] email failed', e) }
 

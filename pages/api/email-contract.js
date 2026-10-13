@@ -1,15 +1,6 @@
-import { resend, fromFor, emailWrap } from '../../lib/email'
+import { emailWrap, escapeHtml, sendStudioEmail } from '../../lib/email'
 import { requireUser } from '../../lib/api-auth'
 import { createContractToken } from '../../lib/signingTokens'
-
-function escapeHtml(value) {
-  return String(value || '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;')
-}
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end()
@@ -33,10 +24,12 @@ export default async function handler(req, res) {
   const contract = { id: row.id, type: row.type, body: row.body, sent: row.sent }
   const clientEmail = client.email
   const clientName = client.name
-  if (!resend) return res.status(500).json({ error: 'Email service is not configured' })
-  const signUrl = contract.id
-    ? `${process.env.NEXT_PUBLIC_APP_URL || 'https://manager.elliesheartstrings.com'}/sign/${createContractToken(contract.id)}`
-    : null
+  let signUrl
+  try {
+    signUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://manager.elliesheartstrings.com'}/sign/${createContractToken(contract.id)}`
+  } catch {
+    return res.status(503).json({ error: 'Contract signing is not configured' })
+  }
   const preview = escapeHtml(contract.body || '').substring(0, 2000)
 
   const html = emailWrap(`
@@ -58,17 +51,12 @@ export default async function handler(req, res) {
     <p style="margin-top:24px;">Warmly,<br/><strong>${escapeHtml(ownerName)}</strong></p>
   `, bizName)
 
-  try {
-    const { data, error } = await resend.emails.send({
-      from: fromFor(bizName),
-      reply_to: auth.profile.email || undefined,
-      to: clientEmail,
-      subject: `Your ${contract.type || 'Photography Agreement'} — ${bizName}`,
-      html,
-    })
-    if (error) return res.status(400).json({ error })
-    return res.status(200).json({ id: data.id })
-  } catch (err) {
-    return res.status(500).json({ error: err.message })
-  }
+  const result = await sendStudioEmail(auth.db, auth.user.id, {
+    businessName: bizName,
+    replyTo: auth.profile.email || auth.user.email,
+    to: clientEmail,
+    subject: `Your ${contract.type || 'Photography Agreement'} — ${bizName}`,
+    html,
+  })
+  return res.status(result.status).json(result.body)
 }

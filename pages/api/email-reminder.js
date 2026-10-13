@@ -1,8 +1,5 @@
-import { resend, fromFor, emailWrap } from '../../lib/email'
+import { emailWrap, escapeHtml, sendStudioEmail } from '../../lib/email'
 import { requireUser } from '../../lib/api-auth'
-
-const escapeHtml = value => String(value ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;')
-  .replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;')
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end()
@@ -24,7 +21,6 @@ export default async function handler(req, res) {
   const booking = row
   const clientEmail = client.email
   const clientName = client.name
-  if (!resend) return res.status(500).json({ error: 'Email service is not configured' })
 
   const fmtDate = iso => iso ? new Date(iso + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }) : 'TBD'
   const fmtTime = t => { if (!t) return ''; const [h, m] = t.split(':'); const hr = parseInt(h); return `${hr % 12 || 12}:${m} ${hr < 12 ? 'AM' : 'PM'}` }
@@ -49,17 +45,12 @@ export default async function handler(req, res) {
     <p style="margin-top:24px;">See you soon!<br/><strong>${escapeHtml(ownerName)}</strong></p>
   `, bizName)
 
-  try {
-    const { data, error } = await resend.emails.send({
-      from: fromFor(bizName),
-      reply_to: auth.profile.email || undefined,
-      to: clientEmail,
-      subject: `Session reminder — ${fmtDate(booking.date)}`,
-      html,
-    })
-    if (error) return res.status(400).json({ error })
-    return res.status(200).json({ id: data.id })
-  } catch (err) {
-    return res.status(500).json({ error: err.message })
-  }
+  const result = await sendStudioEmail(auth.db, auth.user.id, {
+    businessName: bizName,
+    replyTo: auth.profile.email || auth.user.email,
+    to: clientEmail,
+    subject: `Session reminder — ${fmtDate(booking.date)}`,
+    html,
+  })
+  return res.status(result.status).json(result.body)
 }

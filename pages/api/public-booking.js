@@ -1,5 +1,6 @@
 import { createServiceClient } from '../../lib/pibase'
 import { availableSlots, discountAmount, safeImageUrl, validDate } from '../../lib/booking'
+import { rateLimit } from '../../lib/rateLimit'
 
 const publicType = row => ({
   id: row.id, name: row.name, slug: row.slug, category: row.category,
@@ -11,6 +12,9 @@ const clean = (value, length) => typeof value === 'string' ? value.trim().slice(
 
 export default async function handler(req, res) {
   if (!['GET', 'POST'].includes(req.method)) return res.status(405).json({ error: 'Method not allowed' })
+  // Code quotes are throttled so coupon and gift-card codes can't be brute-forced.
+  if (req.method === 'POST' && req.body?.action === 'quote' && !rateLimit(req, res, { key: 'booking-quote', limit: 15, windowMs: 10 * 60 * 1000 })) return
+  if (req.method === 'POST' && req.body?.action !== 'quote' && !rateLimit(req, res, { key: 'booking-create', limit: 5, windowMs: 10 * 60 * 1000 })) return
   const ownerId = process.env.STUDIO_OWNER_USER_ID
   const db = createServiceClient()
   if (!ownerId || !db) return res.status(503).json({ error: 'Booking is not configured yet' })
@@ -52,7 +56,7 @@ export default async function handler(req, res) {
     const safeSlug = clean(slug, 120), safeDate = clean(date, 10), safeTime = clean(time, 5)
     const safeName = clean(name, 120), safeEmail = clean(email, 254).toLowerCase(), safePhone = clean(phone, 40)
     const safeCode = clean(code, 40).toUpperCase()
-    if (!safeSlug || !validDate(safeDate) || !safeTime || !safeName || !/^\S+@\S+\.\S+$/.test(safeEmail)) return res.status(400).json({ error: 'Complete the session, date, time, name and email fields' })
+    if (!safeSlug || !validDate(safeDate) || !safeTime || !safeName || !/^[^\s@<>"]+@[^\s@<>"]+\.[^\s@<>"]+$/.test(safeEmail)) return res.status(400).json({ error: 'Complete the session, date, time, name and email fields' })
     const { data: row, error: typeError } = await db.from('session_catalog').select('*').eq('user_id', ownerId).eq('slug', safeSlug).eq('public', true).single()
     if (typeError || !row) return res.status(404).json({ error: 'Session type not found' })
     const type = publicType(row)

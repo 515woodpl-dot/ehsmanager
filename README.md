@@ -19,8 +19,30 @@ npm run dev
 ```
 
 The public booking page is at `/booking`; the production host is
-`booking.elliesheartstrings.com`. Email sending requires `RESEND_API_KEY`;
-without it, use the contract's copyable signing link.
+`booking.elliesheartstrings.com`.
+
+## Email (Resend) and payments (Stripe)
+
+Set `INTEGRATIONS_ENCRYPTION_KEY` (`openssl rand -base64 32`), apply
+[`supabase-migration-003-integrations.sql`](supabase-migration-003-integrations.sql),
+then open **Integrations** in the app:
+
+- **Resend**: API key, a from address on a domain verified in Resend, and an
+  optional reply-to. Use **Test connection** to send yourself a test email.
+- **Stripe**: a secret key (or a restricted key with write access to Checkout
+  Sessions) and the webhook signing secret. In Stripe → Developers → Webhooks,
+  add the endpoint URL shown on the page and subscribe to
+  `checkout.session.completed` and `checkout.session.async_payment_succeeded`.
+
+Keys are encrypted with AES-256-GCM before they are stored in the
+`integration_secrets` table, which has no RLS policies, so only the server's
+service key can read it. Keys are never returned to the browser.
+
+Once Stripe is connected, invoice emails include a **Pay** button and the
+Invoices page has a **Pay link** button. Clients pay on Stripe Checkout, and the
+webhook marks the invoice paid or partial.
+
+Without Resend, use the contract's copyable signing link.
 
 ## Deploy update to server
 

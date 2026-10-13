@@ -3,7 +3,9 @@ import { useRouter } from 'next/router'
 import '../styles/globals.css'
 import { pibase } from '../lib/pibase'
 
-const PUBLIC_ROUTES = ['/login', '/contact', '/booking']
+// Client-facing pages: contract signing and invoice payment links must load
+// without a studio login.
+const PUBLIC_ROUTES = ['/login', '/contact', '/booking', '/sign', '/pay']
 
 export default function App({ Component, pageProps }) {
   const router = useRouter()
