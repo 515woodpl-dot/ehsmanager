@@ -7,10 +7,11 @@ export default async function handler(req, res) {
   const db = createServiceClient()
   if (!db) return res.status(500).json({ error: 'Database not configured' })
 
-  const { token, signerName, signerEmail } = req.body || {}
+  const { token, signerName, signerEmail, signatureData, signatureMethod } = req.body || {}
   const parsed = verifyContractToken(token)
   if (!parsed) return res.status(400).json({ error: 'Invalid signing link' })
   if (!String(signerName || '').trim()) return res.status(400).json({ error: 'Signer name is required' })
+  if (signatureMethod === 'draw' && (!String(signatureData || '').startsWith('data:image/png;base64,') || String(signatureData).length > 350000)) return res.status(400).json({ error: 'A valid drawn signature is required' })
 
   const { data: current, error: lookupError } = await db
     .from('contracts')
@@ -27,7 +28,7 @@ export default async function handler(req, res) {
       status: 'signed',
       signed_by: String(signerName).trim(),
       signed_at: signedAt,
-      fields: { ...(current?.fields || {}), signerEmail: signerEmail || null, signedVia: 'public_link' },
+      fields: { ...(current?.fields || {}), signerEmail: signerEmail || null, signedVia: 'public_link', signatureMethod: signatureMethod === 'draw' ? 'draw' : 'type', signatureData: signatureMethod === 'draw' ? signatureData : null },
     })
     .eq('id', parsed.contractId)
     .eq('status', 'pending')

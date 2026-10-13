@@ -486,6 +486,29 @@ textarea:focus-visible,
   box-shadow: inset 0 0 0 2px var(--brand-blush), inset 0 0 0 4px #fff;
 }
 
+.calendar-month-cell-action {
+  cursor: pointer;
+  transition: filter .12s ease, box-shadow .12s ease;
+}
+
+.calendar-month-cell-action:hover,
+.calendar-month-cell-action:focus-visible {
+  filter: brightness(.97);
+  outline: 2px solid rgba(17,17,16,.28);
+  outline-offset: -2px;
+}
+
+.contact-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 20px;
+}
+
+@media (max-width: 760px) {
+  .contact-stat-grid { grid-template-columns: 1fr; }
+}
+
 .contract-body-render p {
   margin: 0;
   white-space: pre-wrap;
@@ -501,19 +524,12 @@ textarea:focus-visible,
 }
 
 /* Contract layout follows the supplied portrait agreement. */
-.contract-document { background: #fff; color: #353535; max-width: 850px; margin: 0 auto; padding: 42px 46px 54px; font-family: Arial, Helvetica, sans-serif; font-size: 12px; line-height: 1.55; }
-.contract-document-head { display: flex; justify-content: space-between; gap: 24px; align-items: flex-start; margin-bottom: 52px; }
-.contract-document-head strong, .contract-document-head span { display: block; font-weight: 400; font-size: 20px; line-height: 1.2; }
-.contract-document-head span { color: #8a8a8a; margin-top: 4px; }
-.contract-document-date { display: grid; grid-template-columns: auto auto; column-gap: 28px; align-items: start; }
-.contract-document-date small, .contract-document-parties small { display: block; font-size: 10px; color: #999; letter-spacing: .02em; }
-.contract-document-date span { font-size: 11px; color: #555; margin: 0; }
-.contract-document-name { font: 400 20px Arial, Helvetica, sans-serif; margin: 0 0 28px; }
-.contract-document-parties { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); max-width: 380px; gap: 25px; margin-bottom: 46px; }
-.contract-document-parties span { display: block; margin-top: 10px; font-size: 11px; }
-.contract-document-title { text-align: center; font: 700 20px Arial, Helvetica, sans-serif; margin: 0 0 14px; }
+.contract-document { background: #fff; color: #353535; max-width: 850px; margin: 0 auto; padding: 42px 46px 54px; font-family: Arial, Helvetica, sans-serif; font-size: 12px; line-height: 1.55; contain: layout paint; }
+.contract-document-brand { height: 190px; margin: -42px -46px 36px; overflow: hidden; background: #f2eeeb; }
+.contract-document-brand img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.contract-document-title { text-align: center; font: 700 20px Arial, Helvetica, sans-serif; margin: 0 0 18px; }
 .contract-document-content p { margin: 0 0 12px; overflow-wrap: anywhere; }
-.contract-document-content h3, .contract-document-signatures h3 { font-size: 17px; line-height: 1.3; margin: 26px 0 13px; break-after: avoid; }
+.contract-document-content h2, .contract-document-signatures h2 { font-size: 17px; line-height: 1.3; margin: 26px 0 13px; break-after: avoid; }
 .contract-document-content .contract-document-clause { margin: 0 0 16px; }
 .contract-document-content .contract-document-intro { font-size: 11px; }
 .contract-document-content .contract-document-bullet { padding-left: 23px; position: relative; margin: 4px 0; }
@@ -523,5 +539,35 @@ textarea:focus-visible,
 .contract-document-signatures strong, .contract-document-signatures span { display: block; font-size: 11px; font-weight: 400; }
 .contract-document-signatures span { color: #999; margin-top: 3px; }
 .contract-document-signature-line { border-top: 1px solid #ddd; margin: 20px 0 7px; }
-@media (max-width: 600px) { .contract-document { padding: 25px 20px 35px; } .contract-document-head { margin-bottom: 32px; } .contract-document-head strong, .contract-document-head span { font-size: 15px; } .contract-document-date { column-gap: 10px; } .contract-document-title { font-size: 17px; } .contract-document-signatures > div { gap: 18px; } }
+.contract-signature-image { display: block; height: 64px; max-width: 100%; object-fit: contain; object-position: left bottom; border-bottom: 1px solid #ddd; margin-bottom: 7px; }
+.signature-pad-wrap { border: 1px solid var(--border2); border-radius: 12px; overflow: hidden; margin-bottom: 16px; background: #fff; }
+.signature-pad { display: block; width: 100%; height: 180px; touch-action: none; cursor: crosshair; background: linear-gradient(#fff 82%, #f5f0ed 82%, #f5f0ed 83%, #fff 83%); }
+.signature-pad-footer { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; border-top: 1px solid var(--border); color: var(--muted); font-size: 12px; }
+.signature-pad-footer button { width: auto !important; min-height: 0 !important; padding: 4px 9px !important; background: #fff !important; color: var(--text) !important; border: 1px solid var(--border2) !important; }
+.integration-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 18px; }
+.integration-card h2 { font: 400 21px 'DM Serif Display',Georgia,serif; }
+.integration-card p { color: var(--muted); margin-top: 7px; }
+.integration-card-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.integration-ready,.integration-missing { border-radius: 999px; padding: 4px 9px; font-size: 11px; white-space: nowrap; }
+.integration-ready { background: var(--green-bg); color: var(--green); }.integration-missing { background: var(--amber-bg); color: var(--amber); }
+.integration-vars { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 22px; }.integration-vars code { background: var(--surface2); border: 1px solid var(--border); border-radius: 6px; padding: 5px 7px; font-size: 11px; }
+.integration-note { font-size: 12px !important; line-height: 1.5; }.settings-error { background: var(--red-bg); color: var(--red); padding: 14px; border-radius: 10px; }
+.brand-confirm { display: flex; gap: 16px; align-items: flex-start; padding: 6px 0; }.brand-confirm-mark { width: 48px; height: 48px; border-radius: 50%; display: grid; place-items: center; flex: none; background: var(--brand-blush); font: 400 16px 'DM Serif Display',serif; }.brand-confirm strong { font-size: 15px; }.brand-confirm p { color: var(--muted); margin-top: 6px; line-height: 1.6; }
+.modal-inner { overscroll-behavior: contain; -webkit-overflow-scrolling: touch; transform: translateZ(0); }
+.dashboard-metric-grid { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 16px; margin-bottom: 22px; }
+.dashboard-metric-card { text-align: left; border: 1px solid var(--border); border-radius: 14px; background: #fff; padding: 20px 22px; box-shadow: 0 8px 28px rgba(30,24,20,.065); transition: transform .16s ease, box-shadow .16s ease; }
+.dashboard-metric-card:hover { transform: translateY(-2px); box-shadow: 0 13px 34px rgba(30,24,20,.1); }
+.dashboard-content-grid { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr) minmax(245px,.72fr); gap: 16px; align-items: start; }
+.dashboard-card-title { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+.mini-calendar-grid { display: grid; grid-template-columns: repeat(7,1fr); gap: 4px; }.mini-calendar-grid small { color: var(--faint); text-align: center; font-size: 9px; padding: 4px 0; }.mini-calendar-grid button { position: relative; aspect-ratio: 1; border: 0; border-radius: 8px; background: transparent; color: var(--muted); font-size: 11px; }.mini-calendar-grid button:hover { background: var(--surface2); }.mini-calendar-grid button.today { box-shadow: inset 0 0 0 1px var(--text); color: var(--text); }.mini-calendar-grid button.booked { background: var(--brand-blush); color: #573d34; font-weight: 600; }.mini-calendar-grid button i { position: absolute; top: -2px; right: -1px; display: grid; place-items: center; width: 13px; height: 13px; border-radius: 50%; background: #5b4037; color: #fff; font-size: 8px; font-style: normal; }
+.mini-calendar-next { display: grid; gap: 2px; margin-top: 16px; border-top: 1px solid var(--border); padding-top: 13px; }.mini-calendar-next small,.mini-calendar-next span { color: var(--muted); font-size: 11px; }.mini-calendar-next strong { font-size: 13px; }
+.client-card-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 16px; }.client-summary-card { display: flex; flex-direction: column; justify-content: space-between; min-height: 178px; padding: 20px; border: 1px solid var(--border); border-radius: 14px; background: #fff; box-shadow: 0 8px 28px rgba(30,24,20,.065); cursor: pointer; transition: transform .16s ease, box-shadow .16s ease; }.client-summary-card:hover { transform: translateY(-2px); box-shadow: 0 13px 34px rgba(30,24,20,.1); }.client-summary-card > div:last-child { justify-content: space-between; flex-wrap: wrap; }
+.invoice-card-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 16px; }.invoice-summary-card { display: flex; flex-direction: column; gap: 20px; min-height: 170px; padding: 20px; border: 1px solid var(--border); border-radius: 14px; background: #fff; box-shadow: 0 8px 28px rgba(30,24,20,.065); cursor: pointer; }.invoice-summary-card>div:last-child { margin-left: 0 !important; justify-content: space-between; flex-wrap: wrap; }.invoice-detail-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; }.invoice-detail-grid>div { display: grid; gap: 6px; padding: 13px; background: var(--surface2); border-radius: 9px; }.invoice-detail-grid span,.invoice-note span { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: .06em; }.invoice-note { margin-top: 14px; padding: 14px; border: 1px solid var(--border); border-radius: 9px; }.invoice-note p { margin-top: 6px; }.invoice-line-items { margin-top: 18px; }.invoice-line-items h3 { margin-bottom: 8px; }.invoice-line-items>div { display: flex; justify-content: space-between; gap: 12px; padding: 9px 0; border-bottom: 1px solid var(--border); }
+@media (max-width: 900px) { .integration-grid { grid-template-columns: 1fr; } }
+@media (max-width: 1180px) { .dashboard-content-grid { grid-template-columns: 1fr 1fr; }.dashboard-calendar-card { grid-column: 1/-1; } }
+@media (max-width: 1050px) { .client-card-grid { grid-template-columns: repeat(2,minmax(0,1fr)); } }
+@media (max-width: 768px) { .dashboard-metric-grid { grid-template-columns: 1fr 1fr !important; }.dashboard-content-grid { grid-template-columns: 1fr; }.dashboard-calendar-card { grid-column: auto; } }
+@media (max-width: 600px) { .client-card-grid { grid-template-columns: 1fr; } }
+@media (max-width: 700px) { .invoice-card-grid { grid-template-columns: 1fr; }.invoice-detail-grid { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 600px) { .contract-document { padding: 25px 20px 35px; } .contract-document-brand { height: 125px; margin: -25px -20px 26px; } .contract-document-title { font-size: 17px; } .contract-document-signatures > div { gap: 18px; } }
 @media print { body { background: #fff !important; } .sign-page > :not(.contract-copy), .sign-page .sign-card:not(.contract-copy) { display: none !important; } .contract-copy { border: 0 !important; box-shadow: none !important; padding: 0 !important; width: 100% !important; } .contract-document { max-width: none; padding: 0; font-size: 11pt; } }

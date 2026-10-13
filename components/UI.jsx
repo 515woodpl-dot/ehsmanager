@@ -9,11 +9,14 @@ export function Toast({ msg, onDone }) {
 export function Modal({ title, onClose, children, footer, wide, extraWide }) {
   useEffect(() => {
     const h = e => { if (e.key === 'Escape') onClose() }
-    window.addEventListener('keydown', h); return () => window.removeEventListener('keydown', h)
+    const previous = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    window.addEventListener('keydown', h)
+    return () => { window.removeEventListener('keydown', h); document.body.style.overflow = previous }
   }, [])
   return (
     <div style={T.overlay} onClick={e => { if (e.target === e.currentTarget) onClose() }}>
-      <div style={{ ...T.modal, maxWidth: extraWide ? 900 : wide ? 640 : 520 }}>
+      <div className="modal-inner" role="dialog" aria-modal="true" aria-label={title} style={{ ...T.modal, maxWidth: extraWide ? 900 : wide ? 640 : 520 }}>
         <div style={T.modalHeader}>
           <div style={T.modalTitle}>{title}</div>
           <button onClick={onClose} style={{ ...T.btnGhost, fontSize: 20, lineHeight: 1, padding: '2px 6px', color: C.muted }}>×</button>
@@ -23,6 +26,18 @@ export function Modal({ title, onClose, children, footer, wide, extraWide }) {
       </div>
     </div>
   )
+}
+
+export function ConfirmModal({ title, message, confirmLabel = 'Confirm', onConfirm, onClose, danger = false }) {
+  return <Modal title={title} onClose={onClose} footer={<>
+    <button style={T.btn} onClick={onClose}>Keep it</button>
+    <button style={danger ? T.btnDanger : T.btnPrimary} onClick={onConfirm}>{confirmLabel}</button>
+  </>}>
+    <div className="brand-confirm">
+      <div className="brand-confirm-mark">EH</div>
+      <div><strong>{title}</strong><p>{message}</p></div>
+    </div>
+  </Modal>
 }
 
 export function Seg({ options, value, onChange }) {

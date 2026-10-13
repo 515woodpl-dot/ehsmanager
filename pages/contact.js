@@ -24,7 +24,7 @@ export default function ContactPage() {
       .then(j => { if (j?.settings) setSettings(j.settings); else throw new Error('Contact form is temporarily unavailable.') })
       .catch(e => setConfigError(e.message))
   }, [])
-  const [form, setForm] = useState({ name: '', email: '', phone: '', services: [], message: '' })
+  const [form, setForm] = useState({ name: '', email: '', phone: '', services: [], message: '', website: '' })
   const [errors, setErrors] = useState({})
   const [submitted, setSubmitted] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -185,6 +185,10 @@ export default function ContactPage() {
           </div>
 
           <form className="contact-form-card" onSubmit={handleSubmit} style={{ background: '#fff', borderRadius: 16, padding: '36px 40px', border: '1px solid #EAEAEA', boxShadow: '0 4px 24px rgba(0,0,0,0.06)' }}>
+
+            <div aria-hidden="true" style={{ position: 'absolute', left: '-10000px', width: 1, height: 1, overflow: 'hidden' }}>
+              <label>Website<input tabIndex="-1" autoComplete="off" value={form.website} onChange={e => setForm({ ...form, website: e.target.value })} /></label>
+            </div>
 
             {configError && <div role="alert" style={{ fontSize: 13, color: '#991F1F', marginBottom: 18 }}>{configError}</div>}
 

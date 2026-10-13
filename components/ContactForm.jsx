@@ -7,8 +7,18 @@ export default function ContactFormSettings({ data, setData, toast }) {
   const [newOption, setNewOption] = useState('')
 
   const save = () => {
+    if (!form.buttonLabel?.trim()) return toast('Add a button label')
+    if ((form.afterSubmit || 'message') === 'redirect' && !/^https:\/\//i.test(form.redirectUrl || '')) return toast('Redirect URL must start with https://')
     setData(d => ({ ...d, formSettings: { ...form } }))
     toast('Form settings saved')
+  }
+
+  const copyLink = async () => {
+    try { await navigator.clipboard.writeText(publicUrl); toast('Link copied!') }
+    catch {
+      const input = document.createElement('textarea'); input.value = publicUrl; input.style.position = 'fixed'; input.style.opacity = '0'; document.body.appendChild(input); input.select()
+      const copied = document.execCommand('copy'); input.remove(); toast(copied ? 'Link copied!' : 'Select and copy the link')
+    }
   }
 
   const addOption = () => {
@@ -36,6 +46,12 @@ export default function ContactFormSettings({ data, setData, toast }) {
         </div>
       </div>
 
+      <div className="contact-stat-grid">
+        <div style={T.cardSm}><div style={T.metricLabel}>Leads captured</div><div style={T.metricValue}>{data.leads?.length || 0}</div></div>
+        <div style={T.cardSm}><div style={T.metricLabel}>Form destination</div><div style={{ fontWeight: 600, marginTop: 8 }}>PIBASE</div><div style={T.metricSub}>Clients + inquiries</div></div>
+        <div style={T.cardSm}><div style={T.metricLabel}>Owner notification</div><div style={{ fontWeight: 600, marginTop: 8 }}>Resend</div><div style={T.metricSub}>When configured in Settings</div></div>
+      </div>
+
       {/* Shareable link */}
       <div style={{ ...T.card, marginBottom: 20, display: 'flex', alignItems: 'center', gap: 14 }}>
         <div style={{ flex: 1 }}>
@@ -43,7 +59,7 @@ export default function ContactFormSettings({ data, setData, toast }) {
           <div style={{ fontSize: 14, color: C.text, fontFamily: 'monospace' }}>{publicUrl}</div>
           <div style={{ fontSize: 12, color: C.faint, marginTop: 3 }}>Share this link with potential clients to capture leads</div>
         </div>
-        <button style={T.btnSm} onClick={() => { navigator.clipboard.writeText(publicUrl); toast('Link copied!') }}>Copy link</button>
+        <button style={T.btnSm} onClick={copyLink}>Copy link</button>
         <a href="/contact" target="_blank" style={{ ...T.btnSm, textDecoration: 'none', color: C.text }}>Open ↗</a>
       </div>
 

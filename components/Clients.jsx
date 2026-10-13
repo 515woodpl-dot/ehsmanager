@@ -112,7 +112,7 @@ export default function Clients({ data, setData, toast, sessionTypes }) {
         <div style={{ background: C.redBg, border: `1px solid ${C.red}`, borderRadius: 8, padding: '10px 16px', fontSize: 13, color: C.red, marginBottom: 16 }}>{importError}</div>
       )}
 
-      <div style={T.card}>
+      <div className="client-card-grid">
         <div style={{ display: 'flex', gap: 10, marginBottom: 20 }}>
           <SearchBar value={search} onChange={setSearch} placeholder="Search clients..." />
           <select style={{ ...T.formInput, width: 150 }} value={filter} onChange={e => setFilter(e.target.value)}>
@@ -127,7 +127,7 @@ export default function Clients({ data, setData, toast, sessionTypes }) {
         {filtered.length === 0 && <div style={{ padding: '32px 0', textAlign: 'center', color: C.faint, fontSize: 13 }}>No clients found</div>}
 
         {filtered.map((c, i) => (
-          <div key={c.id} className="data-row-mobile" style={{ ...T.dataRow, borderBottom: i === filtered.length - 1 ? 'none' : `1px solid ${C.border}` }}>
+          <article key={c.id} className="client-summary-card" role="button" tabIndex={0} onClick={() => setEditModal({ ...c })} onKeyDown={event => { if (event.key === 'Enter') setEditModal({ ...c }) }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 13 }}>
               <Avatar name={c.name} size={38} />
               <div>
@@ -142,20 +142,20 @@ export default function Clients({ data, setData, toast, sessionTypes }) {
               </div>
               <Badge type={c.status} label={c.status} />
               {/* Edit — 20% larger */}
-              <button style={{ ...T.btnGhost, padding: '5px 9px' }} onClick={() => setEditModal({ ...c })} title="Edit">
+              <button style={{ ...T.btnGhost, padding: '5px 9px' }} onClick={event => { event.stopPropagation(); setEditModal({ ...c }) }} title="Edit">
                 <svg width={iconSize} height={iconSize} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
                   <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
                 </svg>
               </button>
               {/* Delete — 20% larger */}
-              <button style={{ ...T.btnGhost, padding: '5px 9px', color: C.red }} onClick={() => del(c.id)} title="Delete">
+              <button style={{ ...T.btnGhost, padding: '5px 9px', color: C.red }} onClick={event => { event.stopPropagation(); del(c.id) }} title="Delete">
                 <svg width={iconSize} height={iconSize} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/>
                 </svg>
               </button>
             </div>
-          </div>
+          </article>
         ))}
       </div>
 

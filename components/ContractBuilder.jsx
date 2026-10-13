@@ -46,6 +46,7 @@ function pickInvoice(invoices = [], c) {
 function buildFields(c, data) {
   const booking = c ? pickBooking(data?.bookings, c) : null
   const invoice = c ? pickInvoice(data?.invoices, c) : null
+  const sessionType = booking ? (data?.sessionCatalog || []).find(item => item.id === booking.sessionTypeId || item.name === booking.type) : null
   const today = new Date().toISOString().slice(0, 10)
   return {
     fields: {
@@ -63,6 +64,7 @@ function buildFields(c, data) {
       governingState: 'New Jersey',
       photographerEmail: 'hello@elliesheartstrings.com',
       photographerCity: 'Linden, NJ',
+      headerImageUrl: sessionType?.imageUrl || '',
     },
     sources: { booking, invoice },
   }
@@ -140,6 +142,11 @@ export default function ContractBuilder({ client, data, onSave, onClose }) {
   const previewText = useMemo(() => fillContract(CONTRACT_TEMPLATE, contractFields), [contractFields])
 
   const save = () => {
+    if (fields.headerImageUrl && !/^https:\/\//i.test(fields.headerImageUrl)) {
+      alert('Contract header image must use a secure https:// URL, or be left blank.')
+      setTab('fields')
+      return
+    }
     if (!activeClient || !fields.clientName.trim() || !fields.clientEmail.trim() || !fields.sessionDate || !fields.sessionTime || !fields.location.trim() || !fields.remainingDueDate || !Number.isFinite(totalFee) || totalFee <= 0 || !Number.isFinite(retainerPct) || retainerPct < 0 || retainerPct > 100) {
       alert('Select a client and complete the client, session, and payment details before saving.')
       setTab('fields')
@@ -205,6 +212,12 @@ export default function ContractBuilder({ client, data, onSave, onClose }) {
           {/* Contract title */}
           <Field label="Contract title">
             <input style={inp} value={fields.contractTitle} onChange={e => set('contractTitle', e.target.value)} />
+          </Field>
+          <Field label="Contract header image URL" hint="Optional · auto-filled from the booked session type. Use any HTTPS image or leave blank.">
+            <div style={{ display: 'flex', gap: 8 }}>
+              <input style={inp} type="url" placeholder="https://…" value={fields.headerImageUrl || ''} onChange={e => set('headerImageUrl', e.target.value)} />
+              {!!fields.headerImageUrl && <button type="button" style={T.btn} onClick={() => set('headerImageUrl', '')}>Remove</button>}
+            </div>
           </Field>
 
           <Section title="Session details">
@@ -279,7 +292,7 @@ export default function ContractBuilder({ client, data, onSave, onClose }) {
         </div>
       ) : (
         <div style={{ background: C.surface2, borderRadius: 10, padding: 12, border: `1px solid ${C.border}`, maxHeight: '65vh', overflowY: 'auto' }}>
-          <ContractDocument body={previewText} />
+          <ContractDocument body={previewText} headerImageUrl={fields.headerImageUrl} />
         </div>
       )}
 

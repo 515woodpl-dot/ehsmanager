@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo } from 'react'
 import { InvoiceModal, QuoteModal, ContractModal, QuestionnaireModal, SessionModal, MessageModal, GalleryModal } from './ActionModals'
 import { T, C, badge } from '../lib/tokens'
-import { Modal, Badge, Avatar, Seg } from './UI'
+import { Modal, Badge, Avatar, Seg, ConfirmModal } from './UI'
 import { removeClient } from '../lib/data'
 
 const uid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => { const r = Math.random() * 16 | 0; return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16) })
@@ -30,6 +30,7 @@ function CardModal({ client, stages, sessionTypes, data, setData, onClose, toast
   const [notesSavedAt, setNotesSavedAt] = useState('')
   const [activeTab, setActiveTab] = useState('getstarted')
   const [activeModal, setActiveModal] = useState(null) // invoice|contract|quote|questionnaire|session|message|gallery
+  const [confirmDelete, setConfirmDelete] = useState(false)
 
   const clientInvoices = data.invoices.filter(i => i.clientId === client.id)
   const clientContracts = data.contracts.filter(k => k.clientId === client.id)
@@ -65,9 +66,8 @@ function CardModal({ client, stages, sessionTypes, data, setData, onClose, toast
   }
 
   const del = () => {
-    if (!confirm('Delete this project permanently?')) return
     setData(d => removeClient(d, client.id))
-    toast('Project deleted'); onClose()
+    toast('Project deleted'); setConfirmDelete(false); onClose()
   }
 
   return (
@@ -236,7 +236,7 @@ function CardModal({ client, stages, sessionTypes, data, setData, onClose, toast
               <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: C.faint, marginBottom: 12 }}>Actions</div>
               <div style={{ display: 'flex', gap: 10 }}>
                 <button style={{ ...T.btnSm, color: C.amber, borderColor: C.amber }} onClick={archive}>Archive project</button>
-                <button style={{ ...T.btnSm, color: C.red, borderColor: C.red }} onClick={del}>Delete project</button>
+                <button style={{ ...T.btnSm, color: C.red, borderColor: C.red }} onClick={() => setConfirmDelete(true)}>Delete project</button>
               </div>
             </div>
           </div>
@@ -252,6 +252,7 @@ function CardModal({ client, stages, sessionTypes, data, setData, onClose, toast
     {activeModal === 'session' && <SessionModal client={client} data={data} setData={setData} toast={toast} onClose={() => setActiveModal(null)} />}
     {activeModal === 'message' && <MessageModal client={client} data={data} setData={setData} toast={toast} onClose={() => setActiveModal(null)} />}
     {activeModal === 'gallery' && <GalleryModal client={client} data={data} setData={setData} toast={toast} onClose={() => setActiveModal(null)} />}
+    {confirmDelete && <ConfirmModal danger title="Delete this project?" message={`${client.name}'s project will be removed. Existing invoices, sessions and contracts will remain in your records without a linked client.`} confirmLabel="Delete project" onClose={() => setConfirmDelete(false)} onConfirm={del} />}
     </>
   )
 }
@@ -461,6 +462,7 @@ export default function Projects({ data, setData, toast }) {
   const [cardModal, setCardModal] = useState(null)
   const [newModal, setNewModal] = useState(false)
   const [stageModal, setStageModal] = useState(false)
+  const [archiveDelete, setArchiveDelete] = useState(null)
 
   const stages = data.stages || []
   const sessionTypes = data.sessionTypes || []
@@ -498,9 +500,8 @@ export default function Projects({ data, setData, toast }) {
   }
 
   const deletePermanently = (id) => {
-    if (!confirm('Permanently delete this project?')) return
     setData(d => removeClient(d, id))
-    toast('Project deleted')
+    setArchiveDelete(null); toast('Project deleted')
   }
 
   return (
@@ -554,11 +555,12 @@ export default function Projects({ data, setData, toast }) {
       {/* Views */}
       {view === 'board' && <BoardView clients={activeClients} stages={stages} onCardClick={setCardModal} setData={setData} toast={toast} />}
       {view === 'list' && <ListView clients={activeClients} stages={stages} onCardClick={setCardModal} />}
-      {view === 'archive' && <ArchiveView clients={archivedClients} onUnarchive={unarchive} onDelete={deletePermanently} />}
+      {view === 'archive' && <ArchiveView clients={archivedClients} onUnarchive={unarchive} onDelete={id => setArchiveDelete(archivedClients.find(client => client.id === id))} />}
 
       {/* Modals */}
       {newModal && <NewProjectModal stages={stages} sessionTypes={sessionTypes} onAdd={addProject} onClose={() => setNewModal(false)} onAddType={addSessionType} />}
       {stageModal && <StageModal stages={stages} onSave={saveStages} onClose={() => setStageModal(false)} />}
+      {archiveDelete && <ConfirmModal danger title="Delete archived project?" message={`${archiveDelete.name}'s project will be permanently removed from the client list.`} confirmLabel="Delete project" onClose={() => setArchiveDelete(null)} onConfirm={() => deletePermanently(archiveDelete.id)} />}
       {cardModal && (
         <CardModal
           client={cardModal}

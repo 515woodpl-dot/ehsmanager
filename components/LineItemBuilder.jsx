@@ -108,8 +108,10 @@ export function LineItemBuilder({ value, onChange }) {
 
 export function calcTotal(lineData) {
   const { items = [], discount = '', discountType = '%', tax = '' } = lineData
-  const subtotal = items.reduce((s, i) => s + (parseFloat(i.qty) || 0) * (parseFloat(i.price) || 0), 0)
-  const discountAmt = discount ? (discountType === '%' ? subtotal * parseFloat(discount) / 100 : parseFloat(discount)) : 0
-  const taxAmt = tax ? (subtotal - discountAmt) * parseFloat(tax) / 100 : 0
-  return subtotal - discountAmt + taxAmt
+  const subtotal = items.reduce((sum, item) => sum + Math.max(0, parseFloat(item.qty) || 0) * Math.max(0, parseFloat(item.price) || 0), 0)
+  const discountValue = Math.max(0, parseFloat(discount) || 0)
+  const requestedDiscount = discountType === '%' ? subtotal * Math.min(discountValue, 100) / 100 : discountValue
+  const discountedSubtotal = Math.max(0, subtotal - Math.min(subtotal, requestedDiscount))
+  const taxRate = Math.max(0, parseFloat(tax) || 0)
+  return Math.round((discountedSubtotal + discountedSubtotal * taxRate / 100) * 100) / 100
 }

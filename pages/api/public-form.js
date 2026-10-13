@@ -43,17 +43,20 @@ export default async function handler(req, res) {
     // ── POST: submit a lead ────────────────────────────────────────
     if (req.method === 'POST') {
       const { lead } = req.body || {}
+      if (lead?.website) return res.status(200).json({ ok: true })
       if (!lead?.name || !lead?.email) return res.status(400).json({ error: 'Name and email required' })
 
       // Basic anti-abuse: cap field lengths
       const clean = s => typeof s === 'string' ? s.slice(0, 500).trim() : ''
       const safeLead = {
         name: clean(lead.name),
-        email: clean(lead.email),
+        email: clean(lead.email).toLowerCase(),
         phone: clean(lead.phone),
         interest: Array.isArray(lead.services) ? lead.services.slice(0, 5).map(clean).filter(Boolean).join(', ') : clean(lead.interest),
         message: typeof lead.message === 'string' ? lead.message.slice(0, 3000).trim() : '',
       }
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(safeLead.email)) return res.status(400).json({ error: 'Enter a valid email address' })
+      if (!safeLead.phone) return res.status(400).json({ error: 'Phone number is required' })
 
       // 1. Save lead row
       const { error: leadErr } = await db.from('leads').insert({
@@ -67,16 +70,19 @@ export default async function handler(req, res) {
       }
 
       // 2. Create client in inquiry stage. Lead is already captured, so this is best-effort.
-      const { error: clientErr } = await db.from('clients').insert({
-        user_id: studioId,
-        name: safeLead.name,
-        email: safeLead.email,
-        phone: safeLead.phone,
-        type: safeLead.interest.split(', ')[0] || null,
-        status: 'inquiry',
-        notes: safeLead.message || null,
-      })
-      if (clientErr) console.error('[public-form] client insert failed', clientErr)
+      const { data: existingClient } = await db.from('clients').select('id').eq('user_id', studioId).eq('email', safeLead.email).single()
+      if (!existingClient) {
+        const { error: clientErr } = await db.from('clients').insert({
+          user_id: studioId,
+          name: safeLead.name,
+          email: safeLead.email,
+          phone: safeLead.phone,
+          type: safeLead.interest.split(', ')[0] || null,
+          status: 'inquiry',
+          notes: safeLead.message || null,
+        })
+        if (clientErr) console.error('[public-form] client insert failed', clientErr)
+      }
 
       // 3. Notify the studio owner by email (best-effort)
       try {

@@ -8,12 +8,13 @@ import { Toast } from '../components/UI'
 import Projects, { CardModalExport as CardModal } from '../components/Projects'
 import Clients from '../components/Clients'
 import ContactFormSettings from '../components/ContactForm'
+import Settings from '../components/Settings'
 import { Dashboard, Analytics, Calendar, Invoices, Contracts, Inbox } from '../components/Pages'
 import { SessionTypes, Sessions, Discounts } from '../components/BookingAdmin'
 
 const todayLabel = () => new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
 const VIEW_STORAGE_KEY = 'ehs-studio-active-view'
-const VALID_VIEWS = new Set(['dashboard', 'analytics', 'projects', 'clients', 'sessiontypes', 'sessions', 'calendar', 'discounts', 'invoices', 'contracts', 'inbox', 'contactform'])
+const VALID_VIEWS = new Set(['dashboard', 'analytics', 'projects', 'clients', 'sessiontypes', 'sessions', 'calendar', 'discounts', 'invoices', 'contracts', 'inbox', 'contactform', 'settings'])
 
 function getInitialView() {
   if (typeof window === 'undefined') return 'dashboard'
@@ -91,6 +92,7 @@ function Sidebar({ active, setActive, unread, open, onClose, user, onSignOut }) 
     { id: 'contracts', label: 'Contracts' },
     { id: 'inbox', label: 'Inbox', badge: unread },
     { id: 'contactform', label: 'Contact Form' },
+    { id: 'settings', label: 'Settings' },
   ]
 
   const handleNav = (id) => { setActive(id); onClose() }
@@ -363,6 +365,7 @@ export default function Home() {
     contracts: <Contracts {...props} />,
     inbox: <Inbox {...props} />,
     contactform: <ContactFormSettings {...props} />,
+    settings: <Settings {...props} />,
   }
 
   return (

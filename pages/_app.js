@@ -3,17 +3,19 @@ import { useRouter } from 'next/router'
 import '../styles/globals.css'
 import { pibase } from '../lib/pibase'
 
-const PUBLIC_ROUTES = ['/login', '/contact', '/booking']
+const PUBLIC_ROUTES = ['/login', '/contact', '/booking', '/sign']
 
 export default function App({ Component, pageProps }) {
   const router = useRouter()
-  const [ready, setReady] = useState(!pibase) // if no pibase, skip auth check
+  const publicRoute = PUBLIC_ROUTES.some(route => router.pathname.startsWith(route))
+  const [ready, setReady] = useState(!pibase || publicRoute) // public pages never wait on an auth request
   const [authError, setAuthError] = useState('')
 
   const isPublicRoute = () => PUBLIC_ROUTES.some(r => router.pathname.startsWith(r))
 
   useEffect(() => {
     if (!pibase) return
+    if (isPublicRoute()) setReady(true)
 
     // Check initial session
     pibase.auth.getSession().then(({ data: { session }, error }) => {
@@ -41,7 +43,7 @@ export default function App({ Component, pageProps }) {
     })
 
     return () => subscription.unsubscribe()
-  }, [])
+  }, [router.pathname])
 
   if (!ready) return <main style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', padding: 24, fontFamily: 'sans-serif', color: '#222' }}>Loading EHS Studio Manager…</main>
 

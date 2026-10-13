@@ -3,6 +3,7 @@ import Head from 'next/head'
 import { createServiceClient } from '../../lib/pibase'
 import { verifyContractToken } from '../../lib/signingTokens'
 import ContractDocument from '../../components/ContractDocument'
+import SignaturePad from '../../components/SignaturePad'
 
 export default function SignContractPage({ token, contract }) {
   const [signerName, setSignerName] = useState(contract.signedBy || contract.client || '')
@@ -11,6 +12,8 @@ export default function SignContractPage({ token, contract }) {
   const [status, setStatus] = useState(contract.status === 'signed' ? 'signed' : 'idle')
   const [signedBy, setSignedBy] = useState(contract.signedBy || '')
   const [signedAt, setSignedAt] = useState(contract.signedAt || '')
+  const [signatureMethod, setSignatureMethod] = useState('draw')
+  const [signatureData, setSignatureData] = useState(contract.signatureData || '')
   const [error, setError] = useState('')
 
   const submit = async (event) => {
@@ -20,11 +23,15 @@ export default function SignContractPage({ token, contract }) {
       setError('Please confirm you reviewed and agree to the contract.')
       return
     }
+    if (signatureMethod === 'draw' && !signatureData) {
+      setError('Draw your signature before signing.')
+      return
+    }
     setStatus('sending')
     const res = await fetch('/api/sign-contract', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token, signerName, signerEmail }),
+      body: JSON.stringify({ token, signerName, signerEmail, signatureData: signatureMethod === 'draw' ? signatureData : null, signatureMethod }),
     })
     const data = await res.json().catch(() => ({}))
     if (!res.ok) {
@@ -55,7 +62,7 @@ export default function SignContractPage({ token, contract }) {
         </section>
 
         <section className="sign-card contract-copy">
-          <ContractDocument body={contract.body} signedBy={signedBy} signedAt={signedAt} />
+          <ContractDocument body={contract.body} signedBy={signedBy} signedAt={signedAt} signatureData={signatureData || contract.signatureData} headerImageUrl={contract.headerImageUrl} />
         </section>
 
         <form className="sign-card" onSubmit={submit}>
@@ -67,13 +74,18 @@ export default function SignContractPage({ token, contract }) {
                 <span>Full legal name</span>
                 <input value={signerName} onChange={e => setSignerName(e.target.value)} required />
               </label>
+              <div className="signature-methods" role="group" aria-label="Signature method">
+                <button type="button" className={signatureMethod === 'draw' ? 'active' : ''} onClick={() => setSignatureMethod('draw')}>Draw signature</button>
+                <button type="button" className={signatureMethod === 'type' ? 'active' : ''} onClick={() => setSignatureMethod('type')}>Use typed name</button>
+              </div>
+              {signatureMethod === 'draw' && <SignaturePad onChange={setSignatureData} />}
               <label>
                 <span>Email</span>
                 <input type="email" value={signerEmail} onChange={e => setSignerEmail(e.target.value)} />
               </label>
               <label className="sign-check">
                 <input type="checkbox" checked={accepted} onChange={e => setAccepted(e.target.checked)} />
-                <span>I reviewed and agree to this contract. Typing my name acts as my electronic signature.</span>
+                <span>I reviewed and agree to this contract. My selected signature and full legal name act as my electronic signature.</span>
               </label>
               {error && <p className="sign-error">{error}</p>}
               <button type="submit" disabled={status === 'sending'}>{status === 'sending' ? 'Signing...' : 'Sign contract'}</button>
@@ -100,6 +112,9 @@ export default function SignContractPage({ token, contract }) {
         .sign-check { align-items: flex-start; display: flex !important; gap: 10px !important; }
         .sign-check span { color: #7F7E7C !important; font-size: 13px !important; font-weight: 400 !important; letter-spacing: 0 !important; line-height: 1.6; text-transform: none !important; }
         .sign-check input { margin-top: 4px; }
+        .signature-methods { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 6px 0 14px; }
+        .signature-methods button { background: #fff; color: #555; border-color: #ddd; }
+        .signature-methods button.active { background: #efe9e5; color: #111; border-color: #8f7c71; }
         .sign-card button { width: 100%; border: 1px solid #111110; border-radius: 10px; background: #111110; color: #fff; cursor: pointer; font: inherit; font-weight: 600; min-height: 48px; padding: 12px 16px; }
         .sign-card button:disabled { opacity: .65; }
         .sign-error { color: #991F1F; font-size: 13px; margin: 0 0 12px; }
@@ -119,7 +134,7 @@ export async function getServerSideProps({ params }) {
 
   const { data } = await db
     .from('contracts')
-    .select('id, client_name, type, body, status, sent, signed_by, signed_at')
+    .select('id, client_name, type, body, status, sent, signed_by, signed_at, fields')
     .eq('id', parsed.contractId)
     .single()
 
@@ -137,6 +152,8 @@ export async function getServerSideProps({ params }) {
         sent: data.sent || '',
         signedBy: data.signed_by || '',
         signedAt: data.signed_at || '',
+        signatureData: data.fields?.signatureData || '',
+        headerImageUrl: data.fields?.headerImageUrl || '',
       },
     },
   }

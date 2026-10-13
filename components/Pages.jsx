@@ -11,6 +11,21 @@ const fmtTime = t => { if (!t) return ''; const [h, m] = t.split(':'); const hr 
 const todayLabel = () => new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
 const fmt$ = n => '$' + Number(n || 0).toLocaleString()
 
+function MiniCalendar({ bookings, onOpen }) {
+  const now = new Date(), year = now.getFullYear(), month = now.getMonth()
+  const first = new Date(year, month, 1).getDay(), days = new Date(year, month + 1, 0).getDate()
+  const dateFor = day => `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+  const next = [...bookings].filter(item => item.date >= new Date().toLocaleDateString('en-CA') && item.status !== 'canceled').sort((a,b) => `${a.date}${a.time}`.localeCompare(`${b.date}${b.time}`))[0]
+  return <div style={T.card} className="dashboard-calendar-card">
+    <div className="dashboard-card-title"><strong>{now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</strong><button style={T.btnGhost} onClick={onOpen}>Full calendar</button></div>
+    <div className="mini-calendar-grid">{['S','M','T','W','T','F','S'].map((day,index) => <small key={`${day}-${index}`}>{day}</small>)}
+      {Array(first).fill(null).map((_, index) => <span key={`blank-${index}`} />)}
+      {Array.from({ length: days }, (_, index) => index + 1).map(day => { const count = bookings.filter(item => item.date === dateFor(day) && item.status !== 'canceled').length; return <button key={day} className={`${dateFor(day) === new Date().toLocaleDateString('en-CA') ? 'today' : ''} ${count ? 'booked' : ''}`} onClick={onOpen}>{day}{count > 0 && <i>{count}</i>}</button> })}
+    </div>
+    <div className="mini-calendar-next">{next ? <><small>Next session</small><strong>{next.client}</strong><span>{fmtDate(next.date)} · {fmtTime(next.time)}</span></> : <span>No upcoming sessions</span>}</div>
+  </div>
+}
+
 // ── Dashboard ─────────────────────────────────────────────────────
 export function Dashboard({ data, setView, openClientCard }) {
   const totalRevenue = data.invoices.reduce((s, i) => s + i.paid, 0)
@@ -19,21 +34,21 @@ export function Dashboard({ data, setView, openClientCard }) {
   const upcoming = data.bookings.filter(b => b.status === 'confirmed').length
   return (
     <div>
-      <div style={T.metricStrip} className="metric-strip">
+      <div className="dashboard-metric-grid metric-strip">
         {[
           { label: 'Revenue collected', value: fmt$(totalRevenue), sub: 'all time' },
           { label: 'Outstanding', value: fmt$(outstanding), sub: `${data.invoices.filter(i => i.status !== 'paid').length} invoices` },
           { label: 'Active clients', value: active, sub: `of ${data.clients.filter(c => !c.archived).length} total` },
           { label: 'Sessions confirmed', value: upcoming, sub: 'upcoming' },
         ].map((m, i) => (
-          <div key={m.label} style={T.metricCell(i === 3)}>
+          <button key={m.label} className="dashboard-metric-card" onClick={() => setView(i === 0 || i === 1 ? 'invoices' : i === 2 ? 'clients' : 'sessions')}>
             <div style={T.metricLabel}>{m.label}</div>
             <div style={T.metricValue}>{m.value}</div>
             <div style={T.metricSub}>{m.sub}</div>
-          </div>
+          </button>
         ))}
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }} className="two-col-grid">
+      <div className="dashboard-content-grid">
         <div style={T.card}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
             <div style={{ fontWeight: 500, fontSize: 14 }}>Recent clients</div>
@@ -68,6 +83,7 @@ export function Dashboard({ data, setView, openClientCard }) {
           ))}
           {data.bookings.length === 0 && <div style={{ textAlign: 'center', padding: '24px 0', color: C.faint, fontSize: 13 }}>No sessions yet</div>}
         </div>
+        <MiniCalendar bookings={data.bookings} onOpen={() => setView('calendar')} />
       </div>
     </div>
   )
@@ -198,9 +214,13 @@ export function Analytics({ data }) {
   const totalRevenue = data.invoices.reduce((s, i) => s + (i.paid || 0), 0)
   const outstanding = data.invoices.reduce((s, i) => s + (i.amount - (i.paid || 0)), 0)
   const activeClients = data.clients.filter(c => !c.archived)
-  const avg = activeClients.length ? Math.round(data.invoices.reduce((s, i) => s + i.amount, 0) / activeClients.length) : 0
-  const conv = data.clients.length ? Math.round(data.clients.filter(c => c.status !== 'inquiry').length / data.clients.length * 100) : 0
+  const avg = data.invoices.length ? Math.round(data.invoices.reduce((s, i) => s + i.amount, 0) / data.invoices.length) : 0
+  const inquiryClients = activeClients.filter(c => c.status === 'inquiry')
+  const bookedClients = activeClients.filter(c => c.status !== 'inquiry')
+  const conv = activeClients.length ? Math.round(bookedClients.length / activeClients.length * 100) : 0
   const paidInvoices = data.invoices.filter(i => i.status === 'paid').length
+  const now = new Date(); const inThirtyDays = new Date(now.getTime() + 30 * 86400000)
+  const upcomingThirty = data.bookings.filter(b => { const date = new Date(`${b.date}T12:00:00`); return b.status !== 'canceled' && date >= now && date <= inThirtyDays }).length
 
   return (
     <div>
@@ -208,8 +228,8 @@ export function Analytics({ data }) {
         {[
           { label: 'Total collected', value: fmt$(totalRevenue), sub: `${paidInvoices} paid invoices` },
           { label: 'Outstanding', value: fmt$(outstanding), sub: `${data.invoices.filter(i => i.status !== 'paid').length} open` },
-          { label: 'Avg invoice value', value: fmt$(avg), sub: 'per client' },
-          { label: 'Conversion rate', value: conv + '%', sub: 'inquiry → booked' },
+          { label: 'Avg invoice value', value: fmt$(avg), sub: `${data.invoices.length} invoices` },
+          { label: 'Conversion rate', value: conv + '%', sub: `${bookedClients.length} booked · ${inquiryClients.length} inquiries` },
         ].map((m, i) => (
           <div key={m.label} style={T.metricCell(i === 3)}>
             <div style={T.metricLabel}>{m.label}</div>
@@ -217,6 +237,10 @@ export function Analytics({ data }) {
             {m.sub && <div style={T.metricSub}>{m.sub}</div>}
           </div>
         ))}
+      </div>
+      <div style={{ ...T.cardSm, marginBottom: 16, display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'center' }}>
+        <div><strong>{upcomingThirty}</strong> session{upcomingThirty === 1 ? '' : 's'} scheduled in the next 30 days</div>
+        <div style={{ color: C.muted, fontSize: 12 }}>{activeClients.length} active clients · {data.bookings.filter(b => b.status === 'canceled').length} canceled sessions</div>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: 16, marginBottom: 16 }} className="two-col-grid">
         <div style={T.card}>
@@ -367,13 +391,13 @@ export function Calendar({ data, setData, toast, openClientCard }) {
               const dateStr = ds(d), evts = data.bookings.filter(b => b.date === dateStr && b.status !== 'canceled' && matchesFilter(b)), isToday = dateStr === todayStr
               const hasBooking = evts.length > 0
               return (
-                <div key={i} className={`calendar-month-cell${hasBooking ? ' calendar-month-cell-booked' : ''}${isToday ? ' calendar-month-cell-today' : ''}`} style={{ background: blocked.includes(dateStr) ? '#f2f1ef' : hasBooking ? '#FFF8F5' : isToday ? '#FAFAFA' : C.surface, minHeight: 76, padding: '7px 8px' }}>
+                <div key={i} role="button" tabIndex={0} title="Open this day's agenda" onClick={() => { setSelectedDate(dateStr); setCalView('day') }} onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { setSelectedDate(dateStr); setCalView('day') } }} className={`calendar-month-cell calendar-month-cell-action${hasBooking ? ' calendar-month-cell-booked' : ''}${isToday ? ' calendar-month-cell-today' : ''}`} style={{ background: blocked.includes(dateStr) ? '#f2f1ef' : hasBooking ? '#FFF8F5' : isToday ? '#FAFAFA' : C.surface, minHeight: 76, padding: '7px 8px' }}>
                   <div style={{ fontSize: 12, fontWeight: hasBooking || isToday ? 700 : 400, color: hasBooking ? '#7A3B2E' : isToday ? C.text : C.muted }}>{d}</div>
                   {blocked.includes(dateStr) && <div style={{ fontSize: 10, color: C.muted }}>Blocked</div>}
                   {blockedTimes.some(block => block.date === dateStr) && <div style={{ fontSize: 10, color: C.muted }}>Time blocked</div>}
                   {evts.map(e => {
                     const clientObj = data.clients.find(c => c.id === e.clientId || c.name === e.client)
-                    return <div key={e.id} onClick={() => clientObj ? openClientCard(clientObj) : toggle(e.id)} style={{ fontSize: 10, fontWeight: 500, background: e.status === 'confirmed' ? C.text : C.surface3, color: e.status === 'confirmed' ? '#fff' : C.muted, borderRadius: 4, padding: '2px 5px', marginTop: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', cursor: 'pointer' }} title={clientObj ? `Open ${e.client}'s project` : 'Click to toggle status'}>{e.client}</div>
+                    return <div key={e.id} onClick={event => { event.stopPropagation(); clientObj ? openClientCard(clientObj) : toggle(e.id) }} style={{ fontSize: 10, fontWeight: 500, background: e.status === 'confirmed' ? C.text : C.surface3, color: e.status === 'confirmed' ? '#fff' : C.muted, borderRadius: 4, padding: '2px 5px', marginTop: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', cursor: 'pointer' }} title={clientObj ? `Open ${e.client}'s project` : 'Click to toggle status'}>{e.client}</div>
                   })}
                 </div>
               )
@@ -427,6 +451,7 @@ export function Invoices({ data, setData, toast }) {
   const [payModal, setPayModal] = useState(null) // invoice being marked paid
   const [payMethod, setPayMethod] = useState(null)
   const [sending, setSending] = useState(null) // invoiceId being emailed
+  const [viewInvoice, setViewInvoice] = useState(null)
   const blank = { client: '', amount: '', due: '', note: '' }
   const [form, setForm] = useState(blank)
   const sendInvoice = async (inv) => {
@@ -453,12 +478,12 @@ export function Invoices({ data, setData, toast }) {
   return (
     <div>
       <div style={T.pageHeader} className="page-header-wrap"><div><div style={T.pageTitle}>Invoices</div><div style={T.pageSub}>{fmt$(collected)} collected · {fmt$(total - collected)} outstanding</div></div><button style={T.btnPrimary} onClick={() => setModal(true)}>+ New invoice</button></div>
-      <div style={T.card}>
+      <div className="invoice-card-grid">
         {data.invoices.map((inv, i) => {
           const pct = inv.amount > 0 ? Math.round(inv.paid / inv.amount * 100) : 0
           const owing = inv.amount - inv.paid
           return (
-            <div key={inv.number || inv.id} className="data-row-mobile" style={{ ...T.dataRow, alignItems: 'flex-start', paddingTop: 16, paddingBottom: 16, borderBottom: i === data.invoices.length - 1 ? 'none' : `1px solid ${C.border}` }}>
+            <article key={inv.number || inv.id} className="invoice-summary-card" onClick={() => setViewInvoice(inv)}>
               <div style={{ flex: 1 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 5 }}>
                   <div style={{ fontWeight: 500 }}>{inv.number || inv.id}</div>
@@ -473,11 +498,11 @@ export function Invoices({ data, setData, toast }) {
                   <div style={{ fontFamily: "'DM Serif Display', Georgia, serif", fontSize: 20, letterSpacing: '-0.3px' }}>{fmt$(inv.amount)}</div>
                   {inv.status === 'partial' && <div style={{ fontSize: 11, color: C.muted }}>{fmt$(inv.paid)} paid</div>}
                 </div>
-                {inv.status !== 'paid' && owing > 0 && <button style={{ ...T.btnSm, color: C.green, borderColor: C.green }} onClick={() => { setPayModal(inv); setPayMethod(null) }}>Mark paid</button>}
-                <button style={T.btnSm} onClick={() => sendInvoice(inv)} disabled={sending === inv.id}>{sending === inv.id ? 'Sending...' : 'Send'}</button>
-                <button style={{ ...T.btnGhost, color: C.faint }} onClick={() => del(inv.id)}>×</button>
+                {inv.status !== 'paid' && owing > 0 && <button style={{ ...T.btnSm, color: C.green, borderColor: C.green }} onClick={event => { event.stopPropagation(); setPayModal(inv); setPayMethod(null) }}>Mark paid</button>}
+                <button style={T.btnSm} onClick={event => { event.stopPropagation(); sendInvoice(inv) }} disabled={sending === inv.id}>{sending === inv.id ? 'Sending...' : 'Send'}</button>
+                <button style={{ ...T.btnGhost, color: C.faint }} onClick={event => { event.stopPropagation(); del(inv.id) }}>×</button>
               </div>
-            </div>
+            </article>
           )
         })}
       </div>
@@ -491,6 +516,11 @@ export function Invoices({ data, setData, toast }) {
           <div style={T.formGroup}><label style={T.formLabel}>Note</label><input style={T.formInput} value={form.note} onChange={e => setForm({ ...form, note: e.target.value })} /></div>
         </Modal>
       )}
+      {viewInvoice && <Modal title={`${viewInvoice.number || viewInvoice.id} · ${viewInvoice.client}`} onClose={() => setViewInvoice(null)} wide footer={<><button style={T.btn} onClick={() => setViewInvoice(null)}>Close</button>{viewInvoice.status !== 'paid' && <button style={T.btnPrimary} onClick={() => { setPayModal(viewInvoice); setPayMethod(null); setViewInvoice(null) }}>Record payment</button>}</>}>
+        <div className="invoice-detail-grid"><div><span>Status</span><Badge type={viewInvoice.status} label={viewInvoice.status} /></div><div><span>Total</span><strong>{fmt$(viewInvoice.amount)}</strong></div><div><span>Paid</span><strong>{fmt$(viewInvoice.paid)}</strong></div><div><span>Balance</span><strong>{fmt$(viewInvoice.amount - viewInvoice.paid)}</strong></div><div><span>Due date</span><strong>{fmtDate(viewInvoice.due)}</strong></div><div><span>Payment</span><strong>{viewInvoice.paymentMethod || 'Not recorded'}</strong></div></div>
+        {viewInvoice.note && <div className="invoice-note"><span>Invoice note</span><p>{viewInvoice.note}</p></div>}
+        {!!viewInvoice.lineData?.items?.length && <div className="invoice-line-items"><h3>Items</h3>{viewInvoice.lineData.items.map(item => <div key={item.id}><span>{item.name || 'Item'}{item.description ? ` · ${item.description}` : ''}</span><strong>{item.qty} × {fmt$(item.price)}</strong></div>)}</div>}
+      </Modal>}
 
       {/* 1.6 — Payment method modal */}
       {payModal && (
@@ -534,6 +564,13 @@ export function Contracts({ data, setData, toast }) {
   const [signModal, setSignModal] = useState(null)
   const [signName, setSignName] = useState('')
   const [sending, setSending] = useState(null)
+  const [linkModal, setLinkModal] = useState(null)
+  const copyText = async value => {
+    try { await navigator.clipboard.writeText(value); return true } catch {}
+    const input = document.createElement('textarea')
+    input.value = value; input.style.position = 'fixed'; input.style.opacity = '0'; document.body.appendChild(input); input.select()
+    const copied = document.execCommand('copy'); input.remove(); return copied
+  }
   const copySigningLink = async (contract) => {
     setSending(contract.id)
     try {
@@ -545,8 +582,9 @@ export function Contracts({ data, setData, toast }) {
       })
       const result = await response.json()
       if (!response.ok) throw new Error(result.error || 'Could not create signing link')
-      await navigator.clipboard.writeText(result.url)
-      toast('Signing link copied')
+      const copied = await copyText(result.url)
+      setLinkModal({ contract, url: result.url })
+      toast(copied ? 'Signing link copied' : 'Signing link ready')
     } catch (error) { toast(error.message || 'Could not copy signing link') }
     setSending(null)
   }
@@ -584,7 +622,7 @@ export function Contracts({ data, setData, toast }) {
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <Badge type={k.status} label={k.status} />
               <button style={T.btnSm} onClick={e => { e.stopPropagation(); setViewModal(k) }}>View</button>
-              {k.status === 'pending' && <button style={T.btnSm} onClick={e => { e.stopPropagation(); copySigningLink(k) }} disabled={sending === k.id}>Copy signing link</button>}
+              {k.status === 'pending' && <button style={T.btnSm} onClick={e => { e.stopPropagation(); copySigningLink(k) }} disabled={sending === k.id}>{sending === k.id ? 'Preparing…' : 'Copy signing link'}</button>}
               <button style={T.btnSm} onClick={e => { e.stopPropagation(); sendContract(k) }} disabled={sending === k.id}>{sending === k.id ? 'Sending...' : 'Send'}</button>
               {k.status === 'pending' && <button style={{ ...T.btnSm, color: C.green, borderColor: C.green }} onClick={e => { e.stopPropagation(); setSignModal(k); setSignName('') }}>Sign</button>}
               {k.status === 'signed' && k.signedBy && <div style={{ fontSize: 11, color: C.muted }}>Signed by {k.signedBy} · {k.signedAt}</div>}
@@ -613,10 +651,14 @@ export function Contracts({ data, setData, toast }) {
             {viewModal.signedBy && <span style={{ fontSize: 12, color: C.muted }}>Signed by {viewModal.signedBy} · {viewModal.signedAt}</span>}
           </div>
           <div style={{ background: C.surface2, borderRadius: 10, padding: 12 }}>
-            <ContractDocument body={viewModal.body} signedBy={viewModal.signedBy} signedAt={viewModal.signedAt} />
+            <ContractDocument body={viewModal.body} signedBy={viewModal.signedBy} signedAt={viewModal.signedAt} signatureData={viewModal.fields?.signatureData} headerImageUrl={viewModal.fields?.headerImageUrl} />
           </div>
         </Modal>
       )}
+      {linkModal && <Modal title="Client signing link" onClose={() => setLinkModal(null)} footer={<><button style={T.btn} onClick={() => setLinkModal(null)}>Done</button><button style={T.btnPrimary} onClick={async () => toast(await copyText(linkModal.url) ? 'Signing link copied' : 'Select and copy the link')}>Copy link</button></>}>
+        <p style={{ color: C.muted, fontSize: 13, marginBottom: 12 }}>Share this secure link with {linkModal.contract.client}. It remains valid until the contract is signed.</p>
+        <input aria-label="Signing link" style={T.formInput} readOnly value={linkModal.url} onFocus={event => event.currentTarget.select()} />
+      </Modal>}
       {signModal && (
         <Modal title="Sign contract" onClose={() => { setSignModal(null); setSignName('') }}
           footer={<><button style={T.btn} onClick={() => { setSignModal(null); setSignName('') }}>Cancel</button><button style={T.btnPrimary} onClick={confirmSign}>Sign contract</button></>}>
@@ -649,13 +691,42 @@ export function Inbox({ data, setData, toast }) {
   const [draft, setDraft] = useState('')
   const [newModal, setNewModal] = useState(false)
   const [nf, setNf] = useState({ to: '', body: '' })
+  const [sending, setSending] = useState(false)
   const active = data.messages.find(m => m.id === activeId)
-  const send = () => { if (!draft.trim()) return; setData(d => ({ ...d, messages: d.messages.map(m => m.id === activeId ? { ...m, thread: [...m.thread, { id: uid(), from: 'You', text: draft, time: 'Just now', out: true }], unread: false } : m) })); setDraft(''); toast('Sent') }
+  const deliver = async ({ clientId, clientName, message }) => {
+    const { data: { session } } = await pibase.auth.getSession()
+    const response = await fetch('/api/email-message', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token || ''}` }, body: JSON.stringify({ clientId, clientName, message }) })
+    const payload = await response.json().catch(() => ({}))
+    if (!response.ok) throw new Error(payload.error || 'Message could not be sent')
+    return payload.client
+  }
+  const send = async () => {
+    if (!draft.trim() || !active || sending) return
+    const client = data.clients.find(c => c.id === active.clientId || c.name === active.from)
+    setSending(true)
+    try {
+      await deliver({ clientId: client?.id, clientName: active.from, message: draft })
+      setData(d => ({ ...d, messages: d.messages.map(m => m.id === activeId ? { ...m, clientId: client?.id || m.clientId, thread: [...m.thread, { id: uid(), from: 'You', text: draft, time: 'Just now', out: true }], unread: false } : m) }))
+      setDraft(''); toast('Email sent')
+    } catch (error) { toast(error.message) }
+    setSending(false)
+  }
   const markRead = id => setData(d => ({ ...d, messages: d.messages.map(m => m.id === id ? { ...m, unread: false } : m) }))
-  const sendNew = () => { if (!nf.to.trim()) return; const nm = { id: uid(), from: nf.to, thread: [{ id: uid(), from: 'You', text: nf.body, time: 'Just now', out: true }], unread: false }; setData(d => ({ ...d, messages: [nm, ...d.messages] })); setActiveId(nm.id); setNewModal(false); setNf({ to: '', body: '' }); toast('Sent') }
+  const sendNew = async () => {
+    if (!nf.to.trim() || !nf.body.trim() || sending) return
+    const selected = data.clients.find(c => c.name === nf.to)
+    if (!selected) return toast('Choose an existing client')
+    setSending(true)
+    try {
+      const client = await deliver({ clientId: selected.id, clientName: selected.name, message: nf.body })
+      const nm = { id: uid(), clientId: client.id, from: client.name, thread: [{ id: uid(), from: 'You', text: nf.body, time: 'Just now', out: true }], unread: false }
+      setData(d => ({ ...d, messages: [nm, ...d.messages] })); setActiveId(nm.id); setNewModal(false); setNf({ to: '', body: '' }); toast('Email sent')
+    } catch (error) { toast(error.message) }
+    setSending(false)
+  }
   return (
     <div>
-      <div style={T.pageHeader} className="page-header-wrap"><div><div style={T.pageTitle}>Inbox</div><div style={T.pageSub}>{data.messages.filter(m => m.unread).length} unread</div></div><button style={T.btnPrimary} onClick={() => setNewModal(true)}>+ Compose</button></div>
+      <div style={T.pageHeader} className="page-header-wrap"><div><div style={T.pageTitle}>Inbox</div><div style={T.pageSub}>Outbound email through Resend · replies go to your studio email</div></div><button style={T.btnPrimary} onClick={() => setNewModal(true)}>+ Compose</button></div>
       <div style={{ display: 'grid', gridTemplateColumns: '270px 1fr', border: `1px solid ${C.border}`, borderRadius: 12, overflow: 'hidden', minHeight: 500 }} className="inbox-grid-wrap">
         <div style={{ borderRight: `1px solid ${C.border}`, overflowY: 'auto' }}>
           {data.messages.map(m => (
@@ -680,14 +751,14 @@ export function Inbox({ data, setData, toast }) {
               </div>
               <div style={{ padding: '14px 22px', borderTop: `1px solid ${C.border}`, display: 'flex', gap: 10 }}>
                 <textarea rows={2} style={{ ...T.formInput, flex: 1, resize: 'none', background: C.surface2 }} placeholder="Reply... (Ctrl+Enter)" value={draft} onChange={e => setDraft(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) send() }} />
-                <button style={{ ...T.btnPrimary, alignSelf: 'flex-end', padding: '8px 14px' }} onClick={send}>→</button>
+                <button aria-label="Send email" disabled={sending} style={{ ...T.btnPrimary, alignSelf: 'flex-end', padding: '8px 14px' }} onClick={send}>{sending ? '…' : '→'}</button>
               </div>
             </>
           ) : <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 1, color: C.faint, fontSize: 13 }}>Select a conversation</div>}
         </div>
       </div>
       {newModal && (
-        <Modal title="New message" onClose={() => setNewModal(false)} footer={<><button style={T.btn} onClick={() => setNewModal(false)}>Cancel</button><button style={T.btnPrimary} onClick={sendNew}>Send</button></>}>
+        <Modal title="New email" onClose={() => setNewModal(false)} footer={<><button style={T.btn} onClick={() => setNewModal(false)}>Cancel</button><button style={T.btnPrimary} disabled={sending} onClick={sendNew}>{sending ? 'Sending…' : 'Send email'}</button></>}>
           <div style={T.formGroup}><label style={T.formLabel}>To</label><input style={T.formInput} list="cl4" value={nf.to} onChange={e => setNf({ ...nf, to: e.target.value })} /><datalist id="cl4">{data.clients.map(c => <option key={c.id} value={c.name} />)}</datalist></div>
           <div style={T.formGroup}><label style={T.formLabel}>Message</label><textarea style={{ ...T.formInput, resize: 'none' }} rows={5} value={nf.body} onChange={e => setNf({ ...nf, body: e.target.value })} /></div>
         </Modal>
