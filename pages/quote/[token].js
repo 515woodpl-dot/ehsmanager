@@ -1,9 +1,11 @@
 import { useState } from 'react'
 import { createServiceClient } from '../../lib/pibase'
+import { loadStudioConfig } from '../../lib/studioConfig'
+import { logoUrl } from '../../lib/email'
 import { verifyQuoteToken } from '../../lib/signingTokens'
 import PublicDocument, { LineItemsTable, fmt$, fmtDate, summariseLineItems } from '../../components/PublicDocument'
 
-export default function QuotePage({ token, quote, businessName }) {
+export default function QuotePage({ token, quote, businessName, logo }) {
   const [status, setStatus] = useState(quote.status)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -26,7 +28,7 @@ export default function QuotePage({ token, quote, businessName }) {
 
   const accepted = status === 'accepted'
   return (
-    <PublicDocument pageTitle={`Quote ${quote.number} · ${businessName}`} eyebrow={businessName} title={`Quote ${quote.number}`}
+    <PublicDocument pageTitle={`Quote ${quote.number} · ${businessName}`} eyebrow={businessName} logo={logo} title={`Quote ${quote.number}`}
       statusLabel={accepted ? 'Accepted' : expired ? 'Expired' : 'Awaiting your approval'} tone={accepted ? 'done' : expired ? 'muted' : 'open'}>
       <div className="inv-meta">
         <div><span>Prepared for</span><strong>{quote.client || '—'}</strong></div>
@@ -70,13 +72,14 @@ export async function getServerSideProps({ params, res }) {
     .select('id, user_id, client_name, amount, status, note, line_items')
     .eq('id', parsed.quoteId).single()
   if (!data) return { notFound: true }
-  const { data: profile } = await db.from('profiles').select('business_name').eq('id', data.user_id).single()
+  const studio = await loadStudioConfig(db, data.user_id)
 
   res.setHeader('Cache-Control', 'private, no-store')
   return {
     props: {
       token: params.token,
-      businessName: profile?.business_name || "Ellie's Heartstrings Photography",
+      businessName: studio.branding.businessName,
+      logo: logoUrl(studio),
       quote: {
         number: data.line_items?.number || '', client: data.client_name || '',
         amount: Number(data.amount) || 0, status: data.status || 'pending',

@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo } from 'react'
-import { QuoteModal, ContractModal, QuestionnaireModal, SessionModal, MessageModal } from './ActionModals'
+import { QuoteModal, ContractModal, QuestionnaireModal, SessionModal, MessageModal, copyChatLink } from './ActionModals'
 import { T, C, badge } from '../lib/tokens'
 import { Modal, Badge, Avatar, Seg, ConfirmModal } from './UI'
 import { removeClient } from '../lib/data'
@@ -216,8 +216,9 @@ function CardModal({ client: clientProp, stages, sessionTypes, data, setData, on
                     title={b.type || 'Session'} subtitle={`${fmtDate(b.date)}${b.time ? ` · ${b.time}` : ''}${b.location ? ` · ${b.location}` : ''}`} status={sessionStatus(b)} />)}
                 </ActivitySection>
                 <ActivitySection title="Messages" onAdd={() => setActiveModal('message')} empty="No messages yet">
-                  {clientMessages.map(m => { const last = m.thread?.[m.thread.length - 1]; return <DocCard key={m.id} kind="message" item={m} onClick={() => setActiveModal('message')}
-                    title={`${m.thread?.length || 0} message${m.thread?.length === 1 ? '' : 's'}`} subtitle={last ? `${last.out ? 'You' : client.name}: ${last.text}` : ''} status={last?.time || ''} /> })}
+                  <button key="chat-link" type="button" style={{ ...T.btnGhost, color: C.blue, padding: '0 0 8px', fontSize: 12 }} onClick={() => copyChatLink(client.id, toast)}>Copy {client.name.split(' ')[0]}'s chat link</button>
+                  {clientMessages.map(m => { const last = m.thread?.[m.thread.length - 1]; return <DocCard key={m.id} kind={m.unread ? 'unread' : 'message'} item={m} onClick={() => { if (m.unread) setData(d => ({ ...d, messages: d.messages.map(x => x.id === m.id ? { ...x, unread: false } : x) })); setActiveModal('message') }}
+                    title={`${m.unread ? 'New reply · ' : ''}${m.thread?.length || 0} message${m.thread?.length === 1 ? '' : 's'}`} subtitle={last ? `${last.out ? 'You' : client.name}: ${last.text}` : ''} status={last?.time || ''} /> })}
                 </ActivitySection>
               </div>
             )}

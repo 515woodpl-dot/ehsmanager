@@ -1,4 +1,4 @@
-import { resend, fromFor, emailWrap } from '../../lib/email'
+import { emailWrap, sendStudioEmail, signOffHtml } from '../../lib/email'
 import { requireUser } from '../../lib/api-auth'
 import { createInvoiceToken } from '../../lib/signingTokens'
 
@@ -10,8 +10,8 @@ export default async function handler(req, res) {
 
   const auth = await requireUser(req, res)
   if (!auth) return
-  const bizName = auth.profile.business_name || 'My Studio'
-  const ownerName = (auth.profile.full_name || '').split(' ')[0] || bizName
+  const bizName = auth.config.branding.businessName
+  const ownerName = (auth.config.branding.ownerName || '').split(' ')[0] || bizName
 
   const invoiceId = req.body?.invoice?.id
   if (!invoiceId) return res.status(400).json({ error: 'Missing invoice ID' })
@@ -25,7 +25,6 @@ export default async function handler(req, res) {
   const invoice = { ...row, client: row.client_name, lineItems: Array.isArray(row.line_items) ? row.line_items : row.line_items?.items || [] }
   const clientEmail = client.email
   const clientName = client.name
-  if (!resend) return res.status(500).json({ error: 'Email service is not configured' })
 
   const pct = invoice.amount > 0 ? Math.round((invoice.paid / invoice.amount) * 100) : 0
   const owing = invoice.amount - invoice.paid
@@ -73,20 +72,15 @@ export default async function handler(req, res) {
 
     ${customMessage ? '' : `<p>If you have any questions about this invoice, please don't hesitate to reach out.</p>
     <p>Thank you for choosing ${escapeHtml(bizName)}.</p>`}
-    <p style="margin-top:24px;">Warmly,<br/><strong>${escapeHtml(ownerName)}</strong></p>
-  `, bizName)
+    ${signOffHtml(auth.config)}
+  `, auth.config)
 
-  try {
-    const { data, error } = await resend.emails.send({
-      from: fromFor(bizName),
-      reply_to: auth.profile.email || undefined,
-      to: clientEmail,
-      subject: customSubject || `Invoice ${label} from ${bizName}`,
-      html,
-    })
-    if (error) return res.status(400).json({ error })
-    return res.status(200).json({ id: data.id })
-  } catch (err) {
-    return res.status(500).json({ error: err.message })
-  }
+  const result = await sendStudioEmail(auth.config, {
+    to: clientEmail,
+    clientId: row.client_id,
+    subject: customSubject || `Invoice ${label} from ${bizName}`,
+    html,
+  })
+  if (result.error) return res.status(400).json({ error: result.error })
+  return res.status(200).json({ id: result.id })
 }

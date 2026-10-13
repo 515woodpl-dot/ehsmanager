@@ -1,13 +1,15 @@
 import { createServiceClient } from '../../lib/pibase'
+import { loadStudioConfig } from '../../lib/studioConfig'
+import { logoUrl } from '../../lib/email'
 import { verifyInvoiceToken } from '../../lib/signingTokens'
 import PublicDocument, { LineItemsTable, fmt$, fmtDate, summariseLineItems } from '../../components/PublicDocument'
 
 const STATUS = { paid: 'Paid in full', partial: 'Partially paid', unpaid: 'Awaiting payment' }
 
-export default function InvoicePage({ invoice, businessName }) {
+export default function InvoicePage({ invoice, businessName, logo }) {
   const balance = Math.max(0, invoice.amount - invoice.paid)
   return (
-    <PublicDocument pageTitle={`Invoice ${invoice.number} · ${businessName}`} eyebrow={businessName} title={`Invoice ${invoice.number}`}
+    <PublicDocument pageTitle={`Invoice ${invoice.number} · ${businessName}`} eyebrow={businessName} logo={logo} title={`Invoice ${invoice.number}`}
       statusLabel={STATUS[invoice.status] || invoice.status} tone={invoice.status === 'paid' ? 'done' : 'open'}>
       <div className="inv-meta">
         <div><span>Billed to</span><strong>{invoice.client || '—'}</strong></div>
@@ -39,13 +41,14 @@ export async function getServerSideProps({ params, res }) {
     .select('id, user_id, number, client_name, amount, paid, due, status, note, line_items')
     .eq('id', parsed.invoiceId).single()
   if (!data) return { notFound: true }
-  const { data: profile } = await db.from('profiles').select('business_name').eq('id', data.user_id).single()
+  const studio = await loadStudioConfig(db, data.user_id)
   const { notes, ...summary } = summariseLineItems(data.line_items)
 
   res.setHeader('Cache-Control', 'private, no-store')
   return {
     props: {
-      businessName: profile?.business_name || "Ellie's Heartstrings Photography",
+      businessName: studio.branding.businessName,
+      logo: logoUrl(studio),
       invoice: {
         number: data.number || '', client: data.client_name || '',
         amount: Number(data.amount) || 0, paid: Number(data.paid) || 0,

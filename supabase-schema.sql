@@ -37,8 +37,17 @@ create table if not exists studio_settings (
     "redirectUrl":"",
     "checkboxOptions":["Family Portraits","Maternity Photography","Newborn Photography","Personal Portraits","Kids Portraits","Engagement / Couples Session","Other"]
   }'::jsonb,
+  branding        jsonb not null default '{}'::jsonb,      -- business details + logo
+  integrations    jsonb not null default '{}'::jsonb,      -- non-secret integration options
   updated_at      timestamptz default now(),
   unique (user_id)
+);
+
+-- ── Studio secrets (encrypted API keys; server-only, no RLS policies) ──
+create table if not exists studio_secrets (
+  user_id    uuid primary key references profiles(id) on delete cascade,
+  payload    text not null,
+  updated_at timestamptz not null default now()
 );
 
 -- ── Clients ──────────────────────────────────────────────────────
@@ -172,6 +181,7 @@ alter table quotes             enable row level security;
 alter table questionnaires     enable row level security;
 alter table messages           enable row level security;
 alter table leads              enable row level security;
+alter table studio_secrets     enable row level security;  -- no policies: server only
 
 -- Profiles: own row only
 create policy "profiles_own" on profiles

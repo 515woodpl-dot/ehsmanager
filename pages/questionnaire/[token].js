@@ -1,9 +1,11 @@
 import { useState } from 'react'
 import { createServiceClient } from '../../lib/pibase'
+import { loadStudioConfig } from '../../lib/studioConfig'
+import { logoUrl } from '../../lib/email'
 import { verifyQuestionnaireToken } from '../../lib/signingTokens'
 import PublicDocument from '../../components/PublicDocument'
 
-export default function QuestionnairePage({ token, questionnaire, businessName }) {
+export default function QuestionnairePage({ token, questionnaire, businessName, logo }) {
   const [answers, setAnswers] = useState({})
   const [done, setDone] = useState(questionnaire.status === 'completed')
   const [busy, setBusy] = useState(false)
@@ -26,7 +28,7 @@ export default function QuestionnairePage({ token, questionnaire, businessName }
   }
 
   return (
-    <PublicDocument pageTitle={`${questionnaire.title} · ${businessName}`} eyebrow={businessName} title={questionnaire.title}
+    <PublicDocument pageTitle={`${questionnaire.title} · ${businessName}`} eyebrow={businessName} logo={logo} title={questionnaire.title}
       statusLabel={done ? 'Submitted' : 'Awaiting your answers'} tone={done ? 'done' : 'open'}>
       {done ? (
         <div className="inv-message success">Thank you, {questionnaire.client || 'your answers were received'}! {businessName} has your answers.</div>
@@ -64,14 +66,15 @@ export async function getServerSideProps({ params, res }) {
 
   const { data } = await db.from('questionnaires').select('id, user_id, client_name, questions, status').eq('id', parsed.questionnaireId).single()
   if (!data) return { notFound: true }
-  const { data: profile } = await db.from('profiles').select('business_name').eq('id', data.user_id).single()
+  const studio = await loadStudioConfig(db, data.user_id)
   const details = Array.isArray(data.questions) ? { items: data.questions } : (data.questions || {})
 
   res.setHeader('Cache-Control', 'private, no-store')
   return {
     props: {
       token: params.token,
-      businessName: profile?.business_name || "Ellie's Heartstrings Photography",
+      businessName: studio.branding.businessName,
+      logo: logoUrl(studio),
       questionnaire: {
         title: details.title || 'Questionnaire',
         client: (data.client_name || '').split(/\s+/)[0],

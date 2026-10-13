@@ -38,7 +38,7 @@ export function LineItemsTable({ items }) {
 
 // Page shell + styles shared by the client-facing invoice, quote and
 // questionnaire pages. `tone` is 'open' | 'done' | 'muted'.
-export default function PublicDocument({ pageTitle, eyebrow, title, statusLabel, tone = 'open', children }) {
+export default function PublicDocument({ pageTitle, eyebrow, title, statusLabel, tone = 'open', logo = '', children }) {
   return (
     <>
       <Head>
@@ -50,7 +50,7 @@ export default function PublicDocument({ pageTitle, eyebrow, title, statusLabel,
         <section className="inv-card">
           <div className="inv-top">
             <div>
-              <p className="inv-eyebrow">{eyebrow}</p>
+              {logo ? <img className="inv-logo" src={logo} alt={eyebrow} /> : <p className="inv-eyebrow">{eyebrow}</p>}
               <h1>{title}</h1>
             </div>
             {statusLabel && <span className={`inv-status inv-status-${tone}`}>{statusLabel}</span>}
@@ -64,6 +64,7 @@ export default function PublicDocument({ pageTitle, eyebrow, title, statusLabel,
         .inv-page { min-height: 100vh; padding: 48px 20px 72px; display: grid; justify-items: center; }
         .inv-card { width: min(820px, 100%); background: #fff; border: 1px solid #EAEAEA; border-radius: 16px; padding: 32px; box-shadow: 0 8px 30px rgba(0,0,0,0.04); }
         .inv-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; margin-bottom: 24px; }
+        .inv-logo { display: block; max-height: 56px; max-width: 200px; margin-bottom: 12px; }
         .inv-eyebrow { color: #7F7E7C; font-size: 11px; letter-spacing: .12em; text-transform: uppercase; margin: 0 0 8px; }
         .inv-card h1 { font-family: Georgia, serif; font-size: clamp(1.8rem, 5vw, 2.6rem); font-weight: 400; margin: 0; }
         .inv-status { border-radius: 999px; padding: 6px 12px; font-size: 12px; font-weight: 600; }

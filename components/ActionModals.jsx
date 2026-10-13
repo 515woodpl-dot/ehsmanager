@@ -36,6 +36,14 @@ async function copyText(value) {
   const copied = document.execCommand('copy'); input.remove(); return copied
 }
 
+// Gets the client's private chat link and copies it.
+export async function copyChatLink(clientId, toast) {
+  try {
+    const { url } = await callApi('/api/chat-link', { clientId })
+    toast(await copyText(url) ? 'Chat link copied — share it with your client' : url)
+  } catch (error) { toast(error.message || 'Could not create chat link') }
+}
+
 const clientFor = (data, doc, fallback) => data.clients.find(c => c.id === doc?.clientId) || fallback || data.clients.find(c => c.name === doc?.client) || null
 
 function Banner({ tone = 'open', children }) {
@@ -438,7 +446,7 @@ export function MessageModal({ client, data, setData, toast, onClose, onSaved })
     setSending(true); setError('')
     try {
       await callApi('/api/email-message', { clientId: client.id, clientName: client.name, message: body.trim() })
-      const msg = { id: uid(), from: 'You', text: body.trim(), time: todayShort(), out: true }
+      const msg = { id: uid(), from: 'You', text: body.trim(), time: todayShort(), at: new Date().toISOString(), out: true, via: 'email' }
       if (existing) {
         setData(d => ({ ...d, messages: d.messages.map(m => m.id === existing.id ? { ...m, thread: [...m.thread, msg] } : m) }))
       } else {
@@ -462,7 +470,7 @@ export function MessageModal({ client, data, setData, toast, onClose, onSaved })
         <div style={{ background: C.surface2, borderRadius: 8, padding: '10px 14px', marginBottom: 14, maxHeight: 200, overflowY: 'auto' }}>
           {existing.thread.slice(-5).map(m => (
             <div key={m.id} style={{ marginBottom: 8, fontSize: 13 }}>
-              <span style={{ fontWeight: 600, color: m.out ? C.text : C.blue }}>{m.out ? 'You' : client.name}:</span>{' '}
+              <span style={{ fontWeight: 600, color: m.out ? C.text : C.blue }}>{m.out ? 'You' : client.name}{m.via ? ` (${m.via})` : ''}:</span>{' '}
               <span style={{ color: C.muted, whiteSpace: 'pre-wrap' }}>{m.text}</span>
               {m.time && <span style={{ color: C.faint, fontSize: 11 }}> · {m.time}</span>}
             </div>
@@ -473,7 +481,10 @@ export function MessageModal({ client, data, setData, toast, onClose, onSaved })
         <label style={T.formLabel}>Message</label>
         <textarea style={{ ...T.formInput, resize: 'vertical' }} rows={6} placeholder={`Write a message to ${client.name}...`} value={body} onChange={e => setBody(e.target.value)} autoFocus />
       </div>
-      <div style={{ fontSize: 12, color: C.faint }}>Sent by email. Replies go to your studio email address.</div>
+      <div style={{ fontSize: 12, color: C.faint, display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
+        <span>Sent by email with a link to your private chat. Replies show up here.</span>
+        <button type="button" style={{ ...T.btnGhost, color: C.blue, padding: 0 }} onClick={() => copyChatLink(client.id, toast)}>Copy chat link</button>
+      </div>
       {error && <div style={{ marginTop: 12, padding: '10px 14px', background: C.redBg, color: C.red, borderRadius: 8, fontSize: 13 }}>{error}</div>}
     </Modal>
   )

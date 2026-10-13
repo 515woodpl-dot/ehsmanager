@@ -5,6 +5,98 @@ every round of changes, and keep the "Open / follow-ups" list current.
 
 ---
 
+## 2026-10-13 (round 3) — Settings page, client replies in the app, client chat
+
+### ⚠️ Before using this round
+- [ ] Apply **`supabase-migration-003-settings-inbox.sql`** in PIBASE (adds
+      `studio_settings.branding`, `studio_settings.integrations` and the
+      server-only `studio_secrets` table). Settings shows a banner until
+      this is done.
+- [ ] Set **`SETTINGS_ENCRYPTION_KEY`** (a long random value) on the server.
+      Without it, keys can't be saved in Settings.
+
+### Settings page (new)
+- [x] **Business profile:** logo upload (resized automatically), business
+      name, your name, studio email, phone, website, address and email
+      signature. These appear on every email and on the invoice, quote,
+      questionnaire and chat pages. (`components/Settings.jsx`,
+      `pages/api/settings.js`)
+- [x] **Email (Resend):** API key, "send from" address, and a **Send test
+      email** button.
+- [x] **Payments (Stripe):** publishable key, secret key, webhook signing
+      secret, a webhook URL to copy, and a **Test connection** button.
+      (`pages/api/settings-test.js`)
+- [x] Keys can only be entered or removed, never read back. After saving,
+      only the last 4 characters show. They're encrypted (AES-256-GCM) in
+      `studio_secrets`, which has RLS on and no policies, so only the server
+      can read it. Server environment variables still work as a fallback.
+      (`lib/studioConfig.js`)
+- [x] Every email and Stripe route now uses the studio's saved settings:
+      invoice, quote, contract, questionnaire, message, reminder and
+      contact-form emails, plus payment intents and the Stripe webhook.
+      `lib/stripe.js` and `/api/integration-status` were removed.
+- [x] Logo is served for emails at `/api/logo/<studio id>`.
+
+### Bug fixed
+- [x] **Reply-To was never set on any email.** The code passed `reply_to`,
+      but this Resend library version only reads `replyTo`. Client replies
+      were going to the sending address instead of the studio. Fixed in the
+      shared sender. (`lib/email.js` → `sendStudioEmail`)
+
+### Client replies come into the app ("both")
+- [x] Each client email's Reply-To is now `reply+<client code>@<your
+      receiving domain>` plus, optionally, your studio email. Replies land
+      in the **Inbox and in the client's Activity**, and still reach your
+      own email if "Also send client replies to my studio email" is on
+      (default).
+- [x] New webhook `/api/inbound-email?studio=<id>` (Resend
+      `email.received`). It checks Resend's signature, matches the client
+      from the reply address (checked so it can't be guessed) or else by
+      sender email, fetches the email text, strips the quoted history, and
+      adds it to the conversation as unread. Retries never create
+      duplicates. (`pages/api/inbound-email.js`, `lib/conversations.js`)
+- [x] Settings has step-by-step setup for Resend receiving (domain or free
+      `resend.app` address, webhook, signing secret).
+
+### Client chat page (new)
+- [x] Every client has a private chat link at `/chat/<secure link>`. The
+      client sees the conversation and can send messages; it checks for new
+      ones every 8 seconds. (`pages/chat/[token].js`, `pages/api/chat.js`)
+- [x] Message emails include an **Open our chat** button. In client details
+      there's **Copy chat link** under Messages and in the message window.
+      (`pages/api/chat-link.js`)
+- [x] New chat messages also **email the studio** (at most once per 10
+      minutes of back-and-forth).
+- [x] Inbox and message history show whether each reply came **via email**
+      or **via chat**. Unread conversations show orange in Activity
+      ("New reply").
+
+### Behind the scenes
+- [x] Replies are merged into conversations, never overwritten. When the
+      app saves a conversation, it first adds any replies the server
+      received that this tab hasn't seen yet. (`lib/db.js`)
+- [x] The app now also refreshes every minute while open, not only when you
+      switch back to the tab, so new replies appear on their own. It never
+      refreshes over unsaved changes. (`pages/index.js`)
+- [x] `.env.local.example` and `SESSION-NOTES.md` updated.
+
+### Verified
+- [x] `next build` passes.
+- [x] Server self-test: keys stored encrypted and read back correctly, and
+      removal works; reply address is 48 characters (under the 64 limit)
+      and round-trips; a tampered address is rejected; quoted history is
+      stripped; a Resend/Svix-signed payload is accepted and a tampered
+      one is rejected.
+- [x] Browser test with mocked API at phone and desktop sizes: Settings
+      loads; logo upload resizes and saves; reply settings save only their
+      own fields; saved keys show "Saved · ends in ab12"; chat page shows
+      the conversation and sends a message.
+- [ ] Not tested against live Resend, Stripe or PIBASE. After setup,
+      please: send a test email, reply to a client email, send a chat
+      message, and run Stripe "Test connection".
+
+---
+
 ## 2026-10-13 (round 2) — Client documents: quotes, contracts, questionnaires, sessions, messages
 
 ### Client details on phones
@@ -186,12 +278,13 @@ every round of changes, and keep the "Open / follow-ups" list current.
 ---
 
 ## Open / follow-ups
-- [ ] The public invoice page doesn't take card payments yet. Stripe payment
-      intents exist (`/api/create-payment-intent`) but have no client-facing
-      pay button.
+- [ ] The public invoice page doesn't take card payments yet. Stripe keys
+      can now be saved in Settings, but there's no client-facing "Pay now"
+      button.
 - [ ] `NEXT_PUBLIC_APP_URL` must be set in production so email buttons
-      point at the right domain.
+      and webhook URLs point at the right domain.
 - [ ] No notification email to the studio yet when a client accepts a
-      quote or answers a questionnaire. It only shows up in the app.
-- [ ] The Inbox doesn't receive client replies. Replies go to the studio's
-      email address.
+      quote or answers a questionnaire. It only shows up in the app. (Chat
+      messages do notify.)
+- [ ] Email attachments sent by clients aren't brought into the app (text
+      only). They still arrive in the studio email when copies are on.

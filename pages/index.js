@@ -321,8 +321,8 @@ export default function Home() {
     return () => clearTimeout(timer)
   }, [data, dbReady, user?.id, retryTick])
 
-  // Clients accept quotes, answer questionnaires and sign contracts from
-  // their own links. When the studio comes back to the tab, pull those
+  // Clients accept quotes, answer questionnaires, sign contracts and reply
+  // to messages from their own links and email. When the studio comes back to the tab, pull those
   // updates in — but only if nothing local is still waiting to save.
   useEffect(() => {
     if (!dbReady || !user) return
@@ -344,9 +344,12 @@ export default function Home() {
         refreshing = false
       }
     }
+    // Also check every minute so client replies and chat messages appear
+    // while the app is open.
+    const timer = setInterval(refresh, 60000)
     window.addEventListener('focus', refresh)
     document.addEventListener('visibilitychange', refresh)
-    return () => { window.removeEventListener('focus', refresh); document.removeEventListener('visibilitychange', refresh) }
+    return () => { clearInterval(timer); window.removeEventListener('focus', refresh); document.removeEventListener('visibilitychange', refresh) }
   }, [dbReady, user?.id])
 
   // Older invoices were stored with only a UUID (or "INV-001"). Give each a

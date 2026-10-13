@@ -9,14 +9,25 @@ The app uses the `@supabase/supabase-js` package only as a protocol compatible
 JavaScript client for PIBASE. It does not connect to or require a Supabase
 project.
 
-Required server configuration is documented in `.env.local.example` and can be
-checked from the authenticated **Settings** page. Never store Resend, Stripe,
-or PIBASE service secrets in browser storage or tenant records.
+Required server configuration is documented in `.env.local.example`.
+Business details, logo, and Resend/Stripe keys can be entered on the
+authenticated **Settings** page. Keys entered there are encrypted with
+`SETTINGS_ENCRYPTION_KEY` and stored in `studio_secrets`, a table with RLS on
+and no policies (server-only). They are never returned to the browser (only
+their last 4 characters). Never store secrets in browser storage or in
+browser-readable tables. Environment variables remain the fallback.
+
+Client replies: outgoing emails set `Reply-To` to
+`reply+<client id><check>@<receiving domain>` (plus the studio email if
+chosen). Resend's `email.received` webhook (`/api/inbound-email?studio=<id>`)
+adds the reply to the client's conversation. Clients can also use their
+private chat page at `/chat/<token>`.
 
 ## Local development
 
 1. Run PIBASE on `http://localhost:18080`.
-2. Create a PIBASE project and apply `supabase-schema.sql`. The filename is
+2. Create a PIBASE project and apply `supabase-schema.sql` (existing projects:
+   apply the numbered `supabase-migration-*.sql` files in order). The filename is
    historical; the schema targets PIBASE.
 3. Copy `.env.local.example` to `.env.local` and add the PIBASE project keys.
 4. Run `npm ci` and `npm run dev`.

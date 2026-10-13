@@ -1,10 +1,11 @@
-import stripe from '../../lib/stripe'
+import { getStripe } from '../../lib/studioConfig'
 import { requireUser } from '../../lib/api-auth'
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
   const auth = await requireUser(req, res)
   if (!auth) return
-  if (!stripe) return res.status(503).json({ error: 'Stripe is not configured' })
+  const stripe = getStripe(auth.config)
+  if (!stripe) return res.status(503).json({ error: 'Stripe is not set up yet. Add your keys in Settings.' })
   const invoiceId = req.body?.invoiceId
   if (!invoiceId) return res.status(400).json({ error: 'Invoice ID is required' })
   const { data: invoice, error: lookupError } = await auth.db.from('invoices')

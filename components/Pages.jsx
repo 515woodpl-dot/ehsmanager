@@ -669,7 +669,7 @@ export function Inbox({ data, setData, toast }) {
     setSending(true)
     try {
       await deliver({ clientId: client?.id, clientName: active.from, message: draft })
-      setData(d => ({ ...d, messages: d.messages.map(m => m.id === activeId ? { ...m, clientId: client?.id || m.clientId, thread: [...m.thread, { id: uid(), from: 'You', text: draft, time: 'Just now', out: true }], unread: false } : m) }))
+      setData(d => ({ ...d, messages: d.messages.map(m => m.id === activeId ? { ...m, clientId: client?.id || m.clientId, thread: [...m.thread, { id: uid(), from: 'You', text: draft, time: new Date().toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }), at: new Date().toISOString(), out: true, via: 'email' }], unread: false } : m) }))
       setDraft(''); toast('Email sent')
     } catch (error) { toast(error.message) }
     setSending(false)
@@ -682,7 +682,7 @@ export function Inbox({ data, setData, toast }) {
     setSending(true)
     try {
       const client = await deliver({ clientId: selected.id, clientName: selected.name, message: nf.body })
-      const nm = { id: uid(), clientId: client.id, from: client.name, thread: [{ id: uid(), from: 'You', text: nf.body, time: 'Just now', out: true }], unread: false }
+      const nm = { id: uid(), clientId: client.id, from: client.name, thread: [{ id: uid(), from: 'You', text: nf.body, time: new Date().toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }), at: new Date().toISOString(), out: true, via: 'email' }], unread: false }
       setData(d => ({ ...d, messages: [nm, ...d.messages] })); setActiveId(nm.id); setNewModal(false); setNf({ to: '', body: '' }); toast('Email sent')
     } catch (error) { toast(error.message) }
     setSending(false)
@@ -710,7 +710,7 @@ export function Inbox({ data, setData, toast }) {
             <>
               <div style={{ padding: '16px 22px', borderBottom: `1px solid ${C.border}` }}><div style={{ fontWeight: 500, fontSize: 14 }}>{active.from}</div></div>
               <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', padding: '18px 22px', gap: 2 }}>
-                {active.thread.map(msg => <div key={msg.id} style={T.msgBubble(msg.out)}>{msg.text}<div style={{ fontSize: 10, opacity: 0.5, marginTop: 4, textAlign: msg.out ? 'right' : 'left' }}>{msg.time}</div></div>)}
+                {active.thread.map(msg => <div key={msg.id} style={T.msgBubble(msg.out)}>{msg.text}<div style={{ fontSize: 10, opacity: 0.5, marginTop: 4, textAlign: msg.out ? 'right' : 'left' }}>{msg.time}{msg.via ? ` · via ${msg.via}` : ''}</div></div>)}
               </div>
               <div style={{ padding: '14px 22px', borderTop: `1px solid ${C.border}`, display: 'flex', gap: 10 }}>
                 <textarea rows={2} style={{ ...T.formInput, flex: 1, resize: 'none', background: C.surface2 }} placeholder="Reply... (Ctrl+Enter)" value={draft} onChange={e => setDraft(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) send() }} />
