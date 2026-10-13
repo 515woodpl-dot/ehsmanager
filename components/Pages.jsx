@@ -4,6 +4,8 @@ import { pibase } from '../lib/pibase'
 import { Modal, Badge, Avatar, SearchBar } from './UI'
 import ContractBuilder from './ContractBuilder'
 import ContractDocument from './ContractDocument'
+import { InvoiceModal, SendInvoiceModal } from './InvoiceModals'
+import { invoiceLabel } from '../lib/invoices'
 
 const uid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => { const r = Math.random() * 16 | 0; return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16) })
 const fmtDate = iso => { if (!iso) return 'TBD'; const d = new Date(iso + 'T00:00:00'); return isNaN(d) ? iso : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) }
@@ -269,10 +271,10 @@ export function Analytics({ data }) {
           {data.invoices.length === 0
             ? <div style={{ color: C.faint, fontSize: 13 }}>No invoices yet</div>
             : data.invoices.map((inv, i, arr) => (
-              <div key={inv.number || inv.id} style={{ ...T.dataRow, borderBottom: i === arr.length - 1 ? 'none' : `1px solid ${C.border}` }}>
+              <div key={inv.id} style={{ ...T.dataRow, borderBottom: i === arr.length - 1 ? 'none' : `1px solid ${C.border}` }}>
                 <div>
                   <div style={{ fontWeight: 500, fontSize: 13.5 }}>{inv.client}</div>
-                  <div style={{ fontSize: 12, color: C.muted }}>{inv.number || inv.id} · Due {fmtDate(inv.due)}</div>
+                  <div style={{ fontSize: 12, color: C.muted }}>{invoiceLabel(inv)} · Due {fmtDate(inv.due)}</div>
                 </div>
                 <div style={{ textAlign: 'right' }}>
                   <div style={{ fontWeight: 500, fontSize: 13.5 }}>{fmt$(inv.amount)}</div>
@@ -450,29 +452,18 @@ export function Invoices({ data, setData, toast }) {
   const [modal, setModal] = useState(false)
   const [payModal, setPayModal] = useState(null) // invoice being marked paid
   const [payMethod, setPayMethod] = useState(null)
-  const [sending, setSending] = useState(null) // invoiceId being emailed
-  const [viewInvoice, setViewInvoice] = useState(null)
-  const blank = { client: '', amount: '', due: '', note: '' }
-  const [form, setForm] = useState(blank)
-  const sendInvoice = async (inv) => {
-    const client = data.clients.find(c => c.id === inv.clientId || c.name === inv.client)
-    if (!client?.email) { toast('No email address for this client'); return }
-    setSending(inv.id)
-    try {
-      const { data: { session } } = await pibase.auth.getSession()
-      const r = await fetch('/api/email-invoice', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token || ''}` }, body: JSON.stringify({ invoice: inv, clientEmail: client.email, clientName: client.name }) })
-      if (r.ok) { toast('Invoice sent to ' + client.email) } else { toast('Failed to send email') }
-    } catch { toast('Failed to send email') }
-    setSending(null)
-  }
-  const add = () => { const client = data.clients.find(c => c.name === form.client); if (!client) { toast('Select an existing client'); return }; if (!(Number(form.amount) > 0)) { toast('Enter a positive amount'); return }; setData(d => ({ ...d, invoices: [...d.invoices, { id: uid(), number: 'INV-' + String(d.invoices.length + 1).padStart(3, '0'), client: form.client, clientId: client.id, amount: Number(form.amount), due: form.due, status: 'unpaid', paid: 0, note: form.note, paymentIntentId: null }] })); toast('Invoice created'); setModal(false); setForm(blank) }
+  const [sendFor, setSendFor] = useState(null) // invoice being emailed
+  const [editFor, setEditFor] = useState(null) // invoice being edited
+  const [viewId, setViewId] = useState(null)
+  const viewInvoice = viewId ? data.invoices.find(i => i.id === viewId) : null
+  const clientFor = inv => data.clients.find(c => c.id === inv.clientId) || data.clients.find(c => c.name === inv.client)
   const confirmPaid = () => {
     if (!payMethod) { toast('Select a payment method'); return }
     const now = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
     setData(d => ({ ...d, invoices: d.invoices.map(i => i.id === payModal.id ? { ...i, status: 'paid', paid: i.amount, paymentMethod: payMethod, paidAt: now } : i) }))
     toast(`Marked as paid · ${payMethod}`); setPayModal(null); setPayMethod(null)
   }
-  const del = id => { if (!confirm('Delete invoice?')) return; setData(d => ({ ...d, invoices: d.invoices.filter(i => i.id !== id) })); toast('Deleted') }
+  const del = inv => { if (!confirm(`Delete ${invoiceLabel(inv)}? This cannot be undone.`)) return; setData(d => ({ ...d, invoices: d.invoices.filter(i => i.id !== inv.id) })); setViewId(null); toast(`${invoiceLabel(inv)} deleted`) }
   const total = data.invoices.reduce((s, i) => s + i.amount, 0)
   const collected = data.invoices.reduce((s, i) => s + i.paid, 0)
   return (
@@ -483,10 +474,10 @@ export function Invoices({ data, setData, toast }) {
           const pct = inv.amount > 0 ? Math.round(inv.paid / inv.amount * 100) : 0
           const owing = inv.amount - inv.paid
           return (
-            <article key={inv.number || inv.id} className="invoice-summary-card" onClick={() => setViewInvoice(inv)}>
+            <article key={inv.id} className="invoice-summary-card" onClick={() => setViewId(inv.id)}>
               <div style={{ flex: 1 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 5 }}>
-                  <div style={{ fontWeight: 500 }}>{inv.number || inv.id}</div>
+                  <div style={{ fontWeight: 500 }}>{invoiceLabel(inv)}</div>
                   <div style={{ color: C.text }}>{inv.client}</div>
                   <Badge type={inv.status} label={inv.status} />
                 </div>
@@ -499,27 +490,21 @@ export function Invoices({ data, setData, toast }) {
                   {inv.status === 'partial' && <div style={{ fontSize: 11, color: C.muted }}>{fmt$(inv.paid)} paid</div>}
                 </div>
                 {inv.status !== 'paid' && owing > 0 && <button style={{ ...T.btnSm, color: C.green, borderColor: C.green }} onClick={event => { event.stopPropagation(); setPayModal(inv); setPayMethod(null) }}>Mark paid</button>}
-                <button style={T.btnSm} onClick={event => { event.stopPropagation(); sendInvoice(inv) }} disabled={sending === inv.id}>{sending === inv.id ? 'Sending...' : 'Send'}</button>
-                <button style={{ ...T.btnGhost, color: C.faint }} onClick={event => { event.stopPropagation(); del(inv.id) }}>×</button>
+                <button style={T.btnSm} onClick={event => { event.stopPropagation(); setEditFor(inv) }}>Edit</button>
+                <button style={T.btnSm} onClick={event => { event.stopPropagation(); setSendFor(inv) }}>Send</button>
+                <button style={{ ...T.btnGhost, color: C.faint }} title="Delete invoice" onClick={event => { event.stopPropagation(); del(inv) }}>×</button>
               </div>
             </article>
           )
         })}
       </div>
-      {modal && (
-        <Modal title="New invoice" onClose={() => setModal(false)} footer={<><button style={T.btn} onClick={() => setModal(false)}>Cancel</button><button style={T.btnPrimary} onClick={add}>Create</button></>}>
-          <div style={T.formRow} className="form-row-2">
-            <div style={T.formGroup}><label style={T.formLabel}>Client</label><input style={T.formInput} list="cl2" value={form.client} onChange={e => setForm({ ...form, client: e.target.value })} /><datalist id="cl2">{data.clients.map(c => <option key={c.id} value={c.name} />)}</datalist></div>
-            <div style={T.formGroup}><label style={T.formLabel}>Amount ($)</label><input style={T.formInput} type="number" value={form.amount} onChange={e => setForm({ ...form, amount: e.target.value })} /></div>
-          </div>
-          <div style={T.formGroup}><label style={T.formLabel}>Due date</label><input style={T.formInput} type="date" value={form.due} onChange={e => setForm({ ...form, due: e.target.value })} /></div>
-          <div style={T.formGroup}><label style={T.formLabel}>Note</label><input style={T.formInput} value={form.note} onChange={e => setForm({ ...form, note: e.target.value })} /></div>
-        </Modal>
-      )}
-      {viewInvoice && <Modal title={`${viewInvoice.number || viewInvoice.id} · ${viewInvoice.client}`} onClose={() => setViewInvoice(null)} wide footer={<><button style={T.btn} onClick={() => setViewInvoice(null)}>Close</button>{viewInvoice.status !== 'paid' && <button style={T.btnPrimary} onClick={() => { setPayModal(viewInvoice); setPayMethod(null); setViewInvoice(null) }}>Record payment</button>}</>}>
+      {modal && <InvoiceModal data={data} setData={setData} toast={toast} onClose={() => setModal(false)} />}
+      {editFor && <InvoiceModal invoice={editFor} client={clientFor(editFor)} data={data} setData={setData} toast={toast} onClose={() => setEditFor(null)} />}
+      {sendFor && <SendInvoiceModal invoice={sendFor} client={clientFor(sendFor)} toast={toast} onClose={() => setSendFor(null)} />}
+      {viewInvoice && <Modal title={`${invoiceLabel(viewInvoice)} · ${viewInvoice.client}`} onClose={() => setViewId(null)} wide footer={<><button style={{ ...T.btn, color: C.red, borderColor: C.red }} onClick={() => del(viewInvoice)}>Delete</button><div style={{ flex: 1 }} /><button style={T.btn} onClick={() => { setEditFor(viewInvoice); setViewId(null) }}>Edit</button><button style={T.btn} onClick={() => { setSendFor(viewInvoice); setViewId(null) }}>Email client</button>{viewInvoice.status !== 'paid' && <button style={T.btnPrimary} onClick={() => { setPayModal(viewInvoice); setPayMethod(null); setViewId(null) }}>Record payment</button>}</>}>
         <div className="invoice-detail-grid"><div><span>Status</span><Badge type={viewInvoice.status} label={viewInvoice.status} /></div><div><span>Total</span><strong>{fmt$(viewInvoice.amount)}</strong></div><div><span>Paid</span><strong>{fmt$(viewInvoice.paid)}</strong></div><div><span>Balance</span><strong>{fmt$(viewInvoice.amount - viewInvoice.paid)}</strong></div><div><span>Due date</span><strong>{fmtDate(viewInvoice.due)}</strong></div><div><span>Payment</span><strong>{viewInvoice.paymentMethod || 'Not recorded'}</strong></div></div>
         {viewInvoice.note && <div className="invoice-note"><span>Invoice note</span><p>{viewInvoice.note}</p></div>}
-        {!!viewInvoice.lineData?.items?.length && <div className="invoice-line-items"><h3>Items</h3>{viewInvoice.lineData.items.map(item => <div key={item.id}><span>{item.name || 'Item'}{item.description ? ` · ${item.description}` : ''}</span><strong>{item.qty} × {fmt$(item.price)}</strong></div>)}</div>}
+        {!!viewInvoice.lineData?.items?.length && <div className="invoice-line-items"><h3>Items</h3>{viewInvoice.lineData.items.map(item => <div key={item.id}><span><strong style={{ fontWeight: 500 }}>{item.name || 'Item'}</strong>{item.description ? <><br /><small style={{ color: C.muted, whiteSpace: 'pre-wrap' }}>{item.description}</small></> : null}</span><strong>{item.qty} × {fmt$(item.price)}</strong></div>)}</div>}
       </Modal>}
 
       {/* 1.6 — Payment method modal */}
@@ -527,7 +512,7 @@ export function Invoices({ data, setData, toast }) {
         <Modal title="How was this payment received?" onClose={() => { setPayModal(null); setPayMethod(null) }}
           footer={<><button style={T.btn} onClick={() => { setPayModal(null); setPayMethod(null) }}>Cancel</button><button style={T.btnPrimary} onClick={confirmPaid}>Confirm payment</button></>}>
           <div style={{ marginBottom: 16, padding: '12px 16px', background: C.surface2, borderRadius: 10, fontSize: 13 }}>
-            <div style={{ fontWeight: 500 }}>{payModal.id} · {payModal.client}</div>
+            <div style={{ fontWeight: 500 }}>{invoiceLabel(payModal)} · {payModal.client}</div>
             <div style={{ color: C.muted, marginTop: 2 }}>Amount: <strong style={{ color: C.text }}>${payModal.amount.toLocaleString()}</strong></div>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>

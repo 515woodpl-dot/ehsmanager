@@ -571,3 +571,18 @@ textarea:focus-visible,
 @media (max-width: 700px) { .invoice-card-grid { grid-template-columns: 1fr; }.invoice-detail-grid { grid-template-columns: 1fr 1fr; } }
 @media (max-width: 600px) { .contract-document { padding: 25px 20px 35px; } .contract-document-brand { height: 125px; margin: -25px -20px 26px; } .contract-document-title { font-size: 17px; } .contract-document-signatures > div { gap: 18px; } }
 @media print { body { background: #fff !important; } .sign-page > :not(.contract-copy), .sign-page .sign-card:not(.contract-copy) { display: none !important; } .contract-copy { border: 0 !important; box-shadow: none !important; padding: 0 !important; width: 100% !important; } .contract-document { max-width: none; padding: 0; font-size: 11pt; } }
+
+/* ── Line item builder ── */
+.line-item-card { position: relative; background: var(--surface2, #F8F8F7); border: 1px solid #EAEAEA; border-radius: 10px; padding: 14px 14px 12px; margin-bottom: 10px; }
+.line-item-grid { display: grid; grid-template-columns: minmax(0, 1fr) 76px 128px 104px 32px; gap: 10px; align-items: end; }
+.line-item-field { display: grid; gap: 5px; min-width: 0; }
+.line-item-field > span { color: #7F7E7C; font-size: 10.5px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; }
+.line-item-field input, .line-item-field textarea { background: #fff; }
+.line-item-remove { align-self: end; height: 38px; }
+@media (max-width: 640px) {
+  .line-item-grid { grid-template-columns: 1fr 1fr 1fr; }
+  .line-item-name { grid-column: 1 / -1; }
+  .line-item-remove { position: absolute; top: 6px; right: 6px; height: auto; }
+}
+.invoice-editor-meta { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, .8fr) minmax(0, 1fr); gap: 14px; margin-bottom: 20px; }
+@media (max-width: 640px) { .invoice-editor-meta { grid-template-columns: 1fr; } }

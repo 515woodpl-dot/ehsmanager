@@ -4,6 +4,7 @@ import { T, C } from '../lib/tokens'
 import { seed } from '../lib/data'
 import { pibase } from '../lib/pibase'
 import { loadUserData, syncCollections } from '../lib/db'
+import { assignInvoiceNumbers, hasInvoiceNumber, invoiceLabel } from '../lib/invoices'
 import { Toast } from '../components/UI'
 import Projects, { CardModalExport as CardModal } from '../components/Projects'
 import Clients from '../components/Clients'
@@ -38,7 +39,7 @@ function GlobalSearch({ data, setView }) {
     if (!q.trim()) return []
     const lo = q.toLowerCase(); const r = []
     data.clients.filter(c => !c.archived).forEach(c => { if (c.name.toLowerCase().includes(lo) || (c.email || '').toLowerCase().includes(lo)) r.push({ cat: 'Client', label: c.name, sub: `${c.type} · ${c.email || ''}`, view: 'clients' }) })
-    data.invoices.forEach(i => { if (i.client.toLowerCase().includes(lo) || i.id.toLowerCase().includes(lo)) r.push({ cat: 'Invoice', label: `${i.id} · ${i.client}`, sub: '$' + i.amount.toLocaleString(), view: 'invoices' }) })
+    data.invoices.forEach(i => { if (i.client.toLowerCase().includes(lo) || (i.number || '').toLowerCase().includes(lo)) r.push({ cat: 'Invoice', label: `${invoiceLabel(i)} · ${i.client}`, sub: '$' + i.amount.toLocaleString(), view: 'invoices' }) })
     data.bookings.forEach(b => { if (b.client.toLowerCase().includes(lo)) r.push({ cat: 'Booking', label: b.client, sub: b.date + ' · ' + b.location, view: 'calendar' }) })
     return r.slice(0, 7)
   }, [q, data])
@@ -319,6 +320,13 @@ export default function Home() {
     }, 400)
     return () => clearTimeout(timer)
   }, [data, dbReady, user?.id, retryTick])
+
+  // Older invoices were stored with only a UUID (or "INV-001"). Give each a
+  // "#1xxx" number once after loading; the sync engine above persists it.
+  useEffect(() => {
+    if (!dbReady || data.invoices.every(hasInvoiceNumber)) return
+    setData(d => ({ ...d, invoices: assignInvoiceNumbers(d.invoices) }))
+  }, [dbReady, data.invoices])
 
   useEffect(() => {
     if (!pibase) return

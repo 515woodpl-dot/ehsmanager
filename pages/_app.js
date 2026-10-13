@@ -3,7 +3,7 @@ import { useRouter } from 'next/router'
 import '../styles/globals.css'
 import { pibase } from '../lib/pibase'
 
-const PUBLIC_ROUTES = ['/login', '/contact', '/booking', '/sign']
+const PUBLIC_ROUTES = ['/login', '/contact', '/booking', '/sign', '/invoice']
 
 export default function App({ Component, pageProps }) {
   const router = useRouter()

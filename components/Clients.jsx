@@ -2,6 +2,7 @@ import { useState, useRef } from 'react'
 import { T, C } from '../lib/tokens'
 import { Modal, Badge, Avatar, SearchBar } from './UI'
 import { removeClient } from '../lib/data'
+import { CardModalExport as CardModal } from './Projects'
 
 const uid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => { const r = Math.random() * 16 | 0; return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16) })
 const fmtDate = iso => { if (!iso) return 'TBD'; const d = new Date(iso + 'T00:00:00'); return isNaN(d) ? iso : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) }
@@ -34,6 +35,7 @@ export default function Clients({ data, setData, toast, sessionTypes }) {
   const [filter, setFilter] = useState('all')
   const [addModal, setAddModal] = useState(false)
   const [editModal, setEditModal] = useState(null)
+  const [detailsClient, setDetailsClient] = useState(null)
   const [importModal, setImportModal] = useState(false)
   const [importPreview, setImportPreview] = useState([])
   const [importError, setImportError] = useState('')
@@ -56,7 +58,8 @@ export default function Clients({ data, setData, toast, sessionTypes }) {
   }
 
   const save = () => {
-    setData(d => ({ ...d, clients: d.clients.map(c => c.id === editModal.id ? { ...editModal } : c) }))
+    if (!editModal.name?.trim()) { toast('Name is required'); return }
+    setData(d => ({ ...d, clients: d.clients.map(c => c.id === editModal.id ? { ...c, ...editModal, name: editModal.name.trim() } : c) }))
     toast('Client updated'); setEditModal(null)
   }
 
@@ -127,7 +130,7 @@ export default function Clients({ data, setData, toast, sessionTypes }) {
         {filtered.length === 0 && <div style={{ padding: '32px 0', textAlign: 'center', color: C.faint, fontSize: 13 }}>No clients found</div>}
 
         {filtered.map((c, i) => (
-          <article key={c.id} className="client-summary-card" role="button" tabIndex={0} onClick={() => setEditModal({ ...c })} onKeyDown={event => { if (event.key === 'Enter') setEditModal({ ...c }) }}>
+          <article key={c.id} className="client-summary-card" role="button" tabIndex={0} onClick={() => setDetailsClient(c)} onKeyDown={event => { if (event.key === 'Enter') setDetailsClient(c) }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 13 }}>
               <Avatar name={c.name} size={38} />
               <div>
@@ -207,6 +210,8 @@ export default function Clients({ data, setData, toast, sessionTypes }) {
           <div style={T.formGroup}><label style={T.formLabel}>Notes</label><textarea style={{ ...T.formInput, resize: 'none' }} rows={3} value={editModal.notes || ''} onChange={e => setEditModal({ ...editModal, notes: e.target.value })} /></div>
         </Modal>
       )}
+
+      {detailsClient && <CardModal client={detailsClient} stages={data.stages || []} sessionTypes={types} data={data} setData={setData} onClose={() => setDetailsClient(null)} toast={toast} />}
 
       {/* Import preview modal */}
       {importModal && (

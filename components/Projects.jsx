@@ -1,8 +1,10 @@
 import { useEffect, useState, useMemo } from 'react'
-import { InvoiceModal, QuoteModal, ContractModal, QuestionnaireModal, SessionModal, MessageModal, GalleryModal } from './ActionModals'
+import { QuoteModal, ContractModal, QuestionnaireModal, SessionModal, MessageModal, GalleryModal } from './ActionModals'
 import { T, C, badge } from '../lib/tokens'
 import { Modal, Badge, Avatar, Seg, ConfirmModal } from './UI'
 import { removeClient } from '../lib/data'
+import { InvoiceModal } from './InvoiceModals'
+import { invoiceLabel } from '../lib/invoices'
 
 const uid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => { const r = Math.random() * 16 | 0; return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16) })
 const fmtDate = iso => { if (!iso) return 'TBD'; const d = new Date(iso + 'T00:00:00'); return isNaN(d) ? iso : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) }
@@ -23,29 +25,39 @@ function ActionItem({ icon, title, subtitle, onClick, color = C.text }) {
 }
 
 // ── Card Modal ────────────────────────────────────────────────────
-function CardModal({ client, stages, sessionTypes, data, setData, onClose, toast }) {
+function CardModal({ client: clientProp, stages, sessionTypes, data, setData, onClose, toast }) {
+  // Always render the latest saved version of this client. The prop is the
+  // snapshot taken when the card was clicked, so reading it directly made
+  // saved edits look like they were ignored.
+  const client = data.clients.find(c => c.id === clientProp.id) || clientProp
   const [editing, setEditing] = useState(false)
   const [form, setForm] = useState({ ...client })
   const [liveNotes, setLiveNotes] = useState(client.notes || '')
   const [notesSavedAt, setNotesSavedAt] = useState('')
   const [activeTab, setActiveTab] = useState('getstarted')
   const [activeModal, setActiveModal] = useState(null) // invoice|contract|quote|questionnaire|session|message|gallery
+  const [openInvoice, setOpenInvoice] = useState(null) // existing invoice being edited from Activity
   const [confirmDelete, setConfirmDelete] = useState(false)
 
   const clientInvoices = data.invoices.filter(i => i.clientId === client.id)
   const clientContracts = data.contracts.filter(k => k.clientId === client.id)
   const clientBookings = data.bookings.filter(b => b.clientId === client.id)
 
+  const startEditing = () => { setForm({ ...client }); setEditing(true) }
+
   const save = () => {
-    setData(d => ({ ...d, clients: d.clients.map(c => c.id === client.id ? { ...form, notes: liveNotes } : c) }))
+    if (!form.name?.trim()) { toast('Name is required'); return }
+    const { name, email, phone, type, date, status } = form
+    setData(d => ({ ...d, clients: d.clients.map(c => c.id === client.id ? { ...c, name: name.trim(), email, phone, type, date, status, notes: liveNotes } : c) }))
     toast('Client updated'); setEditing(false)
   }
 
   useEffect(() => {
+    setEditing(false)
     setForm({ ...client })
     setLiveNotes(client.notes || '')
     setNotesSavedAt('')
-  }, [client])
+  }, [client.id])
 
   useEffect(() => {
     if (liveNotes === (client.notes || '')) return
@@ -121,17 +133,18 @@ function CardModal({ client, stages, sessionTypes, data, setData, onClose, toast
 
             {activeTab === 'activity' && (
               <div>
-                {clientInvoices.length > 0 && (
-                  <>
-                    <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: C.faint, marginBottom: 10 }}>Invoices</div>
-                    {clientInvoices.map(i => (
-                      <div key={i.id} style={{ ...T.cardSm, marginBottom: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <div><div style={{ fontSize: 13, fontWeight: 500 }}>{i.id}</div><div style={{ fontSize: 11, color: C.muted }}>${i.amount.toLocaleString()}</div></div>
-                        <Badge type={i.status} label={i.status} />
-                      </div>
-                    ))}
-                  </>
-                )}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                  <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: C.faint }}>Invoices</div>
+                  <button style={{ ...T.btnGhost, color: C.blue, fontWeight: 500 }} onClick={() => setActiveModal('invoice')}>+ New invoice</button>
+                </div>
+                {clientInvoices.length === 0 && <div style={{ fontSize: 12, color: C.faint, marginBottom: 8 }}>No invoices yet</div>}
+                {clientInvoices.map(i => (
+                  <button key={i.id} type="button" onClick={() => setOpenInvoice(i)} title="Open to edit, email or delete"
+                    style={{ ...T.cardSm, width: '100%', marginBottom: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit', color: C.text }}>
+                    <div><div style={{ fontSize: 13, fontWeight: 500 }}>Invoice {invoiceLabel(i)}</div><div style={{ fontSize: 11, color: C.muted }}>${i.amount.toLocaleString()}{i.due ? ` · Due ${fmtDate(i.due)}` : ''}</div></div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><Badge type={i.status} label={i.status} /><span style={{ color: C.faint }}>›</span></div>
+                  </button>
+                ))}
                 {clientContracts.length > 0 && (
                   <>
                     <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: C.faint, margin: '14px 0 10px' }}>Contracts</div>
@@ -154,9 +167,6 @@ function CardModal({ client, stages, sessionTypes, data, setData, onClose, toast
                     ))}
                   </>
                 )}
-                {clientInvoices.length === 0 && clientContracts.length === 0 && clientBookings.length === 0 && (
-                  <div style={{ textAlign: 'center', padding: '32px 0', color: C.faint, fontSize: 13 }}>No activity yet</div>
-                )}
               </div>
             )}
           </div>
@@ -166,9 +176,9 @@ function CardModal({ client, stages, sessionTypes, data, setData, onClose, toast
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }} className="page-header-wrap">
               <div style={{ fontFamily: "'DM Serif Display', Georgia, serif", fontSize: 17 }}>Client details</div>
               {!editing
-                ? <button style={T.btnSm} onClick={() => setEditing(true)}>Edit</button>
+                ? <button style={T.btnSm} onClick={startEditing}>Edit</button>
                 : <div style={{ display: 'flex', gap: 8 }}>
-                  <button style={T.btnSm} onClick={() => { setEditing(false); setForm({ ...client }) }}>Cancel</button>
+                  <button style={T.btnSm} onClick={() => setEditing(false)}>Cancel</button>
                   <button style={T.btnPrimary} onClick={save}>Save</button>
                 </div>
               }
@@ -246,6 +256,7 @@ function CardModal({ client, stages, sessionTypes, data, setData, onClose, toast
 
     {/* Action modals */}
     {activeModal === 'invoice' && <InvoiceModal client={client} data={data} setData={setData} toast={toast} onClose={() => setActiveModal(null)} />}
+    {openInvoice && <InvoiceModal client={client} invoice={openInvoice} data={data} setData={setData} toast={toast} onClose={() => setOpenInvoice(null)} />}
     {activeModal === 'contract' && <ContractModal client={client} data={data} setData={setData} toast={toast} onClose={() => setActiveModal(null)} />}
     {activeModal === 'quote' && <QuoteModal client={client} data={data} setData={setData} toast={toast} onClose={() => setActiveModal(null)} />}
     {activeModal === 'questionnaire' && <QuestionnaireModal client={client} data={data} setData={setData} toast={toast} onClose={() => setActiveModal(null)} />}
