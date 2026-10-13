@@ -278,17 +278,32 @@ export function Analytics({ data }) {
 
 // ── Calendar ──────────────────────────────────────────────────────
 export function Calendar({ data, setData, toast, openClientCard }) {
-  const [cursor, setCursor] = useState(new Date(2026, 5, 1))
+  const [cursor, setCursor] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1))
   const [modal, setModal] = useState(false)
   const [calView, setCalView] = useState('month')
+  const [selectedDate, setSelectedDate] = useState(() => new Date().toLocaleDateString('en-CA'))
+  const [blockDate, setBlockDate] = useState('')
+  const [blockStart, setBlockStart] = useState('')
+  const [blockEnd, setBlockEnd] = useState('')
+  const [filterType, setFilterType] = useState('all')
   const blank = { client: '', type: data.sessionTypes?.[0] || 'Family', date: '', time: '', location: '', notes: '' }
   const [form, setForm] = useState(blank)
   const y = cursor.getFullYear(), mo = cursor.getMonth()
   const first = new Date(y, mo, 1).getDay(), days = new Date(y, mo + 1, 0).getDate()
-  const todayStr = new Date().toISOString().slice(0, 10)
+  const todayStr = new Date().toLocaleDateString('en-CA')
+  const shiftDate = (date, amount) => new Date(Date.parse(`${date}T12:00:00Z`) + amount * 86400000).toISOString().slice(0, 10)
+  const weekStart = shiftDate(selectedDate, -new Date(`${selectedDate}T12:00:00Z`).getUTCDay())
+  const weekEnd = shiftDate(weekStart, 6)
   const ds = d => `${y}-${String(mo + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`
   const cells = [...Array(first).fill(null), ...Array.from({ length: days }, (_, i) => i + 1)]
-  const add = () => { if (!form.client.trim()) return; setData(d => ({ ...d, bookings: [...d.bookings, { id: uid(), ...form, status: 'pending' }] })); toast('Booking added'); setModal(false); setForm(blank) }
+  const add = () => {
+    const client = data.clients.find(c => c.name === form.client)
+    if (!client) { toast('Select an existing client'); return }
+    if (!form.date || !form.time) { toast('Choose a date and time'); return }
+    const start = Number(form.time.slice(0,2)) * 60 + Number(form.time.slice(3,5))
+    if (data.bookings.some(b => { if (b.date !== form.date || !b.time || b.status === 'canceled') return false; const other = Number(b.time.slice(0,2)) * 60 + Number(b.time.slice(3,5)); return start < other + (b.durationMinutes || 60) && start + 60 > other })) { toast('That time overlaps another session'); return }
+    setData(d => ({ ...d, bookings: [...d.bookings, { id: uid(), ...form, clientId: client.id, status: 'pending' }] })); toast('Booking added'); setModal(false); setForm(blank)
+  }
   const toggle = id => { setData(d => ({ ...d, bookings: d.bookings.map(b => b.id === id ? { ...b, status: b.status === 'confirmed' ? 'pending' : 'confirmed' } : b) })); toast('Status updated') }
   const del = id => { if (!confirm('Delete booking?')) return; setData(d => ({ ...d, bookings: d.bookings.filter(b => b.id !== id) })); toast('Deleted') }
   const [sendingReminder, setSendingReminder] = useState(null)
@@ -304,24 +319,55 @@ export function Calendar({ data, setData, toast, openClientCard }) {
     setSendingReminder(null)
   }
   const types = data.sessionTypes || ['Family', 'Maternity', 'Newborn', 'Portrait']
+  const blocked = data.availability?.blockedDates || []
+  const blockedTimes = data.availability?.blockedTimes || []
+  const matchesFilter = booking => filterType === 'all' || booking.type === filterType
+  const toggleBlock = date => {
+    if (!date) return
+    if (blockStart || blockEnd) {
+      if (!blockStart || !blockEnd || blockStart >= blockEnd) return toast('Choose a valid start and end time')
+      setData(current => ({ ...current, availability: { ...current.availability, blockedTimes: [...(current.availability?.blockedTimes || []), { date, start: blockStart, end: blockEnd }] } }))
+      setBlockDate(''); setBlockStart(''); setBlockEnd(''); toast('Time blocked'); return
+    }
+    setData(current => ({ ...current, availability: { ...current.availability, blockedDates: (current.availability?.blockedDates || []).includes(date) ? current.availability.blockedDates.filter(item => item !== date) : [...(current.availability?.blockedDates || []), date].sort() } }))
+    setBlockDate(''); toast('Blocked dates updated')
+  }
+  const downloadCalendar = () => {
+    const escape = value => String(value || '').replace(/\\/g, '\\\\').replace(/\n/g, '\\n').replace(/,/g, '\\,').replace(/;/g, '\\;')
+    const dt = (date, time) => `${date.replaceAll('-', '')}T${(time || '00:00').replace(':', '')}00`
+    const events = data.bookings.filter(b => b.date && b.status !== 'canceled').map(b => {
+      const start = new Date(`${b.date}T${b.time || '00:00'}:00`)
+      const end = new Date(start.getTime() + (b.durationMinutes || 60) * 60000)
+      const pad = value => String(value).padStart(2, '0')
+      const endDate = `${end.getFullYear()}${pad(end.getMonth()+1)}${pad(end.getDate())}T${pad(end.getHours())}${pad(end.getMinutes())}00`
+      return `BEGIN:VEVENT\r\nUID:${b.id}@elliesheartstrings.com\r\nDTSTART;TZID=${data.availability?.timezone || 'America/New_York'}:${dt(b.date,b.time)}\r\nDTEND;TZID=${data.availability?.timezone || 'America/New_York'}:${endDate}\r\nSUMMARY:${escape(`${b.type} - ${b.client}`)}\r\nLOCATION:${escape(b.location)}\r\nEND:VEVENT`
+    })
+    const file = `BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Ellies Heartstrings//Studio Manager//EN\r\n${events.join('\r\n')}\r\nEND:VCALENDAR\r\n`
+    const url = URL.createObjectURL(new Blob([file], { type: 'text/calendar;charset=utf-8' }))
+    const link = document.createElement('a'); link.href = url; link.download = 'ellies-heartstrings-sessions.ics'; link.click(); URL.revokeObjectURL(url)
+  }
   return (
     <div>
       <div style={T.pageHeader} className="page-header-wrap">
         <div><div style={T.pageTitle}>Calendar</div><div style={T.pageSub}>{data.bookings.length} sessions</div></div>
         <div style={{ display: 'flex', gap: 10 }}>
+          <button style={T.btnSm} onClick={downloadCalendar}>Calendar Sync (.ics export)</button>
+          <select aria-label="Filter by session type" value={filterType} onChange={e => setFilterType(e.target.value)} style={{ ...T.formInput, width: 150 }}><option value="all">All types</option>{[...new Set(data.bookings.map(b => b.type).filter(Boolean))].map(type => <option key={type} value={type}>{type}</option>)}</select>
           <div style={{ display: 'inline-flex', background: C.surface2, borderRadius: 8, padding: 3, gap: 2 }}>
-            {[['month', 'Month'], ['list', 'List']].map(([v, l]) => <button key={v} style={{ padding: '5px 12px', borderRadius: 6, border: 'none', background: calView === v ? C.surface : 'transparent', color: C.text, fontWeight: calView === v ? 500 : 400, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }} onClick={() => setCalView(v)}>{l}</button>)}
+            {[['day', 'Day'], ['week', 'Week'], ['month', 'Month'], ['list', 'List']].map(([v, l]) => <button key={v} style={{ padding: '5px 12px', borderRadius: 6, border: 'none', background: calView === v ? C.surface : 'transparent', color: C.text, fontWeight: calView === v ? 500 : 400, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }} onClick={() => setCalView(v)}>{l}</button>)}
           </div>
           <button style={T.btnPrimary} onClick={() => setModal(true)}>+ New booking</button>
         </div>
       </div>
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 18, flexWrap: 'wrap' }}><label style={{ fontSize: 13, color: C.muted }}>Block Off Time</label><input aria-label="Block date" type="date" value={blockDate} onChange={e => setBlockDate(e.target.value)} style={{ ...T.formInput, width: 170 }} /><input aria-label="Block start time" type="time" value={blockStart} onChange={e => setBlockStart(e.target.value)} style={{ ...T.formInput, width: 110 }} /><span style={{ color: C.faint }}>to</span><input aria-label="Block end time" type="time" value={blockEnd} onChange={e => setBlockEnd(e.target.value)} style={{ ...T.formInput, width: 110 }} /><button style={T.btnSm} onClick={() => toggleBlock(blockDate)} disabled={!blockDate}>{blockStart || blockEnd ? 'Block time' : blocked.includes(blockDate) ? 'Unblock date' : 'Block date'}</button><span style={{ fontSize: 12, color: C.faint }}>{blocked.length} blocked date{blocked.length === 1 ? '' : 's'} · {blockedTimes.length} time block{blockedTimes.length === 1 ? '' : 's'}</span></div>
+      {!!blockedTimes.length && <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap', marginBottom: 18 }}>{blockedTimes.map((block, index) => <button key={`${block.date}-${block.start}-${index}`} style={T.btnSm} onClick={() => { setData(current => ({ ...current, availability: { ...current.availability, blockedTimes: (current.availability?.blockedTimes || []).filter((_, i) => i !== index) } })); toast('Time block removed') }}>{block.date} {block.start}–{block.end} ×</button>)}</div>}
       {calView === 'month' ? (
         <div style={T.card}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
             <div style={{ fontFamily: "'DM Serif Display', Georgia, serif", fontSize: 18 }}>{cursor.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</div>
             <div style={{ display: 'flex', gap: 6 }}>
               <button style={T.btnSm} onClick={() => setCursor(new Date(y, mo - 1, 1))}>‹</button>
-              <button style={T.btnSm} onClick={() => setCursor(new Date(2026, 5, 1))}>Today</button>
+              <button style={T.btnSm} onClick={() => setCursor(new Date(new Date().getFullYear(), new Date().getMonth(), 1))}>Today</button>
               <button style={T.btnSm} onClick={() => setCursor(new Date(y, mo + 1, 1))}>›</button>
             </div>
           </div>
@@ -331,11 +377,13 @@ export function Calendar({ data, setData, toast, openClientCard }) {
           <div className="calendar-month-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: 1, background: C.border, border: `1px solid ${C.border}`, borderRadius: 8, overflow: 'hidden' }}>
             {cells.map((d, i) => {
               if (!d) return <div key={i} className="calendar-month-cell calendar-month-cell-empty" style={{ background: C.surface2, minHeight: 76 }} />
-              const dateStr = ds(d), evts = data.bookings.filter(b => b.date === dateStr), isToday = dateStr === todayStr
+              const dateStr = ds(d), evts = data.bookings.filter(b => b.date === dateStr && b.status !== 'canceled' && matchesFilter(b)), isToday = dateStr === todayStr
               const hasBooking = evts.length > 0
               return (
-                <div key={i} className={`calendar-month-cell${hasBooking ? ' calendar-month-cell-booked' : ''}${isToday ? ' calendar-month-cell-today' : ''}`} style={{ background: hasBooking ? '#FFF8F5' : isToday ? '#FAFAFA' : C.surface, minHeight: 76, padding: '7px 8px' }}>
+                <div key={i} className={`calendar-month-cell${hasBooking ? ' calendar-month-cell-booked' : ''}${isToday ? ' calendar-month-cell-today' : ''}`} style={{ background: blocked.includes(dateStr) ? '#f2f1ef' : hasBooking ? '#FFF8F5' : isToday ? '#FAFAFA' : C.surface, minHeight: 76, padding: '7px 8px' }}>
                   <div style={{ fontSize: 12, fontWeight: hasBooking || isToday ? 700 : 400, color: hasBooking ? '#7A3B2E' : isToday ? C.text : C.muted }}>{d}</div>
+                  {blocked.includes(dateStr) && <div style={{ fontSize: 10, color: C.muted }}>Blocked</div>}
+                  {blockedTimes.some(block => block.date === dateStr) && <div style={{ fontSize: 10, color: C.muted }}>Time blocked</div>}
                   {evts.map(e => {
                     const clientObj = data.clients.find(c => c.id === e.clientId || c.name === e.client)
                     return <div key={e.id} onClick={() => clientObj ? openClientCard(clientObj) : toggle(e.id)} style={{ fontSize: 10, fontWeight: 500, background: e.status === 'confirmed' ? C.text : C.surface3, color: e.status === 'confirmed' ? '#fff' : C.muted, borderRadius: 4, padding: '2px 5px', marginTop: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', cursor: 'pointer' }} title={clientObj ? `Open ${e.client}'s project` : 'Click to toggle status'}>{e.client}</div>
@@ -347,7 +395,8 @@ export function Calendar({ data, setData, toast, openClientCard }) {
         </div>
       ) : (
         <div style={T.card}>
-          {[...data.bookings].sort((a, b) => a.date.localeCompare(b.date)).map((b, i) => (
+          {calView !== 'list' && <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 18, flexWrap: 'wrap' }}><button style={T.btnSm} onClick={() => setSelectedDate(shiftDate(selectedDate, calView === 'week' ? -7 : -1))}>‹</button><button style={T.btnSm} onClick={() => setSelectedDate(todayStr)}>Today</button><button style={T.btnSm} onClick={() => setSelectedDate(shiftDate(selectedDate, calView === 'week' ? 7 : 1))}>›</button><strong style={{ marginLeft: 8 }}>{calView === 'week' ? `${weekStart} – ${weekEnd}` : selectedDate}</strong><input type="date" value={selectedDate} onChange={e => setSelectedDate(e.target.value)} style={{ ...T.formInput, width: 165, marginLeft: 'auto' }} /></div>}
+          {[...data.bookings].filter(b => matchesFilter(b) && (calView === 'list' || (calView === 'day' ? b.date === selectedDate : b.date >= weekStart && b.date <= weekEnd))).sort((a, b) => a.date.localeCompare(b.date)).map((b, i) => (
             <div key={b.id} style={{ ...T.dataRow, borderBottom: i === data.bookings.length - 1 ? 'none' : `1px solid ${C.border}` }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 13 }}>
                 <div style={{ width: 42, height: 42, borderRadius: 10, background: C.surface2, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -364,6 +413,7 @@ export function Calendar({ data, setData, toast, openClientCard }) {
               </div>
             </div>
           ))}
+          {!data.bookings.some(b => matchesFilter(b) && (calView === 'list' || (calView === 'day' ? b.date === selectedDate : b.date >= weekStart && b.date <= weekEnd))) && <div style={{ padding: 30, textAlign: 'center', color: C.faint }}>No sessions in this view</div>}
         </div>
       )}
       {modal && (
@@ -403,7 +453,7 @@ export function Invoices({ data, setData, toast }) {
     } catch { toast('Failed to send email') }
     setSending(null)
   }
-  const add = () => { if (!form.client.trim() || !form.amount) return; setData(d => ({ ...d, invoices: [...d.invoices, { id: uid(), number: 'INV-' + String(d.invoices.length + 1).padStart(3, '0'), client: form.client, clientId: null, amount: parseFloat(form.amount), due: form.due, status: 'unpaid', paid: 0, note: form.note, paymentIntentId: null }] })); toast('Invoice created'); setModal(false); setForm(blank) }
+  const add = () => { const client = data.clients.find(c => c.name === form.client); if (!client) { toast('Select an existing client'); return }; if (!(Number(form.amount) > 0)) { toast('Enter a positive amount'); return }; setData(d => ({ ...d, invoices: [...d.invoices, { id: uid(), number: 'INV-' + String(d.invoices.length + 1).padStart(3, '0'), client: form.client, clientId: client.id, amount: Number(form.amount), due: form.due, status: 'unpaid', paid: 0, note: form.note, paymentIntentId: null }] })); toast('Invoice created'); setModal(false); setForm(blank) }
   const confirmPaid = () => {
     if (!payMethod) { toast('Select a payment method'); return }
     const now = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
@@ -482,7 +532,7 @@ export function Invoices({ data, setData, toast }) {
             ))}
           </div>
           <div style={{ marginTop: 14, fontSize: 12, color: C.faint, padding: '10px 14px', background: C.surface2, borderRadius: 8 }}>
-            Stripe payments mark invoices as paid automatically via webhook — no manual step needed.
+            Use this form to record a payment you have already received.
           </div>
         </Modal>
       )}

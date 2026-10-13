@@ -17,11 +17,12 @@ function loadSettingsFallback() {
 
 export default function ContactPage() {
   const [settings, setSettings] = useState(loadSettingsFallback)
+  const [configError, setConfigError] = useState('')
   useEffect(() => {
     fetch('/api/public-form')
-      .then(r => r.ok ? r.json() : null)
-      .then(j => { if (j?.settings) setSettings(j.settings) })
-      .catch(() => {})
+      .then(r => { if (!r.ok) throw new Error('Contact form is temporarily unavailable.'); return r.json() })
+      .then(j => { if (j?.settings) setSettings(j.settings); else throw new Error('Contact form is temporarily unavailable.') })
+      .catch(e => setConfigError(e.message))
   }, [])
   const [form, setForm] = useState({ name: '', email: '', phone: '', services: [], message: '' })
   const [errors, setErrors] = useState({})
@@ -185,6 +186,8 @@ export default function ContactPage() {
 
           <form className="contact-form-card" onSubmit={handleSubmit} style={{ background: '#fff', borderRadius: 16, padding: '36px 40px', border: '1px solid #EAEAEA', boxShadow: '0 4px 24px rgba(0,0,0,0.06)' }}>
 
+            {configError && <div role="alert" style={{ fontSize: 13, color: '#991F1F', marginBottom: 18 }}>{configError}</div>}
+
             {/* Full Name */}
             <div style={{ marginBottom: 20 }}>
               <label style={{ display: 'block', fontSize: 12, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#7F7E7C', marginBottom: 7 }}>
@@ -241,7 +244,7 @@ export default function ContactPage() {
 
             {/* Submit */}
             {errors.submit && <div style={{ fontSize: 13, color: '#991F1F', marginBottom: 12, textAlign: 'center' }}>{errors.submit}</div>}
-            <button type="submit" disabled={loading} className="contact-submit"
+            <button type="submit" disabled={loading || !!configError} className="contact-submit"
               style={{ width: '100%', padding: '13px', borderRadius: 10, border: 'none', background: loading ? '#555' : '#111110', color: '#fff', fontSize: 15, fontWeight: 500, cursor: loading ? 'not-allowed' : 'pointer', letterSpacing: '-0.1px', transition: 'background 0.15s' }}>
               {loading ? 'Sending...' : (settings.buttonLabel || 'Submit')}
             </button>

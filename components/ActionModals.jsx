@@ -86,7 +86,7 @@ export function QuoteModal({ client, data, setData, toast, onClose }) {
 
   const save = () => {
     const q = {
-      id: 'QT-' + String((data.quotes?.length || 0) + 1).padStart(3, '0'),
+      id: uid(),
       client: client.name, clientId: client.id,
       amount: total, validUntil, status: 'pending',
       lineData, createdAt: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),

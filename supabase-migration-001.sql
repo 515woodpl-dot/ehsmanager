@@ -16,8 +16,8 @@ begin
   ) then
     update invoices set number = id where number is null;
     alter table invoices drop constraint invoices_pkey;
-    alter table invoices add column id_new uuid default uuid_generate_v4();
-    update invoices set id_new = uuid_generate_v4() where id_new is null;
+    alter table invoices add column id_new uuid default gen_random_uuid();
+    update invoices set id_new = gen_random_uuid() where id_new is null;
     alter table invoices drop column id;
     alter table invoices rename column id_new to id;
     alter table invoices add primary key (id);

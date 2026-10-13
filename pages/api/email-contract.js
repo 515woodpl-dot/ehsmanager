@@ -19,8 +19,20 @@ export default async function handler(req, res) {
   const bizName = auth.profile.business_name || 'My Studio'
   const ownerName = (auth.profile.full_name || '').split(' ')[0] || bizName
 
-  const { contract, clientEmail, clientName } = req.body
-  if (!contract || !clientEmail) return res.status(400).json({ error: 'Missing fields' })
+  const contractId = req.body?.contract?.id
+  if (!contractId) return res.status(400).json({ error: 'Missing contract ID' })
+  const { data: row, error: lookupError } = await auth.db.from('contracts')
+    .select('id, client_id, client_name, type, body, sent, status')
+    .eq('id', contractId).eq('user_id', auth.user.id).single()
+  if (lookupError || !row) return res.status(404).json({ error: 'Contract not found' })
+  if (row.status !== 'pending') return res.status(409).json({ error: 'Contract is already signed' })
+  if (!row.client_id) return res.status(400).json({ error: 'Contract has no linked client' })
+  const { data: client } = await auth.db.from('clients').select('name, email')
+    .eq('id', row.client_id).eq('user_id', auth.user.id).single()
+  if (!client?.email) return res.status(400).json({ error: 'Client email is missing' })
+  const contract = { id: row.id, type: row.type, body: row.body, sent: row.sent }
+  const clientEmail = client.email
+  const clientName = client.name
   if (!resend) return res.status(500).json({ error: 'Email service is not configured' })
   const signUrl = contract.id
     ? `${process.env.NEXT_PUBLIC_APP_URL || 'https://manager.elliesheartstrings.com'}/sign/${createContractToken(contract.id)}`

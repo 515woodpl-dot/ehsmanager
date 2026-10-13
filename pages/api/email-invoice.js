@@ -1,6 +1,9 @@
 import { resend, fromFor, emailWrap } from '../../lib/email'
 import { requireUser } from '../../lib/api-auth'
 
+const escapeHtml = value => String(value ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;')
+  .replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;')
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end()
 
@@ -9,8 +12,18 @@ export default async function handler(req, res) {
   const bizName = auth.profile.business_name || 'My Studio'
   const ownerName = (auth.profile.full_name || '').split(' ')[0] || bizName
 
-  const { invoice, clientEmail, clientName } = req.body
-  if (!invoice || !clientEmail) return res.status(400).json({ error: 'Missing fields' })
+  const invoiceId = req.body?.invoice?.id
+  if (!invoiceId) return res.status(400).json({ error: 'Missing invoice ID' })
+  const { data: row } = await auth.db.from('invoices').select('*')
+    .eq('id', invoiceId).eq('user_id', auth.user.id).single()
+  if (!row) return res.status(404).json({ error: 'Invoice not found' })
+  if (!row.client_id) return res.status(400).json({ error: 'Invoice has no linked client' })
+  const { data: client } = await auth.db.from('clients').select('name, email')
+    .eq('id', row.client_id).eq('user_id', auth.user.id).single()
+  if (!client?.email) return res.status(400).json({ error: 'Client email is missing' })
+  const invoice = { ...row, client: row.client_name, lineItems: Array.isArray(row.line_items) ? row.line_items : row.line_items?.items || [] }
+  const clientEmail = client.email
+  const clientName = client.name
   if (!resend) return res.status(500).json({ error: 'Email service is not configured' })
 
   const pct = invoice.amount > 0 ? Math.round((invoice.paid / invoice.amount) * 100) : 0
@@ -21,27 +34,27 @@ export default async function handler(req, res) {
   const statusLabel = invoice.status === 'paid' ? 'Paid in full' : invoice.status === 'partial' ? `${fmt(invoice.paid)} paid · ${fmt(owing)} remaining` : `${fmt(invoice.amount)} due`
 
   const lineItemsHtml = invoice.lineItems?.length
-    ? invoice.lineItems.map(li => `<div class="box-row"><span class="label">${li.description || li.name || 'Item'}${li.qty > 1 ? ` ×${li.qty}` : ''}</span><span class="value">${fmt((li.price || 0) * (li.qty || 1))}</span></div>`).join('')
+    ? invoice.lineItems.map(li => `<div class="box-row"><span class="label">${escapeHtml(li.description || li.name || 'Item')}${li.qty > 1 ? ` ×${Number(li.qty)}` : ''}</span><span class="value">${fmt((li.price || 0) * (li.qty || 1))}</span></div>`).join('')
     : ''
 
   const html = emailWrap(`
-    <h1>Invoice ${invoice.number || invoice.id}</h1>
-    <p>Hi ${clientName || 'there'},</p>
+    <h1>Invoice ${escapeHtml(invoice.number || invoice.id)}</h1>
+    <p>Hi ${escapeHtml(clientName || 'there')},</p>
     <p>Please find your invoice details below. ${invoice.status !== 'paid' ? 'Payment is due by ' + fmtDate(invoice.due) + '.' : 'Thank you for your payment!'}</p>
 
     <div class="amount">${fmt(invoice.amount)}</div>
 
     <div class="box">
       ${lineItemsHtml}
-      <div class="box-row"><span class="label">Invoice</span><span class="value">${invoice.number || invoice.id}</span></div>
+      <div class="box-row"><span class="label">Invoice</span><span class="value">${escapeHtml(invoice.number || invoice.id)}</span></div>
       <div class="box-row"><span class="label">Due date</span><span class="value">${fmtDate(invoice.due)}</span></div>
       <div class="box-row"><span class="label">Status</span><span class="value">${statusLabel}</span></div>
-      ${invoice.note ? `<div class="box-row"><span class="label">Note</span><span class="value">${invoice.note}</span></div>` : ''}
+      ${invoice.note ? `<div class="box-row"><span class="label">Note</span><span class="value">${escapeHtml(invoice.note)}</span></div>` : ''}
     </div>
 
     <p>If you have any questions about this invoice, please don't hesitate to reach out.</p>
-    <p>Thank you for choosing ${bizName}.</p>
-    <p style="margin-top:24px;">Warmly,<br/><strong>${ownerName}</strong></p>
+    <p>Thank you for choosing ${escapeHtml(bizName)}.</p>
+    <p style="margin-top:24px;">Warmly,<br/><strong>${escapeHtml(ownerName)}</strong></p>
   `, bizName)
 
   try {

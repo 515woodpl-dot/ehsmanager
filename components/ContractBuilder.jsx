@@ -61,17 +61,17 @@ function buildFields(c, data) {
   const today = new Date().toISOString().slice(0, 10)
   return {
     fields: {
-      contractTitle: `${c?.type || 'Portrait'} Photography Services Agreement`,
+      contractTitle: 'Portrait Photography Services Agreement',
       effectiveDate: today,
       clientName: c?.name || '',
       clientEmail: c?.email || '',
       sessionType: c?.type || 'Portrait',
       sessionDate: booking?.date || c?.date || '',
       sessionTime: booking?.time || '',
-      location: booking?.location || 'EHS Studio',
+      location: booking?.location || '',
       totalFee: invoice?.amount ? String(invoice.amount) : '',
       retainerPct: '50',
-      remainingDueDate: invoice?.due || '',
+      remainingDueDate: invoice?.due || 'Proof Delivery Date',
       governingState: 'New Jersey',
       photographerEmail: 'hello@elliesheartstrings.com',
       photographerCity: 'Linden, NJ',
@@ -114,9 +114,11 @@ export default function ContractBuilder({ client, data, onSave, onClose }) {
     return `Auto-filled ${bits.join(' · ')}`
   })()
 
-  const totalFee = parseFloat(fields.totalFee) || 0
-  const retainerAmt = Math.round(totalFee * (parseFloat(fields.retainerPct) || 50) / 100 * 100) / 100
+  const totalFee = Number(fields.totalFee)
+  const retainerPct = Number(fields.retainerPct)
+  const retainerAmt = Math.round(totalFee * retainerPct) / 100
   const remainingAmt = Math.round((totalFee - retainerAmt) * 100) / 100
+  const money = amount => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount)
 
   const fmtD = iso => {
     if (!iso) return '[Date]'
@@ -130,6 +132,7 @@ export default function ContractBuilder({ client, data, onSave, onClose }) {
   }
 
   const contractFields = useMemo(() => ({
+    contractTitle: fields.contractTitle || '[Contract Title]',
     effectiveDate: fmtD(fields.effectiveDate),
     clientName: fields.clientName || '[Client Name]',
     clientEmail: fields.clientEmail || '[Client Email]',
@@ -137,15 +140,23 @@ export default function ContractBuilder({ client, data, onSave, onClose }) {
     sessionDate: fmtD(fields.sessionDate),
     sessionTime: fmtT(fields.sessionTime),
     location: fields.location || '[Location]',
-    totalFee: totalFee ? `$${totalFee.toLocaleString()}.00` : '[Total Fee]',
-    retainerAmount: totalFee ? `$${retainerAmt.toLocaleString()}.00` : '[Retainer]',
-    remainingAmount: totalFee ? `$${remainingAmt.toLocaleString()}.00` : '[Remaining]',
+    totalFee: totalFee > 0 ? money(totalFee) : '[Total Fee]',
+    retainerAmount: totalFee > 0 ? money(retainerAmt) : '[Retainer]',
+    remainingAmount: totalFee > 0 ? money(remainingAmt) : '[Remaining]',
     remainingDueDate: fmtD(fields.remainingDueDate),
+    photographerEmail: fields.photographerEmail || '[Photographer Email]',
+    photographerCity: fields.photographerCity || '[Photographer City]',
+    governingState: fields.governingState || '[Governing State]',
   }), [fields, totalFee, retainerAmt, remainingAmt])
 
   const previewText = useMemo(() => fillContract(CONTRACT_TEMPLATE, contractFields), [contractFields])
 
   const save = () => {
+    if (!activeClient || !fields.clientName.trim() || !fields.clientEmail.trim() || !fields.sessionDate || !fields.sessionTime || !fields.location.trim() || !fields.remainingDueDate || !Number.isFinite(totalFee) || totalFee <= 0 || !Number.isFinite(retainerPct) || retainerPct < 0 || retainerPct > 100) {
+      alert('Select a client and complete the client, session, and payment details before saving.')
+      setTab('fields')
+      return
+    }
     const k = {
       id: uid(),
       client: fields.clientName || 'Unknown',
@@ -154,6 +165,7 @@ export default function ContractBuilder({ client, data, onSave, onClose }) {
       sent: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
       status: 'pending',
       body: previewText,
+      fields: { ...fields },
     }
     onSave(k)
   }
@@ -250,7 +262,7 @@ export default function ContractBuilder({ client, data, onSave, onClose }) {
               </Field>
               <Field
                 label="Retainer %"
-                hint={totalFee > 0 ? `$${retainerAmt.toLocaleString()} due on signing · $${remainingAmt.toLocaleString()} remaining` : ''}
+                hint={totalFee > 0 ? `${money(retainerAmt)} due on signing · ${money(remainingAmt)} remaining` : ''}
               >
                 <div style={{ position: 'relative' }}>
                   <input style={{ ...inp, paddingRight: 28 }} type="number" min="0" max="100" value={fields.retainerPct} onChange={e => set('retainerPct', e.target.value)} />
@@ -258,8 +270,8 @@ export default function ContractBuilder({ client, data, onSave, onClose }) {
                 </div>
               </Field>
             </div>
-            <Field label="Remaining balance due date">
-              <input style={{ ...inp, maxWidth: 220 }} type="date" value={fields.remainingDueDate} onChange={e => set('remainingDueDate', e.target.value)} />
+            <Field label="Remaining balance due date or milestone">
+              <input style={{ ...inp, maxWidth: 300 }} type="text" value={fields.remainingDueDate} onChange={e => set('remainingDueDate', e.target.value)} />
             </Field>
           </Section>
 
@@ -272,6 +284,9 @@ export default function ContractBuilder({ client, data, onSave, onClose }) {
                 <input style={inp} value={fields.governingState} onChange={e => set('governingState', e.target.value)} />
               </Field>
             </div>
+            <Field label="Photographer city">
+              <input style={inp} value={fields.photographerCity} onChange={e => set('photographerCity', e.target.value)} />
+            </Field>
           </Section>
         </div>
       ) : (

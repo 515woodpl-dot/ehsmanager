@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react'
 import { T, C } from '../lib/tokens'
 import { Modal, Badge, Avatar, SearchBar } from './UI'
+import { removeClient } from '../lib/data'
 
 const uid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => { const r = Math.random() * 16 | 0; return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16) })
 const fmtDate = iso => { if (!iso) return 'TBD'; const d = new Date(iso + 'T00:00:00'); return isNaN(d) ? iso : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) }
@@ -61,7 +62,7 @@ export default function Clients({ data, setData, toast, sessionTypes }) {
 
   const del = id => {
     if (!confirm('Delete this client?')) return
-    setData(d => ({ ...d, clients: d.clients.filter(c => c.id !== id) }))
+    setData(d => removeClient(d, id))
     toast('Client deleted')
   }
 
@@ -76,18 +77,8 @@ export default function Clients({ data, setData, toast, sessionTypes }) {
         if (parsed.length === 0) { setImportError('No valid contacts found. Make sure the CSV has a header row with at least a "name" column.'); return }
         setImportPreview(parsed)
         setImportModal(true)
-      } else if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) {
-        const XLSX = await import('xlsx')
-        const buf = await file.arrayBuffer()
-        const wb = XLSX.read(buf)
-        const ws = wb.Sheets[wb.SheetNames[0]]
-        const rows = XLSX.utils.sheet_to_csv(ws)
-        const parsed = parseCSV(rows)
-        if (parsed.length === 0) { setImportError('No valid contacts found in the spreadsheet.'); return }
-        setImportPreview(parsed)
-        setImportModal(true)
       } else {
-        setImportError('Please upload a .csv or .xlsx file.')
+        setImportError('Please export your spreadsheet as CSV and upload the .csv file.')
       }
     } catch (err) {
       setImportError('Could not read file: ' + err.message)
@@ -111,8 +102,8 @@ export default function Clients({ data, setData, toast, sessionTypes }) {
           <div style={T.pageSub}>{filtered.length} clients</div>
         </div>
         <div style={{ display: 'flex', gap: 10 }}>
-          <button style={T.btn} onClick={() => fileRef.current.click()}>↑ Import CSV / XLSX</button>
-          <input ref={fileRef} type="file" accept=".csv,.xlsx,.xls" style={{ display: 'none' }} onChange={handleFile} />
+          <button style={T.btn} onClick={() => fileRef.current.click()}>↑ Import CSV</button>
+          <input ref={fileRef} type="file" accept=".csv,text/csv" style={{ display: 'none' }} onChange={handleFile} />
           <button style={T.btnPrimary} onClick={() => setAddModal(true)}>+ Add client</button>
         </div>
       </div>

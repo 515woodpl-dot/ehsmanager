@@ -94,7 +94,7 @@ export default async function handler(req, res) {
               <div class="box-row"><span class="label">Received</span><span class="value">${escapeHtml(fmtDate)}</span></div>
             </div>
             ${safeLead.message ? `<div class="box" style="font-family:Arial,sans-serif;font-size:13px;line-height:1.7;color:#444;"><strong>Message:</strong><br/><br/>${escapeHtml(safeLead.message)}</div>` : ''}
-            <a href="https://manager.elliesheartstrings.com" class="btn">Open Studio Manager</a>
+            <a href="${escapeHtml(process.env.NEXT_PUBLIC_APP_URL || 'https://manager.elliesheartstrings.com')}" class="btn">Open Studio Manager</a>
             <p style="margin-top:20px;font-size:13px;color:#9B9B98;">This lead has been added to your client list.</p>
           `, profile.business_name)
           await resend.emails.send({

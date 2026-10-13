@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo } from 'react'
 import { InvoiceModal, QuoteModal, ContractModal, QuestionnaireModal, SessionModal, MessageModal, GalleryModal } from './ActionModals'
 import { T, C, badge } from '../lib/tokens'
 import { Modal, Badge, Avatar, Seg } from './UI'
+import { removeClient } from '../lib/data'
 
 const uid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => { const r = Math.random() * 16 | 0; return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16) })
 const fmtDate = iso => { if (!iso) return 'TBD'; const d = new Date(iso + 'T00:00:00'); return isNaN(d) ? iso : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) }
@@ -65,7 +66,7 @@ function CardModal({ client, stages, sessionTypes, data, setData, onClose, toast
 
   const del = () => {
     if (!confirm('Delete this project permanently?')) return
-    setData(d => ({ ...d, clients: d.clients.filter(c => c.id !== client.id) }))
+    setData(d => removeClient(d, client.id))
     toast('Project deleted'); onClose()
   }
 
@@ -498,7 +499,7 @@ export default function Projects({ data, setData, toast }) {
 
   const deletePermanently = (id) => {
     if (!confirm('Permanently delete this project?')) return
-    setData(d => ({ ...d, clients: d.clients.filter(c => c.id !== id) }))
+    setData(d => removeClient(d, id))
     toast('Project deleted')
   }
 
