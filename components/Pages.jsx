@@ -1,28 +1,15 @@
 import { useState, useRef, useEffect } from 'react'
 import { T, C } from '../lib/tokens'
-import { supabase } from '../lib/supabase'
+import { pibase } from '../lib/pibase'
 import { Modal, Badge, Avatar, SearchBar } from './UI'
 import ContractBuilder from './ContractBuilder'
+import ContractDocument from './ContractDocument'
 
 const uid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => { const r = Math.random() * 16 | 0; return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16) })
 const fmtDate = iso => { if (!iso) return 'TBD'; const d = new Date(iso + 'T00:00:00'); return isNaN(d) ? iso : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) }
 const fmtTime = t => { if (!t) return ''; const [h, m] = t.split(':'); const hr = parseInt(h); return `${hr % 12 || 12}:${m} ${hr < 12 ? 'AM' : 'PM'}` }
 const todayLabel = () => new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
 const fmt$ = n => '$' + Number(n || 0).toLocaleString()
-
-function ContractBody({ body }) {
-  const lines = String(body || 'No contract body.').split('\n')
-  return (
-    <div className="contract-body-render">
-      {lines.map((line, index) => {
-        const trimmed = line.trim()
-        if (!trimmed) return <div key={index} className="contract-body-space" />
-        const isHeading = /^\d+\.\s+/.test(trimmed) || trimmed === 'Signatures'
-        return <p key={index} className={isHeading ? 'contract-body-heading' : ''}>{line}</p>
-      })}
-    </div>
-  )
-}
 
 // ── Dashboard ─────────────────────────────────────────────────────
 export function Dashboard({ data, setView, openClientCard }) {
@@ -312,7 +299,7 @@ export function Calendar({ data, setData, toast, openClientCard }) {
     if (!client?.email) { toast('No email address for this client'); return }
     setSendingReminder(b.id)
     try {
-      const { data: { session } } = await supabase.auth.getSession()
+      const { data: { session } } = await pibase.auth.getSession()
       const r = await fetch('/api/email-reminder', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token || ''}` }, body: JSON.stringify({ booking: b, clientEmail: client.email, clientName: client.name }) })
       if (r.ok) { toast('Reminder sent to ' + client.email) } else { toast('Failed to send') }
     } catch { toast('Failed to send') }
@@ -447,7 +434,7 @@ export function Invoices({ data, setData, toast }) {
     if (!client?.email) { toast('No email address for this client'); return }
     setSending(inv.id)
     try {
-      const { data: { session } } = await supabase.auth.getSession()
+      const { data: { session } } = await pibase.auth.getSession()
       const r = await fetch('/api/email-invoice', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token || ''}` }, body: JSON.stringify({ invoice: inv, clientEmail: client.email, clientName: client.name }) })
       if (r.ok) { toast('Invoice sent to ' + client.email) } else { toast('Failed to send email') }
     } catch { toast('Failed to send email') }
@@ -547,6 +534,22 @@ export function Contracts({ data, setData, toast }) {
   const [signModal, setSignModal] = useState(null)
   const [signName, setSignName] = useState('')
   const [sending, setSending] = useState(null)
+  const copySigningLink = async (contract) => {
+    setSending(contract.id)
+    try {
+      const { data: { session } } = await pibase.auth.getSession()
+      const response = await fetch('/api/contract-link', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token || ''}` },
+        body: JSON.stringify({ contractId: contract.id }),
+      })
+      const result = await response.json()
+      if (!response.ok) throw new Error(result.error || 'Could not create signing link')
+      await navigator.clipboard.writeText(result.url)
+      toast('Signing link copied')
+    } catch (error) { toast(error.message || 'Could not copy signing link') }
+    setSending(null)
+  }
   const blank = { client: '', type: '', body: '' }
   const [form, setForm] = useState(blank)
   const sendContract = async (k) => {
@@ -554,7 +557,7 @@ export function Contracts({ data, setData, toast }) {
     if (!client?.email) { toast('No email address for this client'); return }
     setSending(k.id)
     try {
-      const { data: { session } } = await supabase.auth.getSession()
+      const { data: { session } } = await pibase.auth.getSession()
       const r = await fetch('/api/email-contract', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token || ''}` }, body: JSON.stringify({ contract: k, clientEmail: client.email, clientName: client.name }) })
       if (r.ok) { toast('Contract sent to ' + client.email) } else { toast('Failed to send email') }
     } catch { toast('Failed to send email') }
@@ -581,6 +584,7 @@ export function Contracts({ data, setData, toast }) {
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <Badge type={k.status} label={k.status} />
               <button style={T.btnSm} onClick={e => { e.stopPropagation(); setViewModal(k) }}>View</button>
+              {k.status === 'pending' && <button style={T.btnSm} onClick={e => { e.stopPropagation(); copySigningLink(k) }} disabled={sending === k.id}>Copy signing link</button>}
               <button style={T.btnSm} onClick={e => { e.stopPropagation(); sendContract(k) }} disabled={sending === k.id}>{sending === k.id ? 'Sending...' : 'Send'}</button>
               {k.status === 'pending' && <button style={{ ...T.btnSm, color: C.green, borderColor: C.green }} onClick={e => { e.stopPropagation(); setSignModal(k); setSignName('') }}>Sign</button>}
               {k.status === 'signed' && k.signedBy && <div style={{ fontSize: 11, color: C.muted }}>Signed by {k.signedBy} · {k.signedAt}</div>}
@@ -608,8 +612,8 @@ export function Contracts({ data, setData, toast }) {
             <Badge type={viewModal.status} label={viewModal.status} />
             {viewModal.signedBy && <span style={{ fontSize: 12, color: C.muted }}>Signed by {viewModal.signedBy} · {viewModal.signedAt}</span>}
           </div>
-          <div style={{ background: C.surface2, borderRadius: 10, padding: '18px 20px', fontSize: 14, lineHeight: 1.8, color: C.text, fontWeight: 300 }}>
-            <ContractBody body={viewModal.body} />
+          <div style={{ background: C.surface2, borderRadius: 10, padding: 12 }}>
+            <ContractDocument body={viewModal.body} signedBy={viewModal.signedBy} signedAt={viewModal.signedAt} />
           </div>
         </Modal>
       )}

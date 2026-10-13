@@ -1,26 +1,16 @@
 import { useState } from 'react'
 import Head from 'next/head'
-import { createServiceClient } from '../../lib/supabase'
+import { createServiceClient } from '../../lib/pibase'
 import { verifyContractToken } from '../../lib/signingTokens'
-
-function ContractBody({ body }) {
-  return (
-    <div className="contract-body-render">
-      {String(body || 'No contract body.').split('\n').map((line, index) => {
-        const trimmed = line.trim()
-        if (!trimmed) return <div key={index} className="contract-body-space" />
-        const isHeading = /^\d+\.\s+/.test(trimmed) || trimmed === 'Signatures'
-        return <p key={index} className={isHeading ? 'contract-body-heading' : ''}>{line}</p>
-      })}
-    </div>
-  )
-}
+import ContractDocument from '../../components/ContractDocument'
 
 export default function SignContractPage({ token, contract }) {
   const [signerName, setSignerName] = useState(contract.signedBy || contract.client || '')
   const [signerEmail, setSignerEmail] = useState('')
   const [accepted, setAccepted] = useState(contract.status === 'signed')
   const [status, setStatus] = useState(contract.status === 'signed' ? 'signed' : 'idle')
+  const [signedBy, setSignedBy] = useState(contract.signedBy || '')
+  const [signedAt, setSignedAt] = useState(contract.signedAt || '')
   const [error, setError] = useState('')
 
   const submit = async (event) => {
@@ -43,6 +33,8 @@ export default function SignContractPage({ token, contract }) {
       return
     }
     setStatus('signed')
+    setSignedBy(signerName.trim())
+    setSignedAt(data.signedAt || '')
   }
 
   return (
@@ -63,7 +55,7 @@ export default function SignContractPage({ token, contract }) {
         </section>
 
         <section className="sign-card contract-copy">
-          <ContractBody body={contract.body} />
+          <ContractDocument body={contract.body} signedBy={signedBy} signedAt={signedAt} />
         </section>
 
         <form className="sign-card" onSubmit={submit}>

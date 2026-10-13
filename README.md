@@ -2,24 +2,25 @@
 
 Photography CRM — v2.0
 
-The app uses `@supabase/supabase-js`, so it can run against hosted Supabase or
-PIBASE. For PIBASE, set `NEXT_PUBLIC_PIBASE_URL`, `NEXT_PUBLIC_PIBASE_ANON_KEY`,
-and the server-only `PIBASE_SERVICE_KEY`; existing `NEXT_PUBLIC_SUPABASE_*`
-variables remain supported.
+The app stores its data in PIBASE. It uses `@supabase/supabase-js` solely as
+a client for PIBASE's compatible API protocol.
 
-## Setup
+## Local setup
+
+1. Start PIBASE and create a project using its dashboard or CLI.
+2. Apply [`supabase-schema.sql`](supabase-schema.sql) to that project with PIBASE's owner SQL or `migration-apply` tool. The SQL filename is historical; it targets PIBASE.
+3. Sign up the studio owner, verify their email, and set `STUDIO_OWNER_USER_ID` to that PIBASE user ID.
+4. Copy `.env.local.example` to `.env.local` and set the PIBASE project URL, anonymous key, service key, and a random contract signing secret.
+5. Install and run the app:
 
 ```bash
-npm install
-cp .env.local.example .env.local   # add Stripe keys when ready
-npm run build
-npm start                           # runs on port 3001
+npm ci
+npm run dev
 ```
 
-For a PIBASE project, apply `supabase-schema.sql` with the PIBASE owner SQL
-tool or `migration-apply`, then use the project URL and keys shown in the
-PIBASE dashboard. The SQL uses only the public schema plus PIBASE’s standard
-`auth` helpers, so the app’s existing RLS policies continue to apply.
+The public booking page is at `/booking`; the production host is
+`booking.elliesheartstrings.com`. Email sending requires `RESEND_API_KEY`;
+without it, use the contract's copyable signing link.
 
 ## Deploy update to server
 

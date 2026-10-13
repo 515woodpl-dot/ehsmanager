@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react'
 import { T, C } from '../lib/tokens'
 import { CONTRACT_TEMPLATE, fillContract } from '../lib/contractTemplate'
+import ContractDocument from './ContractDocument'
 
 const uid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => { const r = Math.random() * 16 | 0; return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16) })
 
@@ -19,19 +20,6 @@ function Section({ title, children }) {
     <div style={{ marginBottom: 18 }}>
       <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: C.faint, marginBottom: 10, paddingBottom: 6, borderBottom: `1px solid ${C.border}` }}>{title}</div>
       {children}
-    </div>
-  )
-}
-
-function ContractPreview({ body }) {
-  return (
-    <div className="contract-body-render">
-      {String(body || '').split('\n').map((line, index) => {
-        const trimmed = line.trim()
-        if (!trimmed) return <div key={index} className="contract-body-space" />
-        const isHeading = /^\d+\.\s+/.test(trimmed) || trimmed === 'Signatures'
-        return <p key={index} className={isHeading ? 'contract-body-heading' : ''}>{line}</p>
-      })}
     </div>
   )
 }
@@ -65,7 +53,7 @@ function buildFields(c, data) {
       effectiveDate: today,
       clientName: c?.name || '',
       clientEmail: c?.email || '',
-      sessionType: c?.type || 'Portrait',
+      sessionType: booking?.type || c?.type || 'Portrait',
       sessionDate: booking?.date || c?.date || '',
       sessionTime: booking?.time || '',
       location: booking?.location || '',
@@ -290,8 +278,8 @@ export default function ContractBuilder({ client, data, onSave, onClose }) {
           </Section>
         </div>
       ) : (
-        <div style={{ background: C.surface2, borderRadius: 10, padding: '20px 24px', fontSize: 13, lineHeight: 1.85, color: C.text, fontWeight: 300, border: `1px solid ${C.border}`, maxHeight: 420, overflowY: 'auto' }}>
-          <ContractPreview body={previewText} />
+        <div style={{ background: C.surface2, borderRadius: 10, padding: 12, border: `1px solid ${C.border}`, maxHeight: '65vh', overflowY: 'auto' }}>
+          <ContractDocument body={previewText} />
         </div>
       )}
 

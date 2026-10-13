@@ -1,4 +1,6 @@
 # EHS Studio Manager — Session Handoff
+> Archived handoff notes. The current app uses PIBASE only. Follow README.md
+> and .env.local.example for setup; the legacy deployment details below are obsolete.
 ## Use this to start a new chat with Claude
 
 ## Current bug report — 2026-10-13

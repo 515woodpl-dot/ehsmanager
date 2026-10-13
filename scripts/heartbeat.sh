@@ -1,7 +1,7 @@
 #!/bin/bash
 # /var/www/ehsmanager/scripts/heartbeat.sh
 #
-# Pings the /api/heartbeat endpoint to keep Supabase alive.
+# Checks the PIBASE connection through /api/heartbeat.
 # Runs every 3 days via cron (see crontab entry below).
 #
 # Install:

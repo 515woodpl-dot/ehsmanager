@@ -1,5 +1,5 @@
 import stripe from '../../lib/stripe'
-import { createServiceClient } from '../../lib/supabase'
+import { createServiceClient } from '../../lib/pibase'
 export const config = { api: { bodyParser: false } }
 async function getRawBody(req) {
   return new Promise((resolve, reject) => {

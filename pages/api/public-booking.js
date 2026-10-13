@@ -1,4 +1,4 @@
-import { createServiceClient } from '../../lib/supabase'
+import { createServiceClient } from '../../lib/pibase'
 import { availableSlots, discountAmount, safeImageUrl, validDate } from '../../lib/booking'
 
 const publicType = row => ({

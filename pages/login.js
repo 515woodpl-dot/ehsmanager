@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import Head from 'next/head'
 import { useRouter } from 'next/router'
-import { supabase } from '../lib/supabase'
+import { pibase } from '../lib/pibase'
 import { T, C } from '../lib/tokens'
 
 export default function Login() {
@@ -15,19 +15,21 @@ export default function Login() {
   const [success, setSuccess] = useState(null)
 
   const handleLogin = async () => {
+    if (!pibase) { setError('PIBASE is not configured.'); return }
     if (!email || !password) { setError('Email and password required'); return }
     setLoading(true); setError(null)
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
+    const { error } = await pibase.auth.signInWithPassword({ email, password })
     setLoading(false)
     if (error) { setError(error.message); return }
     router.push('/')
   }
 
   const handleSignup = async () => {
+    if (!pibase) { setError('PIBASE is not configured.'); return }
     if (!email || !password || !name) { setError('All fields required'); return }
     if (password.length < 6) { setError('Password must be at least 6 characters'); return }
     setLoading(true); setError(null)
-    const { error } = await supabase.auth.signUp({
+    const { error } = await pibase.auth.signUp({
       email, password,
       options: { data: { full_name: name } }
     })

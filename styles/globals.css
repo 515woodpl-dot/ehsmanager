@@ -499,3 +499,29 @@ textarea:focus-visible,
   color: var(--text);
   font-weight: 700;
 }
+
+/* Contract layout follows the supplied portrait agreement. */
+.contract-document { background: #fff; color: #353535; max-width: 850px; margin: 0 auto; padding: 42px 46px 54px; font-family: Arial, Helvetica, sans-serif; font-size: 12px; line-height: 1.55; }
+.contract-document-head { display: flex; justify-content: space-between; gap: 24px; align-items: flex-start; margin-bottom: 52px; }
+.contract-document-head strong, .contract-document-head span { display: block; font-weight: 400; font-size: 20px; line-height: 1.2; }
+.contract-document-head span { color: #8a8a8a; margin-top: 4px; }
+.contract-document-date { display: grid; grid-template-columns: auto auto; column-gap: 28px; align-items: start; }
+.contract-document-date small, .contract-document-parties small { display: block; font-size: 10px; color: #999; letter-spacing: .02em; }
+.contract-document-date span { font-size: 11px; color: #555; margin: 0; }
+.contract-document-name { font: 400 20px Arial, Helvetica, sans-serif; margin: 0 0 28px; }
+.contract-document-parties { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); max-width: 380px; gap: 25px; margin-bottom: 46px; }
+.contract-document-parties span { display: block; margin-top: 10px; font-size: 11px; }
+.contract-document-title { text-align: center; font: 700 20px Arial, Helvetica, sans-serif; margin: 0 0 14px; }
+.contract-document-content p { margin: 0 0 12px; overflow-wrap: anywhere; }
+.contract-document-content h3, .contract-document-signatures h3 { font-size: 17px; line-height: 1.3; margin: 26px 0 13px; break-after: avoid; }
+.contract-document-content .contract-document-clause { margin: 0 0 16px; }
+.contract-document-content .contract-document-intro { font-size: 11px; }
+.contract-document-content .contract-document-bullet { padding-left: 23px; position: relative; margin: 4px 0; }
+.contract-document-bullet::before { content: '•'; position: absolute; left: 12px; }
+.contract-document-signatures { margin-top: 42px; break-inside: avoid; }
+.contract-document-signatures > div { display: grid; grid-template-columns: 1fr 1fr; gap: 48px; }
+.contract-document-signatures strong, .contract-document-signatures span { display: block; font-size: 11px; font-weight: 400; }
+.contract-document-signatures span { color: #999; margin-top: 3px; }
+.contract-document-signature-line { border-top: 1px solid #ddd; margin: 20px 0 7px; }
+@media (max-width: 600px) { .contract-document { padding: 25px 20px 35px; } .contract-document-head { margin-bottom: 32px; } .contract-document-head strong, .contract-document-head span { font-size: 15px; } .contract-document-date { column-gap: 10px; } .contract-document-title { font-size: 17px; } .contract-document-signatures > div { gap: 18px; } }
+@media print { body { background: #fff !important; } .sign-page > :not(.contract-copy), .sign-page .sign-card:not(.contract-copy) { display: none !important; } .contract-copy { border: 0 !important; box-shadow: none !important; padding: 0 !important; width: 100% !important; } .contract-document { max-width: none; padding: 0; font-size: 11pt; } }

@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import Head from 'next/head'
 import Link from 'next/link'
-import { DEMO_SESSION_CATALOG } from '../../lib/data'
 import { durationLabel, money, publicBookingBase, safeImageUrl } from '../../lib/booking'
 import s from '../../styles/Booking.module.css'
 
@@ -22,7 +21,7 @@ export default function BookingLanding() {
       if (!response.ok) throw new Error('Booking catalog unavailable')
       return response.json()
     }).then(payload => setSessionTypes(payload.sessionTypes || []))
-      .catch(() => { setSessionTypes(process.env.NEXT_PUBLIC_SUPABASE_URL ? [] : DEMO_SESSION_CATALOG); setPreview(true) })
+      .catch(() => { setSessionTypes([]); setPreview(true) })
       .finally(() => setLoading(false))
   }, [])
   const categories = useMemo(() => ['All sessions', ...new Set(sessionTypes.map(item => item.category).filter(Boolean))], [sessionTypes])
@@ -31,7 +30,7 @@ export default function BookingLanding() {
   return <div className={s.shell}>
     <Head><title>Book a Photography Session | Ellie's Heartstrings</title><meta name="description" content="Explore portrait, maternity, milestone and family photography sessions with Ellie's Heartstrings." /><meta name="viewport" content="width=device-width, initial-scale=1" /></Head>
     <BookingHeader />
-    {preview && <div className={s.notice}>{process.env.NEXT_PUBLIC_SUPABASE_URL ? 'Booking is temporarily unavailable. Please try again shortly.' : 'Preview catalog · Connect PIBASE and publish session types to accept bookings.'}</div>}
+    {preview && <div className={s.notice}>Booking is temporarily unavailable. Please try again shortly.</div>}
     <main>
       <section className={s.hero}>
         <div><div className={s.eyebrow}>Photography sessions made personal</div><h1>Hold on to the moments that matter.</h1><p>Every season deserves to be remembered. Explore a collection of thoughtful portrait experiences, choose the one that feels like you, and request a time that fits your life.</p><a href="#collections" className={s.navButton} style={{ display: 'inline-block', marginTop: 20, background: '#1fb89c', color: '#fff', textDecoration: 'none', padding: '15px 25px', fontSize: 12, fontWeight: 700, letterSpacing: '.06em' }}>EXPLORE SESSIONS ↓</a></div>

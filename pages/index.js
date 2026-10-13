@@ -1,18 +1,19 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import Head from 'next/head'
 import { T, C } from '../lib/tokens'
-import { loadData, seed, STORAGE_KEY } from '../lib/data'
-import { supabase } from '../lib/supabase'
-import { loadUserData, saveSettings, syncCollections } from '../lib/db'
+import { seed } from '../lib/data'
+import { pibase } from '../lib/pibase'
+import { loadUserData, syncCollections } from '../lib/db'
 import { Toast } from '../components/UI'
 import Projects, { CardModalExport as CardModal } from '../components/Projects'
 import Clients from '../components/Clients'
 import ContactFormSettings from '../components/ContactForm'
 import { Dashboard, Analytics, Calendar, Invoices, Contracts, Inbox } from '../components/Pages'
+import { SessionTypes, Sessions, Discounts } from '../components/BookingAdmin'
 
 const todayLabel = () => new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
 const VIEW_STORAGE_KEY = 'ehs-studio-active-view'
-const VALID_VIEWS = new Set(['dashboard', 'analytics', 'projects', 'clients', 'calendar', 'invoices', 'contracts', 'inbox', 'contactform'])
+const VALID_VIEWS = new Set(['dashboard', 'analytics', 'projects', 'clients', 'sessiontypes', 'sessions', 'calendar', 'discounts', 'invoices', 'contracts', 'inbox', 'contactform'])
 
 function getInitialView() {
   if (typeof window === 'undefined') return 'dashboard'
@@ -82,7 +83,10 @@ function Sidebar({ active, setActive, unread, open, onClose, user, onSignOut }) 
     { id: 'clients', label: 'Clients' },
   ]
   const nav2 = [
+    { id: 'sessiontypes', label: 'Session Types' },
+    { id: 'sessions', label: 'Sessions' },
     { id: 'calendar', label: 'Calendar' },
+    { id: 'discounts', label: 'Discounts' },
     { id: 'invoices', label: 'Invoices' },
     { id: 'contracts', label: 'Contracts' },
     { id: 'inbox', label: 'Inbox', badge: unread },
@@ -191,16 +195,24 @@ function Sidebar({ active, setActive, unread, open, onClose, user, onSignOut }) 
 
 // ── Root ──────────────────────────────────────────────────────────
 export default function Home() {
-  const [view, setView] = useState(getInitialView)
-  const [data, setData] = useState(loadData)
+  const [view, setView] = useState('dashboard')
+  const [data, setData] = useState(seed)
+  const [localReady, setLocalReady] = useState(false)
   const [toastMsg, setToastMsg] = useState(null)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [calendarCardModal, setCalendarCardModal] = useState(null)
   const [user, setUser] = useState(null)
   const [dbReady, setDbReady] = useState(false)
-  const [dataReady, setDataReady] = useState(!supabase)
-  const [dataError, setDataError] = useState(null)
+  const [authChecked, setAuthChecked] = useState(false)
+  const [loadError, setLoadError] = useState('')
+  const [saveStatus, setSaveStatus] = useState('saved')
+  const [retryTick, setRetryTick] = useState(0)
   const toast = msg => setToastMsg(msg)
+
+  useEffect(() => {
+    setView(getInitialView())
+    setLocalReady(true)
+  }, [])
 
   useEffect(() => {
     if (typeof document === 'undefined') return
@@ -219,112 +231,119 @@ export default function Home() {
   }
 
   useEffect(() => {
-    if (typeof window === 'undefined') return
+    if (typeof window === 'undefined' || !localReady) return
     window.localStorage.setItem(VIEW_STORAGE_KEY, view)
     const url = new URL(window.location.href)
     if (url.searchParams.get('view') !== view) {
       url.searchParams.set('view', view)
       window.history.replaceState({}, '', url)
     }
-  }, [view])
+  }, [view, localReady])
 
   // ── Auth + initial DB load ──────────────────────────────────────
   useEffect(() => {
-    if (!supabase) { setDbReady(false); setDataReady(true); return }
+    if (!pibase) { setDbReady(false); setLoadError('PIBASE is not configured. Set NEXT_PUBLIC_PIBASE_URL and NEXT_PUBLIC_PIBASE_ANON_KEY.'); return }
 
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      if (!session) return
+    let loadGeneration = 0
+
+    const loadSession = async session => {
+      const generation = ++loadGeneration
+      if (!session) { setUser(null); setDbReady(false); setData(seed); setAuthChecked(true); return }
       setUser(session.user)
       try {
         const dbData = await loadUserData(session.user.id)
-        if (dbData) { setData(d => ({ ...d, ...dbData })); setDbReady(true); setDataReady(true) }
+        if (generation !== loadGeneration) return
+        setData(dbData)
+        setLoadError('')
+        setDbReady(true)
       } catch (error) {
-        console.error('[pibase] EHS Manager data fetch failed', error)
-        setDataError(error.message || 'Unable to load your data from PiBase')
-        setDataReady(true)
+        if (generation !== loadGeneration) return
+        console.error('[db] initial load', error)
+        setLoadError(error.message)
+        setDbReady(false)
       }
-    })
+      setAuthChecked(true)
+    }
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === 'SIGNED_IN' && session) {
-        setUser(session.user)
-        try {
-          const dbData = await loadUserData(session.user.id)
-          if (dbData) { setData(d => ({ ...d, ...dbData })); setDbReady(true); setDataReady(true) }
-        } catch (error) {
-          console.error('[pibase] EHS Manager data fetch failed', error)
-          setDataError(error.message || 'Unable to load your data from PiBase')
-          setDataReady(true)
-        }
-      }
-      if (event === 'SIGNED_OUT') { setUser(null); setDbReady(false) }
+    pibase.auth.getSession().then(({ data: { session } }) => loadSession(session))
+
+    const { data: { subscription } } = pibase.auth.onAuthStateChange((event, session) => {
+      // The auth client holds a lock during this callback. Database queries
+      // must run after it returns, or session lookup can deadlock.
+      if (event === 'SIGNED_IN' && session) setTimeout(() => loadSession(session), 0)
+      if (event === 'SIGNED_OUT') setTimeout(() => loadSession(null), 0)
     })
-    return () => subscription.unsubscribe()
+    return () => { ++loadGeneration; subscription.unsubscribe() }
   }, [])
-
-  // ── localStorage fallback (when no Supabase) ───────────────────
-  useEffect(() => {
-    if (dbReady) return  // DB is active — don't also write localStorage
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)) } catch (e) {}
-  }, [data, dbReady])
-
-  // ── Settings sync ──────────────────────────────────────────────
-  useEffect(() => {
-    if (!dbReady || !user) return
-    saveSettings(user.id, { stages: data.stages, sessionTypes: data.sessionTypes, formSettings: data.formSettings })
-  }, [data.stages, data.sessionTypes, data.formSettings, dbReady, user])
 
   // ── Collection sync engine ─────────────────────────────────────
   // Diffs current data vs last-synced snapshot and persists adds,
-  // edits, and deletes to Supabase. Debounced to batch rapid changes.
+  // edits, and deletes to PIBASE. Debounced to batch rapid changes.
   const snapshotRef = useRef(null)
+  const syncPromiseRef = useRef(Promise.resolve())
+  const syncUserRef = useRef(null)
+  const latestDataRef = useRef(data)
+  const retryTimerRef = useRef(null)
+  latestDataRef.current = data
   useEffect(() => {
-    if (!dbReady || !user) { snapshotRef.current = null; return }
+    if (!dbReady || !user) {
+      snapshotRef.current = null
+      syncUserRef.current = null
+      clearTimeout(retryTimerRef.current)
+      return
+    }
+    syncUserRef.current = user.id
     if (snapshotRef.current === null) {
       // First run after DB load — take the baseline, don't sync
       snapshotRef.current = data
+      setSaveStatus('saved')
       return
     }
-    const prev = snapshotRef.current
+    if (JSON.stringify(snapshotRef.current) === JSON.stringify(data)) return
+    setSaveStatus('saving')
     const timer = setTimeout(() => {
-      syncCollections(user.id, prev, data)
-      snapshotRef.current = data
+      syncPromiseRef.current = syncPromiseRef.current.then(async () => {
+        if (syncUserRef.current !== user.id || !snapshotRef.current) return
+        await syncCollections(user.id, snapshotRef.current, data)
+        snapshotRef.current = data
+        if (JSON.stringify(latestDataRef.current) === JSON.stringify(data)) setSaveStatus('saved')
+      }).catch(error => {
+        console.error('[sync]', error)
+        if (syncUserRef.current !== user.id) return
+        setSaveStatus('retrying')
+        clearTimeout(retryTimerRef.current)
+        retryTimerRef.current = setTimeout(() => setRetryTick(tick => tick + 1), 3000)
+      })
     }, 400)
     return () => clearTimeout(timer)
-  }, [data, dbReady, user])
+  }, [data, dbReady, user?.id, retryTick])
+
+  useEffect(() => {
+    if (!pibase) return
+    const warnOnExit = event => {
+      if (!dbReady || !snapshotRef.current || JSON.stringify(snapshotRef.current) === JSON.stringify(latestDataRef.current)) return
+      event.preventDefault()
+      event.returnValue = ''
+    }
+    window.addEventListener('beforeunload', warnOnExit)
+    return () => window.removeEventListener('beforeunload', warnOnExit)
+  }, [dbReady])
 
   const handleSignOut = async () => {
-    if (supabase) await supabase.auth.signOut()
+    if (saveStatus !== 'saved' && !window.confirm('Changes are still saving. Sign out anyway?')) return
+    if (pibase) await pibase.auth.signOut()
+  }
+
+  if (!dbReady) {
+    return <main style={{ maxWidth: 520, margin: '12vh auto', padding: 24, fontFamily: 'sans-serif' }}>
+      <h1>EHS Studio Manager</h1>
+      <p>{loadError || (authChecked ? 'Sign in to access your studio data.' : 'Loading studio data...')}</p>
+      {authChecked && <a href="/login">Go to sign in</a>}
+    </main>
   }
 
   const props = { data, setData, toast, setView: setActiveView }
   const unread = data.messages.filter(m => m.unread).length
-
-  if (supabase && !dataReady) {
-    return (
-      <>
-        <Head><title>EHS Studio Manager</title></Head>
-        <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', background: C.bg, color: C.muted, fontSize: 14 }}>
-          Loading your studio data…
-        </div>
-      </>
-    )
-  }
-
-  if (dataError) {
-    return (
-      <>
-        <Head><title>EHS Studio Manager</title></Head>
-        <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', background: C.bg, color: C.text, padding: 24 }}>
-          <div style={{ maxWidth: 420, textAlign: 'center' }}>
-            <div style={{ fontSize: 18, marginBottom: 8 }}>Couldn’t load your studio data</div>
-            <div style={{ color: C.muted, fontSize: 13 }}>{dataError}</div>
-            <button onClick={() => window.location.reload()} style={{ ...T.btnPrimary, marginTop: 20 }}>Try again</button>
-          </div>
-        </div>
-      </>
-    )
-  }
 
   const pageTitles = {
     dashboard: ['Dashboard', todayLabel()],
@@ -332,11 +351,14 @@ export default function Home() {
   }
 
   const views = {
-    dashboard: <Dashboard {...props} />,
+    dashboard: <Dashboard {...props} openClientCard={c => setCalendarCardModal(c)} />,
     analytics: <Analytics {...props} />,
     projects: <Projects {...props} />,
     clients: <Clients {...props} sessionTypes={data.sessionTypes} />,
+    sessiontypes: <SessionTypes {...props} />,
+    sessions: <Sessions {...props} />,
     calendar: <Calendar {...props} openClientCard={c => setCalendarCardModal(c)} />,
+    discounts: <Discounts {...props} />,
     invoices: <Invoices {...props} />,
     contracts: <Contracts {...props} />,
     inbox: <Inbox {...props} />,
@@ -366,6 +388,9 @@ export default function Home() {
               ☰
             </button>
             <GlobalSearch data={data} setView={setActiveView} />
+            {pibase && <span role="status" style={{ fontSize: 12, color: saveStatus === 'retrying' ? '#991F1F' : C.muted, whiteSpace: 'nowrap' }}>
+              {saveStatus === 'saved' ? 'Saved' : saveStatus === 'retrying' ? 'Save failed · retrying' : 'Saving…'}
+            </span>}
           </div>
 
           {/* Page title */}

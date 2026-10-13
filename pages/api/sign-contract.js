@@ -1,4 +1,4 @@
-import { createServiceClient } from '../../lib/supabase'
+import { createServiceClient } from '../../lib/pibase'
 import { verifyContractToken } from '../../lib/signingTokens'
 
 export default async function handler(req, res) {

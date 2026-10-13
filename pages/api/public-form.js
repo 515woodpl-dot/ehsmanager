@@ -1,4 +1,4 @@
-import { createServiceClient } from '../../lib/supabase'
+import { createServiceClient } from '../../lib/pibase'
 import { resend, FROM, emailWrap } from '../../lib/email'
 
 const escapeHtml = (value = '') => String(value)

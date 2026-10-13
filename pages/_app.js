@@ -1,22 +1,22 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/router'
 import '../styles/globals.css'
-import { supabase } from '../lib/supabase'
+import { pibase } from '../lib/pibase'
 
 const PUBLIC_ROUTES = ['/login', '/contact', '/booking']
 
 export default function App({ Component, pageProps }) {
   const router = useRouter()
-  const [ready, setReady] = useState(!supabase) // if no supabase, skip auth check
+  const [ready, setReady] = useState(!pibase) // if no pibase, skip auth check
   const [authError, setAuthError] = useState('')
 
   const isPublicRoute = () => PUBLIC_ROUTES.some(r => router.pathname.startsWith(r))
 
   useEffect(() => {
-    if (!supabase) return
+    if (!pibase) return
 
     // Check initial session
-    supabase.auth.getSession().then(({ data: { session }, error }) => {
+    pibase.auth.getSession().then(({ data: { session }, error }) => {
       if (error) throw error
       if (!session && !isPublicRoute()) {
         router.push('/login')
@@ -30,7 +30,7 @@ export default function App({ Component, pageProps }) {
     })
 
     // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+    const { data: { subscription } } = pibase.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_OUT' && !isPublicRoute()) {
         router.push('/login')
       }
