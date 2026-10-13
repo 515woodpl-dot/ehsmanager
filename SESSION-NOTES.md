@@ -1,6 +1,14 @@
 # EHS Studio Manager — Session Handoff
 ## Use this to start a new chat with Claude
 
+## Current bug report — 2026-10-13
+
+- Pull the latest code and rebuild before making fixes.
+- Dashboard client cards are not clickable.
+- The UI needs better mobile support.
+- Some content flashes during loading/refresh.
+- Contract cards are not opening correctly; the demo contract placeholder text is shown instead of the editable/final contract content.
+
 ---
 
 ## GitHub Repo
@@ -193,3 +201,10 @@ crontab -e
 Paste this entire document and say:
 
 > "Here's my project context. I'm building EHS Studio Manager. The GitHub repo is https://github.com/515woodpl-dot/ehsmanager. I want to work on [whatever you want next]."
+
+## 2026-10-13 white-screen fix
+
+- Root cause: production `NEXT_PUBLIC_PIBASE_URL` pointed to the standalone `pibase.elliesheartstrings.com` endpoint, whose TLS/DNS path was failing.
+- Fix: switched the manager to the working same-origin proxy, `https://manager.elliesheartstrings.com/pibase`, rebuilt, and restarted PM2.
+- Added a visible auth loading/error fallback in `pages/_app.js` so session failures cannot render a blank page.
+- Verified proxy login, authenticated client REST access, production build, and live HTTP 200.
