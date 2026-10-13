@@ -3,13 +3,14 @@ import { T, C } from '../lib/tokens'
 import { pibase } from '../lib/pibase'
 import { LineItemBuilder, calcTotal } from './LineItemBuilder'
 import { invoiceLabel, invoiceStatus, nextInvoiceNumber } from '../lib/invoices'
+import { buildItemCatalog } from '../lib/documents'
 
 const uid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => { const r = Math.random() * 16 | 0; return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16) })
 const fmt$ = n => '$' + Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 const fmtLongDate = iso => { if (!iso) return ''; const d = new Date(iso + 'T00:00:00'); return isNaN(d) ? iso : d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) }
 const wait = ms => new Promise(resolve => setTimeout(resolve, ms))
 
-function Overlay({ onClose, children, maxWidth = 860 }) {
+export function Overlay({ onClose, children, maxWidth = 860 }) {
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.22)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20, backdropFilter: 'blur(4px)' }} className="modal-wrap"
       onClick={e => { if (e.target === e.currentTarget) onClose() }}>
@@ -20,7 +21,7 @@ function Overlay({ onClose, children, maxWidth = 860 }) {
   )
 }
 
-function Header({ title, onClose }) {
+export function Header({ title, onClose }) {
   return (
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 24 }}>
       <div style={T.modalTitle}>{title}</div>
@@ -41,7 +42,7 @@ function lineDataFor(invoice) {
 // ── Create / edit invoice ─────────────────────────────────────────
 // Pass `invoice` to edit an existing one; omit it to create. `client` is
 // optional — without it the modal shows a client picker.
-export function InvoiceModal({ client: clientProp, invoice, data, setData, toast, onClose }) {
+export function InvoiceModal({ client: clientProp, invoice, data, setData, toast, onClose, onSaved }) {
   const isEdit = !!invoice
   const [clientId, setClientId] = useState(invoice?.clientId || clientProp?.id || '')
   const [lineData, setLineData] = useState(() => lineDataFor(invoice))
@@ -68,6 +69,7 @@ export function InvoiceModal({ client: clientProp, invoice, data, setData, toast
       setData(d => ({ ...d, invoices: [...d.invoices, saved] }))
       toast(`Invoice ${saved.number} created`)
     }
+    onSaved?.()
     if (!isEdit || thenSend) setSendFor(saved)
     else onClose()
   }
@@ -130,7 +132,7 @@ export function InvoiceModal({ client: clientProp, invoice, data, setData, toast
         </div>
       )}
 
-      <LineItemBuilder value={lineData} onChange={setLineData} />
+      <LineItemBuilder value={lineData} onChange={setLineData} catalog={buildItemCatalog(data)} />
 
       <div style={{ ...T.modalFooter, flexWrap: 'wrap' }} className="modal-footer-wrap">
         {isEdit && <button style={{ ...T.btn, color: C.red, borderColor: C.red }} onClick={remove}>Delete invoice</button>}
@@ -158,8 +160,23 @@ export function defaultInvoiceEmail(invoice, clientName) {
 export function SendInvoiceModal({ invoice, client, toast, onClose, justCreated = false }) {
   const clientName = client?.name || invoice.client
   const initial = defaultInvoiceEmail(invoice, clientName)
-  const [subject, setSubject] = useState(initial.subject)
-  const [message, setMessage] = useState(initial.message)
+  return (
+    <SendEmailModal
+      endpoint="/api/email-invoice" payload={{ invoice: { id: invoice.id } }}
+      client={client} clientName={clientName} toast={toast} onClose={onClose} justCreated={justCreated}
+      title={justCreated ? `Invoice ${invoiceLabel(invoice)} created — email it to ${clientName}?` : `Email invoice ${invoiceLabel(invoice)}`}
+      sentToast={`Invoice ${invoiceLabel(invoice)} emailed`}
+      initialSubject={initial.subject} initialMessage={initial.message} buttonLabel={`View invoice ${invoiceLabel(invoice)}`}
+    />
+  )
+}
+
+// Generic "email this document to the client" step: editable subject and
+// message, a preview with the link button, and a retry while a freshly
+// created document finishes saving in the background.
+export function SendEmailModal({ endpoint, payload, client, clientName, toast, onClose, justCreated = false, title, sentToast, initialSubject, initialMessage, buttonLabel, extraActions = null }) {
+  const [subject, setSubject] = useState(initialSubject)
+  const [message, setMessage] = useState(initialMessage)
   const [sending, setSending] = useState(false)
   const [error, setError] = useState('')
   const email = client?.email || ''
@@ -169,20 +186,18 @@ export function SendInvoiceModal({ invoice, client, toast, onClose, justCreated 
     setSending(true); setError('')
     try {
       const { data: { session } } = await pibase.auth.getSession()
-      // A brand-new invoice is saved in the background; give the sync a
-      // moment to land before the server looks it up.
       for (let attempt = 0; attempt < 6; attempt++) {
-        const r = await fetch('/api/email-invoice', {
+        const r = await fetch(endpoint, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token || ''}` },
-          body: JSON.stringify({ invoice: { id: invoice.id }, subject, message }),
+          body: JSON.stringify({ ...payload, subject, message }),
         })
-        if (r.ok) { toast(`Invoice ${invoiceLabel(invoice)} emailed to ${email}`); onClose(); return }
+        if (r.ok) { toast(`${sentToast} to ${email}`); onClose({ sent: true }); return }
         const body = await r.json().catch(() => ({}))
         if (r.status !== 404) { setError(typeof body.error === 'string' ? body.error : body.error?.message || 'Failed to send email'); return }
         await wait(1000)
       }
-      setError('The invoice is still saving. Please try again in a moment.')
+      setError('This is still saving. Please try again in a moment.')
     } catch {
       setError('Failed to send email')
     } finally {
@@ -192,13 +207,13 @@ export function SendInvoiceModal({ invoice, client, toast, onClose, justCreated 
 
   return (
     <Overlay onClose={onClose} maxWidth={680}>
-      <Header title={justCreated ? `Invoice ${invoiceLabel(invoice)} created — email it to ${clientName}?` : `Email invoice ${invoiceLabel(invoice)}`} onClose={onClose} />
+      <Header title={title} onClose={onClose} />
 
       <div style={T.formGroup}>
         <label style={T.formLabel}>To</label>
         {email
           ? <div style={{ padding: '9px 12px', background: C.surface2, borderRadius: 8, fontSize: 14 }}>{clientName} &lt;{email}&gt;</div>
-          : <div style={{ padding: '10px 14px', background: C.redBg, color: C.red, borderRadius: 8, fontSize: 13 }}>{clientName} has no email address. Add one in the client details to send this invoice.</div>}
+          : <div style={{ padding: '10px 14px', background: C.redBg, color: C.red, borderRadius: 8, fontSize: 13 }}>{clientName} has no email address. Add one in the client details to send this.</div>}
       </div>
       <div style={T.formGroup}>
         <label style={T.formLabel}>Subject</label>
@@ -212,13 +227,15 @@ export function SendInvoiceModal({ invoice, client, toast, onClose, justCreated 
       <div style={{ ...T.formLabel, marginTop: 4 }}>Preview</div>
       <div style={{ border: `1px solid ${C.border}`, borderRadius: 10, padding: '18px 20px', background: C.surface2 }}>
         <div style={{ fontSize: 13.5, lineHeight: 1.7, color: '#444', whiteSpace: 'pre-wrap' }}>{message}</div>
-        <div style={{ display: 'inline-block', marginTop: 14, background: C.text, color: '#fff', padding: '10px 24px', borderRadius: 8, fontSize: 14, fontWeight: 500 }}>View invoice {invoiceLabel(invoice)}</div>
+        <div style={{ display: 'inline-block', marginTop: 14, background: C.text, color: '#fff', padding: '10px 24px', borderRadius: 8, fontSize: 14, fontWeight: 500 }}>{buttonLabel}</div>
       </div>
 
       {error && <div style={{ marginTop: 14, padding: '10px 14px', background: C.redBg, color: C.red, borderRadius: 8, fontSize: 13 }}>{error}</div>}
 
-      <div style={T.modalFooter}>
-        <button style={T.btn} onClick={onClose}>{justCreated ? 'Not now' : 'Cancel'}</button>
+      <div style={{ ...T.modalFooter, flexWrap: 'wrap' }}>
+        {extraActions}
+        <div style={{ flex: 1 }} />
+        <button style={T.btn} onClick={() => onClose()}>{justCreated ? 'Not now' : 'Cancel'}</button>
         <button style={{ ...T.btnPrimary, opacity: !email || sending ? 0.55 : 1 }} disabled={!email || sending} onClick={send}>{sending ? 'Sending…' : 'Send email'}</button>
       </div>
     </Overlay>

@@ -321,6 +321,34 @@ export default function Home() {
     return () => clearTimeout(timer)
   }, [data, dbReady, user?.id, retryTick])
 
+  // Clients accept quotes, answer questionnaires and sign contracts from
+  // their own links. When the studio comes back to the tab, pull those
+  // updates in — but only if nothing local is still waiting to save.
+  useEffect(() => {
+    if (!dbReady || !user) return
+    let lastRefresh = Date.now()
+    let refreshing = false
+    const refresh = async () => {
+      if (document.visibilityState !== 'visible' || refreshing || Date.now() - lastRefresh < 15000) return
+      const idle = () => snapshotRef.current && JSON.stringify(snapshotRef.current) === JSON.stringify(latestDataRef.current)
+      if (!idle()) return
+      refreshing = true; lastRefresh = Date.now()
+      try {
+        const fresh = await loadUserData(user.id)
+        if (!idle() || syncUserRef.current !== user.id) return
+        snapshotRef.current = fresh
+        setData(fresh)
+      } catch (error) {
+        console.error('[db] refresh', error)
+      } finally {
+        refreshing = false
+      }
+    }
+    window.addEventListener('focus', refresh)
+    document.addEventListener('visibilitychange', refresh)
+    return () => { window.removeEventListener('focus', refresh); document.removeEventListener('visibilitychange', refresh) }
+  }, [dbReady, user?.id])
+
   // Older invoices were stored with only a UUID (or "INV-001"). Give each a
   // "#1xxx" number once after loading; the sync engine above persists it.
   useEffect(() => {

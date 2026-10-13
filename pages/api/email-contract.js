@@ -1,6 +1,7 @@
 import { resend, fromFor, emailWrap } from '../../lib/email'
 import { requireUser } from '../../lib/api-auth'
 import { createContractToken } from '../../lib/signingTokens'
+import { messageHtml, cleanSubject } from '../../lib/documentEmail'
 
 function escapeHtml(value) {
   return String(value || '')
@@ -41,8 +42,8 @@ export default async function handler(req, res) {
 
   const html = emailWrap(`
     <h1>${escapeHtml(contract.type || 'Photography Agreement')}</h1>
-    <p>Hi ${escapeHtml(clientName || 'there')},</p>
-    <p>Please review your photography contract below. You can sign it securely using the button in this email.</p>
+    ${messageHtml(req.body?.message) || `<p>Hi ${escapeHtml(clientName || 'there')},</p>
+    <p>Please review your photography contract below. You can sign it securely using the button in this email.</p>`}
 
     <div class="box">
       <div class="box-row"><span class="label">Contract</span><span class="value">${escapeHtml(contract.type || 'Photography Agreement')}</span></div>
@@ -63,7 +64,7 @@ export default async function handler(req, res) {
       from: fromFor(bizName),
       reply_to: auth.profile.email || undefined,
       to: clientEmail,
-      subject: `Your ${contract.type || 'Photography Agreement'} — ${bizName}`,
+      subject: cleanSubject(req.body?.subject) || `Your ${contract.type || 'Photography Agreement'} — ${bizName}`,
       html,
     })
     if (error) return res.status(400).json({ error })

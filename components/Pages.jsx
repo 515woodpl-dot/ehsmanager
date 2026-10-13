@@ -2,10 +2,10 @@ import { useState, useRef, useEffect } from 'react'
 import { T, C } from '../lib/tokens'
 import { pibase } from '../lib/pibase'
 import { Modal, Badge, Avatar, SearchBar } from './UI'
-import ContractBuilder from './ContractBuilder'
-import ContractDocument from './ContractDocument'
 import { InvoiceModal, SendInvoiceModal } from './InvoiceModals'
 import { invoiceLabel } from '../lib/invoices'
+import { docTone } from '../lib/documents'
+import { ContractModal } from './ActionModals'
 
 const uid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => { const r = Math.random() * 16 | 0; return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16) })
 const fmtDate = iso => { if (!iso) return 'TBD'; const d = new Date(iso + 'T00:00:00'); return isNaN(d) ? iso : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) }
@@ -474,7 +474,7 @@ export function Invoices({ data, setData, toast }) {
           const pct = inv.amount > 0 ? Math.round(inv.paid / inv.amount * 100) : 0
           const owing = inv.amount - inv.paid
           return (
-            <article key={inv.id} className="invoice-summary-card" onClick={() => setViewId(inv.id)}>
+            <article key={inv.id} className={`invoice-summary-card doc-card-${docTone('invoice', inv)}`} onClick={() => setViewId(inv.id)}>
               <div style={{ flex: 1 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 5 }}>
                   <div style={{ fontWeight: 500 }}>{invoiceLabel(inv)}</div>
@@ -599,7 +599,7 @@ export function Contracts({ data, setData, toast }) {
       <div style={T.pageHeader} className="page-header-wrap"><div><div style={T.pageTitle}>Contracts</div><div style={T.pageSub}>{data.contracts.filter(k => k.status === 'signed').length} signed · {data.contracts.filter(k => k.status === 'pending').length} pending</div></div><button style={T.btnPrimary} onClick={() => setModal(true)}>+ New contract</button></div>
       <div style={T.card}>
         {data.contracts.map((k, i) => (
-            <div key={k.id} className="data-row-mobile" onClick={() => setViewModal(k)} style={{ ...T.dataRow, borderBottom: i === data.contracts.length - 1 ? 'none' : `1px solid ${C.border}`, cursor: 'pointer' }}>
+            <div key={k.id} className={`data-row-mobile contract-row doc-card-${docTone('contract', k)}`} onClick={() => setViewModal(k)} style={{ ...T.dataRow, cursor: 'pointer' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 13 }}>
               <div style={{ width: 40, height: 40, borderRadius: 10, background: k.status === 'signed' ? C.greenBg : C.surface2, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, color: k.status === 'signed' ? C.green : C.muted, flexShrink: 0 }}>{k.status === 'signed' ? '✓' : '✎'}</div>
               <div><div style={{ fontWeight: 500 }}>{k.type || 'Contract'}</div><div style={{ fontSize: 12, color: C.muted }}>{k.client} · Sent {k.sent}</div></div>
@@ -616,30 +616,8 @@ export function Contracts({ data, setData, toast }) {
           </div>
         ))}
       </div>
-      {modal && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.22)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20, backdropFilter: 'blur(4px)' }} className="modal-wrap"
-          onClick={e => { if (e.target === e.currentTarget) setModal(false) }}>
-          <div style={{ background: C.surface, borderRadius: 16, padding: 30, width: '100%', maxWidth: 740, maxHeight: '92vh', overflowY: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,0.14)' }} className="modal-inner">
-            <ContractBuilder
-              client={null}
-              data={data}
-              onSave={k => { setData(d => ({ ...d, contracts: [...d.contracts, k] })); toast('Contract created'); setModal(false) }}
-              onClose={() => setModal(false)}
-            />
-          </div>
-        </div>
-      )}
-      {viewModal && (
-        <Modal title={viewModal.type || 'Contract'} onClose={() => setViewModal(null)} wide footer={<><div style={{ fontSize: 12, color: C.muted }}>Sent {viewModal.sent}{viewModal.signedAt ? ` · Signed ${viewModal.signedAt}` : ''}</div><div style={{ flex: 1 }} /><button style={T.btn} onClick={() => setViewModal(null)}>Close</button></>}>
-          <div style={{ marginBottom: 12, display: 'flex', gap: 8, alignItems: 'center' }}>
-            <Badge type={viewModal.status} label={viewModal.status} />
-            {viewModal.signedBy && <span style={{ fontSize: 12, color: C.muted }}>Signed by {viewModal.signedBy} · {viewModal.signedAt}</span>}
-          </div>
-          <div style={{ background: C.surface2, borderRadius: 10, padding: 12 }}>
-            <ContractDocument body={viewModal.body} signedBy={viewModal.signedBy} signedAt={viewModal.signedAt} signatureData={viewModal.fields?.signatureData} headerImageUrl={viewModal.fields?.headerImageUrl} />
-          </div>
-        </Modal>
-      )}
+      {modal && <ContractModal data={data} setData={setData} toast={toast} onClose={() => setModal(false)} />}
+      {viewModal && <ContractModal contract={viewModal} data={data} setData={setData} toast={toast} onClose={() => setViewModal(null)} />}
       {linkModal && <Modal title="Client signing link" onClose={() => setLinkModal(null)} footer={<><button style={T.btn} onClick={() => setLinkModal(null)}>Done</button><button style={T.btnPrimary} onClick={async () => toast(await copyText(linkModal.url) ? 'Signing link copied' : 'Select and copy the link')}>Copy link</button></>}>
         <p style={{ color: C.muted, fontSize: 13, marginBottom: 12 }}>Share this secure link with {linkModal.contract.client}. It remains valid until the contract is signed.</p>
         <input aria-label="Signing link" style={T.formInput} readOnly value={linkModal.url} onFocus={event => event.currentTarget.select()} />

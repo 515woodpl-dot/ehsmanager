@@ -70,12 +70,14 @@ function buildFields(c, data) {
   }
 }
 
-export default function ContractBuilder({ client, data, onSave, onClose }) {
-  const initial = buildFields(client, data)
+export default function ContractBuilder({ client, contract = null, data, onSave, onClose }) {
+  // Editing keeps what was saved; a new contract auto-fills from the client.
+  const built = buildFields(client, data)
+  const initial = contract?.fields ? { fields: { ...built.fields, ...contract.fields }, sources: built.sources } : built
   const [selectedClientId, setSelectedClientId] = useState(client?.id || '')
   const [fields, setFields] = useState(initial.fields)
   const [sources, setSources] = useState(initial.sources)
-  const [touched, setTouched] = useState(false) // has the user hand-edited?
+  const [touched, setTouched] = useState(!!contract) // has the user hand-edited?
 
   const [tab, setTab] = useState('fields')
   const set = (k, v) => { setTouched(true); setFields(f => ({ ...f, [k]: v })) }
@@ -153,14 +155,15 @@ export default function ContractBuilder({ client, data, onSave, onClose }) {
       return
     }
     const k = {
-      id: uid(),
+      ...(contract || {}),
+      id: contract?.id || uid(),
       client: fields.clientName || 'Unknown',
       clientId: activeClient?.id || null,
       type: fields.contractTitle,
-      sent: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-      status: 'pending',
+      sent: contract?.sent || new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+      status: contract?.status || 'pending',
       body: previewText,
-      fields: { ...fields },
+      fields: { ...(contract?.fields || {}), ...fields },
     }
     onSave(k)
   }

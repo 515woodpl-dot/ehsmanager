@@ -1,10 +1,11 @@
 import { useEffect, useState, useMemo } from 'react'
-import { QuoteModal, ContractModal, QuestionnaireModal, SessionModal, MessageModal, GalleryModal } from './ActionModals'
+import { QuoteModal, ContractModal, QuestionnaireModal, SessionModal, MessageModal } from './ActionModals'
 import { T, C, badge } from '../lib/tokens'
 import { Modal, Badge, Avatar, Seg, ConfirmModal } from './UI'
 import { removeClient } from '../lib/data'
 import { InvoiceModal } from './InvoiceModals'
 import { invoiceLabel } from '../lib/invoices'
+import { docTone, quoteLabel } from '../lib/documents'
 
 const uid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => { const r = Math.random() * 16 | 0; return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16) })
 const fmtDate = iso => { if (!iso) return 'TBD'; const d = new Date(iso + 'T00:00:00'); return isNaN(d) ? iso : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) }
@@ -24,6 +25,40 @@ function ActionItem({ icon, title, subtitle, onClick, color = C.text }) {
   )
 }
 
+// ── Activity card (client documents) ──────────────────────────────
+// Light orange while waiting on the studio or client, light green once done.
+function DocCard({ kind, item, title, subtitle, status, onClick }) {
+  const tone = docTone(kind, item)
+  return (
+    <button type="button" onClick={onClick} className={`doc-card doc-card-${tone}`} title="Open">
+      <div style={{ minWidth: 0 }}>
+        <div className="doc-card-title">{title}</div>
+        {subtitle && <div className="doc-card-sub">{subtitle}</div>}
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+        <span className="doc-card-status">{status}</span>
+        <span style={{ color: C.faint }}>›</span>
+      </div>
+    </button>
+  )
+}
+
+function ActivitySection({ title, onAdd, addLabel = '+ New', empty, children }) {
+  const items = [].concat(children || []).filter(Boolean)
+  return (
+    <div style={{ marginBottom: 16 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+        <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: C.faint }}>{title}</div>
+        {onAdd && <button style={{ ...T.btnGhost, color: C.blue, fontWeight: 500 }} onClick={onAdd}>{addLabel}</button>}
+      </div>
+      {items.length ? items : <div style={{ fontSize: 12, color: C.faint, marginBottom: 6 }}>{empty}</div>}
+    </div>
+  )
+}
+
+const QUESTIONNAIRE_STATUS = { draft: 'Not sent', sent: 'Awaiting answers', completed: 'Answered' }
+const sessionStatus = b => b.status === 'canceled' ? 'Canceled' : docTone('session', b) === 'done' ? 'Done' : b.status === 'confirmed' ? 'Confirmed' : 'Upcoming'
+
 // ── Card Modal ────────────────────────────────────────────────────
 function CardModal({ client: clientProp, stages, sessionTypes, data, setData, onClose, toast }) {
   // Always render the latest saved version of this client. The prop is the
@@ -34,14 +69,25 @@ function CardModal({ client: clientProp, stages, sessionTypes, data, setData, on
   const [form, setForm] = useState({ ...client })
   const [liveNotes, setLiveNotes] = useState(client.notes || '')
   const [notesSavedAt, setNotesSavedAt] = useState('')
-  const [activeTab, setActiveTab] = useState('getstarted')
-  const [activeModal, setActiveModal] = useState(null) // invoice|contract|quote|questionnaire|session|message|gallery
-  const [openInvoice, setOpenInvoice] = useState(null) // existing invoice being edited from Activity
+  // details | getstarted | activity. On phones these are three tabs of one
+  // screen; on desktop "details" is always visible on the right.
+  const [tab, setTab] = useState('details')
+  const [activeModal, setActiveModal] = useState(null) // invoice|contract|quote|questionnaire|session|message
+  const [openDoc, setOpenDoc] = useState(null) // { kind, item } — existing document opened from Activity
   const [confirmDelete, setConfirmDelete] = useState(false)
 
-  const clientInvoices = data.invoices.filter(i => i.clientId === client.id)
-  const clientContracts = data.contracts.filter(k => k.clientId === client.id)
-  const clientBookings = data.bookings.filter(b => b.clientId === client.id)
+  const mine = list => (list || []).filter(x => x.clientId === client.id)
+  const clientInvoices = mine(data.invoices)
+  const clientQuotes = mine(data.quotes)
+  const clientContracts = mine(data.contracts)
+  const clientQuestionnaires = mine(data.questionnaires)
+  const clientBookings = mine(data.bookings).sort((a, b) => (b.date || '').localeCompare(a.date || ''))
+  const clientMessages = mine(data.messages)
+  const openCount = [
+    ...clientInvoices.map(x => docTone('invoice', x)), ...clientQuotes.map(x => docTone('quote', x)),
+    ...clientContracts.map(x => docTone('contract', x)), ...clientQuestionnaires.map(x => docTone('questionnaire', x)),
+    ...clientBookings.map(x => docTone('session', x)),
+  ].filter(t => t === 'open').length
 
   const startEditing = () => { setForm({ ...client }); setEditing(true) }
 
@@ -82,98 +128,104 @@ function CardModal({ client: clientProp, stages, sessionTypes, data, setData, on
     toast('Project deleted'); setConfirmDelete(false); onClose()
   }
 
+  // After creating anything, show it in Activity so it's clear it exists.
+  const showActivity = () => setTab('activity')
+  const open = (kind, item) => setOpenDoc({ kind, item })
+  const closeDoc = () => setOpenDoc(null)
+  const modalProps = { client, data, setData, toast, onSaved: showActivity }
+  const leftTab = tab === 'activity' ? 'activity' : 'getstarted'
+
+  const sectionLabel = text => <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: C.faint, marginBottom: 10 }}>{text}</div>
+
   return (
     <>
-    <div style={T.overlay} onClick={e => { if (e.target === e.currentTarget) onClose() }}>
-      <div style={{ background: C.surface, borderRadius: 16, width: '100%', maxWidth: 900, maxHeight: '92vh', overflow: 'hidden', boxShadow: '0 20px 60px rgba(0,0,0,0.14)', display: 'flex', flexDirection: 'column' }} className="card-modal-inner">
+    <div style={T.overlay} className="card-modal-overlay" onClick={e => { if (e.target === e.currentTarget) onClose() }}>
+      <div style={{ background: C.surface, borderRadius: 16, width: '100%', maxWidth: 940, maxHeight: '92vh', overflow: 'hidden', boxShadow: '0 20px 60px rgba(0,0,0,0.14)', display: 'flex', flexDirection: 'column' }} className="card-modal-inner">
         {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '20px 28px', borderBottom: `1px solid ${C.border}`, flexShrink: 0 }}>
+        <div className="card-modal-header" style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '20px 28px', borderBottom: `1px solid ${C.border}`, flexShrink: 0 }}>
           <Avatar name={client.name} size={42} />
-          <div style={{ flex: 1 }}>
-            <div style={{ fontFamily: "'DM Serif Display', Georgia, serif", fontSize: 20, fontWeight: 400, letterSpacing: '-0.3px' }}>{client.name}</div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontFamily: "'DM Serif Display', Georgia, serif", fontSize: 20, fontWeight: 400, letterSpacing: '-0.3px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{client.name}</div>
             <div style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>{client.type} · {fmtDate(client.date)}</div>
           </div>
-          <Badge type={client.status} label={client.status} />
-          <button onClick={onClose} style={{ ...T.btnGhost, fontSize: 20, color: C.faint, marginLeft: 8 }}>×</button>
+          <Badge type={client.status} label={stages.find(s => s.id === client.status)?.label || client.status} />
+          <button onClick={onClose} aria-label="Close" style={{ ...T.btnGhost, fontSize: 22, color: C.faint, marginLeft: 4 }}>×</button>
+        </div>
+
+        {/* Phone tabs — one screen, three views */}
+        <div className="card-mobile-tabs" role="tablist">
+          {[{ id: 'details', label: 'Details' }, { id: 'getstarted', label: 'Create' }, { id: 'activity', label: `Activity${openCount ? ` · ${openCount}` : ''}` }].map(t => (
+            <button key={t.id} role="tab" aria-selected={tab === t.id} className={tab === t.id ? 'active' : ''} onClick={() => setTab(t.id)}>{t.label}</button>
+          ))}
         </div>
 
         {/* Body */}
-        <div style={{ display: 'grid', gridTemplateColumns: '300px 1fr', flex: 1, overflow: 'hidden' }} className="card-modal-body">
+        <div style={{ display: 'grid', gridTemplateColumns: '320px 1fr', flex: 1, overflow: 'hidden' }} className="card-modal-body">
 
           {/* LEFT PANEL */}
-          <div style={{ borderRight: `1px solid ${C.border}`, padding: '22px 20px', overflowY: 'auto' }} className="card-modal-left">
-            {/* Tabs */}
-            <div style={{ display: 'flex', gap: 2, background: C.surface2, borderRadius: 8, padding: 3, marginBottom: 20 }}>
-              {[{ id: 'getstarted', label: 'Get Started' }, { id: 'activity', label: 'Activity' }].map(tab => (
-                <button key={tab.id} onClick={() => setActiveTab(tab.id)}
-                  style={{ flex: 1, padding: '5px 0', borderRadius: 6, border: 'none', background: activeTab === tab.id ? C.surface : 'transparent', color: C.text, fontWeight: activeTab === tab.id ? 500 : 400, fontSize: 12.5, cursor: 'pointer', fontFamily: 'inherit' }}>
-                  {tab.label}
+          <div style={{ borderRight: `1px solid ${C.border}`, padding: '22px 20px', overflowY: 'auto' }} className={`card-modal-left${tab === 'details' ? ' card-pane-hidden-mobile' : ''}`}>
+            {/* Desktop tabs */}
+            <div className="card-left-tabs" style={{ display: 'flex', gap: 2, background: C.surface2, borderRadius: 8, padding: 3, marginBottom: 20 }}>
+              {[{ id: 'getstarted', label: 'Get Started' }, { id: 'activity', label: `Activity${openCount ? ` · ${openCount}` : ''}` }].map(t => (
+                <button key={t.id} onClick={() => setTab(t.id)}
+                  style={{ flex: 1, padding: '5px 0', borderRadius: 6, border: 'none', background: leftTab === t.id ? C.surface : 'transparent', color: C.text, fontWeight: leftTab === t.id ? 500 : 400, fontSize: 12.5, cursor: 'pointer', fontFamily: 'inherit' }}>
+                  {t.label}
                 </button>
               ))}
             </div>
 
-            {activeTab === 'getstarted' && (
+            {leftTab === 'getstarted' && (
               <>
-                <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: C.faint, marginBottom: 10 }}>Send documents</div>
+                {sectionLabel('Send documents')}
                 <ActionItem icon="$" title="Invoice" subtitle="Get paid for your services" onClick={() => setActiveModal('invoice')} color={C.green} />
+                <ActionItem icon="📋" title="Quote" subtitle="Get client acceptance" onClick={() => setActiveModal('quote')} color={C.amber} />
                 <ActionItem icon="✎" title="Contract" subtitle="Request a signature" onClick={() => setActiveModal('contract')} color={C.blue} />
                 <ActionItem icon="?" title="Questionnaire" subtitle="Learn about client needs" onClick={() => setActiveModal('questionnaire')} color={C.purple} />
-                <ActionItem icon="📋" title="Quote" subtitle="Get client acceptance" onClick={() => setActiveModal('quote')} color={C.amber} />
 
-                <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: C.faint, margin: '18px 0 10px' }}>Schedule sessions</div>
+                <div style={{ height: 8 }} />
+                {sectionLabel('Schedule sessions')}
                 <ActionItem icon="📅" title="Session" subtitle="Invite your client to a session" onClick={() => setActiveModal('session')} />
 
-                <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: C.faint, margin: '18px 0 10px' }}>Conversations</div>
-                <ActionItem icon="✉" title="New message" subtitle="Write to your client" onClick={() => setActiveModal('message')} />
-
-                <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: C.faint, margin: '18px 0 10px' }}>Gallery</div>
-                <ActionItem icon="🖼" title="Client Gallery" subtitle="Link photo collections" onClick={() => setActiveModal('gallery')} />
+                <div style={{ height: 8 }} />
+                {sectionLabel('Conversations')}
+                <ActionItem icon="✉" title="New message" subtitle="Email your client" onClick={() => setActiveModal('message')} />
               </>
             )}
 
-            {activeTab === 'activity' && (
+            {leftTab === 'activity' && (
               <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-                  <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: C.faint }}>Invoices</div>
-                  <button style={{ ...T.btnGhost, color: C.blue, fontWeight: 500 }} onClick={() => setActiveModal('invoice')}>+ New invoice</button>
-                </div>
-                {clientInvoices.length === 0 && <div style={{ fontSize: 12, color: C.faint, marginBottom: 8 }}>No invoices yet</div>}
-                {clientInvoices.map(i => (
-                  <button key={i.id} type="button" onClick={() => setOpenInvoice(i)} title="Open to edit, email or delete"
-                    style={{ ...T.cardSm, width: '100%', marginBottom: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit', color: C.text }}>
-                    <div><div style={{ fontSize: 13, fontWeight: 500 }}>Invoice {invoiceLabel(i)}</div><div style={{ fontSize: 11, color: C.muted }}>${i.amount.toLocaleString()}{i.due ? ` · Due ${fmtDate(i.due)}` : ''}</div></div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><Badge type={i.status} label={i.status} /><span style={{ color: C.faint }}>›</span></div>
-                  </button>
-                ))}
-                {clientContracts.length > 0 && (
-                  <>
-                    <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: C.faint, margin: '14px 0 10px' }}>Contracts</div>
-                    {clientContracts.map(k => (
-                      <div key={k.id} style={{ ...T.cardSm, marginBottom: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <div style={{ fontSize: 13, fontWeight: 500 }}>{k.type}</div>
-                        <Badge type={k.status} label={k.status} />
-                      </div>
-                    ))}
-                  </>
-                )}
-                {clientBookings.length > 0 && (
-                  <>
-                    <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: C.faint, margin: '14px 0 10px' }}>Sessions</div>
-                    {clientBookings.map(b => (
-                      <div key={b.id} style={{ ...T.cardSm, marginBottom: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <div><div style={{ fontSize: 13, fontWeight: 500 }}>{b.type}</div><div style={{ fontSize: 11, color: C.muted }}>{fmtDate(b.date)}</div></div>
-                        <Badge type={b.status} label={b.status} />
-                      </div>
-                    ))}
-                  </>
-                )}
+                <div className="doc-legend"><span className="doc-dot doc-dot-open" /> Waiting <span className="doc-dot doc-dot-done" /> Done</div>
+                <ActivitySection title="Invoices" onAdd={() => setActiveModal('invoice')} empty="No invoices yet">
+                  {clientInvoices.map(i => <DocCard key={i.id} kind="invoice" item={i} onClick={() => open('invoice', i)}
+                    title={`Invoice ${invoiceLabel(i)}`} subtitle={`$${i.amount.toLocaleString()}${i.due ? ` · Due ${fmtDate(i.due)}` : ''}`} status={i.status} />)}
+                </ActivitySection>
+                <ActivitySection title="Quotes" onAdd={() => setActiveModal('quote')} empty="No quotes yet">
+                  {clientQuotes.map(q => <DocCard key={q.id} kind="quote" item={q} onClick={() => open('quote', q)}
+                    title={`Quote ${quoteLabel(q)}`} subtitle={`$${Number(q.amount || 0).toLocaleString()}${q.validUntil ? ` · Valid until ${fmtDate(q.validUntil)}` : ''}`} status={q.status === 'accepted' ? 'accepted' : 'awaiting'} />)}
+                </ActivitySection>
+                <ActivitySection title="Contracts" onAdd={() => setActiveModal('contract')} empty="No contracts yet">
+                  {clientContracts.map(k => <DocCard key={k.id} kind="contract" item={k} onClick={() => open('contract', k)}
+                    title={k.type || 'Contract'} subtitle={k.sent ? `Created ${k.sent}` : ''} status={k.status === 'signed' ? 'signed' : 'awaiting signature'} />)}
+                </ActivitySection>
+                <ActivitySection title="Questionnaires" onAdd={() => setActiveModal('questionnaire')} empty="No questionnaires yet">
+                  {clientQuestionnaires.map(q => <DocCard key={q.id} kind="questionnaire" item={q} onClick={() => open('questionnaire', q)}
+                    title={q.title || 'Questionnaire'} subtitle={`${q.questions?.length || 0} question${q.questions?.length === 1 ? '' : 's'}${q.createdAt ? ` · ${q.createdAt}` : ''}`} status={QUESTIONNAIRE_STATUS[q.status] || q.status} />)}
+                </ActivitySection>
+                <ActivitySection title="Sessions" onAdd={() => setActiveModal('session')} empty="No sessions yet">
+                  {clientBookings.map(b => <DocCard key={b.id} kind="session" item={b} onClick={() => open('session', b)}
+                    title={b.type || 'Session'} subtitle={`${fmtDate(b.date)}${b.time ? ` · ${b.time}` : ''}${b.location ? ` · ${b.location}` : ''}`} status={sessionStatus(b)} />)}
+                </ActivitySection>
+                <ActivitySection title="Messages" onAdd={() => setActiveModal('message')} empty="No messages yet">
+                  {clientMessages.map(m => { const last = m.thread?.[m.thread.length - 1]; return <DocCard key={m.id} kind="message" item={m} onClick={() => setActiveModal('message')}
+                    title={`${m.thread?.length || 0} message${m.thread?.length === 1 ? '' : 's'}`} subtitle={last ? `${last.out ? 'You' : client.name}: ${last.text}` : ''} status={last?.time || ''} /> })}
+                </ActivitySection>
               </div>
             )}
           </div>
 
           {/* RIGHT PANEL — Client details */}
-          <div style={{ padding: '22px 26px', overflowY: 'auto' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }} className="page-header-wrap">
+          <div style={{ padding: '22px 26px', overflowY: 'auto' }} className={`card-modal-right${tab !== 'details' ? ' card-pane-hidden-mobile' : ''}`}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, marginBottom: 20 }}>
               <div style={{ fontFamily: "'DM Serif Display', Georgia, serif", fontSize: 17 }}>Client details</div>
               {!editing
                 ? <button style={T.btnSm} onClick={startEditing}>Edit</button>
@@ -215,11 +267,11 @@ function CardModal({ client: clientProp, stages, sessionTypes, data, setData, on
                   { label: 'Phone', value: client.phone || '—' },
                   { label: 'Session type', value: client.type },
                   { label: 'Session date', value: fmtDate(client.date) },
-                  { label: 'Status', value: client.status },
+                  { label: 'Status', value: stages.find(s => s.id === client.status)?.label || client.status },
                 ].map(f => (
-                  <div key={f.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderBottom: `1px solid ${C.border}` }}>
+                  <div key={f.label} style={{ display: 'flex', justifyContent: 'space-between', gap: 12, padding: '10px 0', borderBottom: `1px solid ${C.border}` }}>
                     <div style={{ fontSize: 12, color: C.muted, fontWeight: 500 }}>{f.label}</div>
-                    <div style={{ fontSize: 13.5, fontWeight: 400, textAlign: 'right', maxWidth: '60%' }}>{f.value}</div>
+                    <div style={{ fontSize: 13.5, fontWeight: 400, textAlign: 'right', maxWidth: '65%', overflowWrap: 'anywhere' }}>{f.value}</div>
                   </div>
                 ))}
               </div>
@@ -244,7 +296,7 @@ function CardModal({ client: clientProp, stages, sessionTypes, data, setData, on
             {/* Danger zone */}
             <div style={{ marginTop: 32, paddingTop: 20, borderTop: `1px solid ${C.border}` }}>
               <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: C.faint, marginBottom: 12 }}>Actions</div>
-              <div style={{ display: 'flex', gap: 10 }}>
+              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
                 <button style={{ ...T.btnSm, color: C.amber, borderColor: C.amber }} onClick={archive}>Archive project</button>
                 <button style={{ ...T.btnSm, color: C.red, borderColor: C.red }} onClick={() => setConfirmDelete(true)}>Delete project</button>
               </div>
@@ -254,15 +306,21 @@ function CardModal({ client: clientProp, stages, sessionTypes, data, setData, on
       </div>
     </div>
 
-    {/* Action modals */}
-    {activeModal === 'invoice' && <InvoiceModal client={client} data={data} setData={setData} toast={toast} onClose={() => setActiveModal(null)} />}
-    {openInvoice && <InvoiceModal client={client} invoice={openInvoice} data={data} setData={setData} toast={toast} onClose={() => setOpenInvoice(null)} />}
-    {activeModal === 'contract' && <ContractModal client={client} data={data} setData={setData} toast={toast} onClose={() => setActiveModal(null)} />}
-    {activeModal === 'quote' && <QuoteModal client={client} data={data} setData={setData} toast={toast} onClose={() => setActiveModal(null)} />}
-    {activeModal === 'questionnaire' && <QuestionnaireModal client={client} data={data} setData={setData} toast={toast} onClose={() => setActiveModal(null)} />}
-    {activeModal === 'session' && <SessionModal client={client} data={data} setData={setData} toast={toast} onClose={() => setActiveModal(null)} />}
-    {activeModal === 'message' && <MessageModal client={client} data={data} setData={setData} toast={toast} onClose={() => setActiveModal(null)} />}
-    {activeModal === 'gallery' && <GalleryModal client={client} data={data} setData={setData} toast={toast} onClose={() => setActiveModal(null)} />}
+    {/* New documents */}
+    {activeModal === 'invoice' && <InvoiceModal {...modalProps} onClose={() => setActiveModal(null)} />}
+    {activeModal === 'quote' && <QuoteModal {...modalProps} onClose={() => setActiveModal(null)} />}
+    {activeModal === 'contract' && <ContractModal {...modalProps} onClose={() => setActiveModal(null)} />}
+    {activeModal === 'questionnaire' && <QuestionnaireModal {...modalProps} onClose={() => setActiveModal(null)} />}
+    {activeModal === 'session' && <SessionModal {...modalProps} onClose={() => setActiveModal(null)} />}
+    {activeModal === 'message' && <MessageModal {...modalProps} onClose={() => setActiveModal(null)} />}
+
+    {/* Existing documents opened from Activity */}
+    {openDoc?.kind === 'invoice' && <InvoiceModal {...modalProps} invoice={openDoc.item} onClose={closeDoc} />}
+    {openDoc?.kind === 'quote' && <QuoteModal {...modalProps} quote={openDoc.item} onClose={closeDoc} />}
+    {openDoc?.kind === 'contract' && <ContractModal {...modalProps} contract={openDoc.item} onClose={closeDoc} />}
+    {openDoc?.kind === 'questionnaire' && <QuestionnaireModal {...modalProps} questionnaire={openDoc.item} onClose={closeDoc} />}
+    {openDoc?.kind === 'session' && <SessionModal {...modalProps} session={openDoc.item} onClose={closeDoc} />}
+
     {confirmDelete && <ConfirmModal danger title="Delete this project?" message={`${client.name}'s project will be removed. Existing invoices, sessions and contracts will remain in your records without a linked client.`} confirmLabel="Delete project" onClose={() => setConfirmDelete(false)} onConfirm={del} />}
     </>
   )
