@@ -10,13 +10,16 @@ export default async function handler(req, res) {
   const db = createServiceClient()
   if (!db) return res.status(500).json({ error: 'Database not configured' })
 
-  const { token, signerName, signerEmail } = req.body || {}
+  const { token, signerName, signerEmail, signatureImage } = req.body || {}
   const parsed = verifyContractToken(token)
   if (!parsed) return res.status(400).json({ error: 'Invalid signing link' })
   const name = String(signerName || '').trim().slice(0, 160)
   const email = String(signerEmail || '').trim().slice(0, 254)
   if (!name) return res.status(400).json({ error: 'Signer name is required' })
   if (email && !/^[^\s@<>"]+@[^\s@<>"]+\.[^\s@<>"]+$/.test(email)) return res.status(400).json({ error: 'Enter a valid email' })
+  // Optional hand-drawn signature: a small PNG from the signing pad, nothing else.
+  const image = typeof signatureImage === 'string' ? signatureImage : ''
+  if (image && (image.length > 300000 || !/^data:image\/png;base64,[A-Za-z0-9+/]+=*$/.test(image))) return res.status(400).json({ error: 'Signature image is invalid' })
 
   const { data: current, error: lookupError } = await db
     .from('contracts')
@@ -37,6 +40,7 @@ export default async function handler(req, res) {
       fields: {
         ...(current?.fields || {}),
         signerEmail: email || null,
+        signatureImage: image || null,
         signedVia: 'public_link',
         signedAtIso: new Date().toISOString(),
         signerIp: clientIp(req),

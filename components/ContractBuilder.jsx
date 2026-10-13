@@ -137,7 +137,9 @@ export default function ContractBuilder({ client, data, onSave, onClose }) {
     governingState: fields.governingState || '[Governing State]',
   }), [fields, totalFee, retainerAmt, remainingAmt])
 
-  const previewText = useMemo(() => fillContract(CONTRACT_TEMPLATE, contractFields), [contractFields])
+  // A retainer covering the full fee leaves nothing outstanding, so drop that line.
+  const template = totalFee > 0 && remainingAmt <= 0 ? CONTRACT_TEMPLATE.replace(/\n\n● Remaining amount due on .*\n/, '\n') : CONTRACT_TEMPLATE
+  const previewText = useMemo(() => fillContract(template, contractFields), [template, contractFields])
 
   const save = () => {
     if (!activeClient || !fields.clientName.trim() || !fields.clientEmail.trim() || !fields.sessionDate || !fields.sessionTime || !fields.location.trim() || !fields.remainingDueDate || !Number.isFinite(totalFee) || totalFee <= 0 || !Number.isFinite(retainerPct) || retainerPct < 0 || retainerPct > 100) {

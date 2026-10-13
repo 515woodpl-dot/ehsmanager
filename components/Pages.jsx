@@ -625,7 +625,7 @@ export function Contracts({ data, setData, toast }) {
             {viewModal.signedBy && <span style={{ fontSize: 12, color: C.muted }}>Signed by {viewModal.signedBy} · {viewModal.signedAt}</span>}
           </div>
           <div style={{ background: C.surface2, borderRadius: 10, padding: 12 }}>
-            <ContractDocument body={viewModal.body} signedBy={viewModal.signedBy} signedAt={viewModal.signedAt} />
+            <ContractDocument body={viewModal.body} signedBy={viewModal.signedBy} signedAt={viewModal.signedAt} signatureImage={viewModal.fields?.signatureImage} />
           </div>
         </Modal>
       )}

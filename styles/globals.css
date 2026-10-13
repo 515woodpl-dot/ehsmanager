@@ -1,4 +1,5 @@
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&family=DM+Serif+Display:ital@0;1&display=swap');
+/* Fonts are loaded with <link> tags in pages/index.js and pages/sign/[token].js:
+   Next 16's CSS pipeline drops remote @import rules from global CSS. */
 
 *, *::before, *::after {
   box-sizing: border-box;
@@ -500,28 +501,31 @@ textarea:focus-visible,
   font-weight: 700;
 }
 
-/* Contract layout follows the supplied portrait agreement. */
-.contract-document { background: #fff; color: #353535; max-width: 850px; margin: 0 auto; padding: 42px 46px 54px; font-family: Arial, Helvetica, sans-serif; font-size: 12px; line-height: 1.55; }
-.contract-document-head { display: flex; justify-content: space-between; gap: 24px; align-items: flex-start; margin-bottom: 52px; }
-.contract-document-head strong, .contract-document-head span { display: block; font-weight: 400; font-size: 20px; line-height: 1.2; }
-.contract-document-head span { color: #8a8a8a; margin-top: 4px; }
-.contract-document-date { display: grid; grid-template-columns: auto auto; column-gap: 28px; align-items: start; }
-.contract-document-date small, .contract-document-parties small { display: block; font-size: 10px; color: #999; letter-spacing: .02em; }
-.contract-document-date span { font-size: 11px; color: #555; margin: 0; }
-.contract-document-name { font: 400 20px Arial, Helvetica, sans-serif; margin: 0 0 28px; }
-.contract-document-parties { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); max-width: 380px; gap: 25px; margin-bottom: 46px; }
-.contract-document-parties span { display: block; margin-top: 10px; font-size: 11px; }
-.contract-document-title { text-align: center; font: 700 20px Arial, Helvetica, sans-serif; margin: 0 0 14px; }
-.contract-document-content p { margin: 0 0 12px; overflow-wrap: anywhere; }
-.contract-document-content h3, .contract-document-signatures h3 { font-size: 17px; line-height: 1.3; margin: 26px 0 13px; break-after: avoid; }
-.contract-document-content .contract-document-clause { margin: 0 0 16px; }
-.contract-document-content .contract-document-intro { font-size: 11px; }
-.contract-document-content .contract-document-bullet { padding-left: 23px; position: relative; margin: 4px 0; }
-.contract-document-bullet::before { content: '•'; position: absolute; left: 12px; }
-.contract-document-signatures { margin-top: 42px; break-inside: avoid; }
-.contract-document-signatures > div { display: grid; grid-template-columns: 1fr 1fr; gap: 48px; }
-.contract-document-signatures strong, .contract-document-signatures span { display: block; font-size: 11px; font-weight: 400; }
-.contract-document-signatures span { color: #999; margin-top: 3px; }
-.contract-document-signature-line { border-top: 1px solid #ddd; margin: 20px 0 7px; }
-@media (max-width: 600px) { .contract-document { padding: 25px 20px 35px; } .contract-document-head { margin-bottom: 32px; } .contract-document-head strong, .contract-document-head span { font-size: 15px; } .contract-document-date { column-gap: 10px; } .contract-document-title { font-size: 17px; } .contract-document-signatures > div { gap: 18px; } }
-@media print { body { background: #fff !important; } .sign-page > :not(.contract-copy), .sign-page .sign-card:not(.contract-copy) { display: none !important; } .contract-copy { border: 0 !important; box-shadow: none !important; padding: 0 !important; width: 100% !important; } .contract-document { max-width: none; padding: 0; font-size: 11pt; } }
+/* Contract layout follows the studio's Pixieset contract (Figtree stands in for
+   Proxima Nova). Used on the client signing page and in admin previews. */
+.contract-document { --cd-text: #1f1f1f; --cd-muted: #707070; --cd-rule: #e6e6e6; background: #fff; color: var(--cd-text); max-width: 850px; margin: 0 auto; padding: 44px 32px 40px; font-family: 'Figtree', 'Helvetica Neue', Arial, sans-serif; font-size: 15px; line-height: 1.75; }
+.cd-summary { border-bottom: 1px solid var(--cd-rule); padding-bottom: 28px; margin-bottom: 40px; }
+.cd-summary h2 { font: 500 22px/1.3 'Figtree', sans-serif; margin: 0 0 22px; }
+.cd-summary dl { display: flex; flex-wrap: wrap; gap: 18px 56px; margin: 0; }
+.cd-summary dt { font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--cd-muted); margin-bottom: 4px; }
+.cd-summary dd { margin: 0; font-size: 15px; }
+.cd-title { text-align: center; font: 600 23px/1.35 'Figtree', sans-serif; margin: 0 0 34px; }
+.cd-body p { margin: 0 0 14px; overflow-wrap: anywhere; }
+.cd-body h3, .cd-signatures h3 { font: 500 19px/1.35 'Figtree', sans-serif; margin: 46px 0 22px; break-after: avoid; }
+.cd-body .cd-clause { margin-bottom: 22px; }
+.cd-body .cd-detail { margin-bottom: 0; }
+.cd-body .cd-detail + p:not(.cd-detail) { margin-top: 18px; }
+.cd-body strong { font-weight: 600; }
+.cd-body ul { margin: -8px 0 22px; padding-left: 22px; }
+.cd-body li { margin: 0; padding-left: 2px; }
+.cd-value { border-bottom: 1px solid #9a9a9a; padding-bottom: 1px; }
+.cd-signatures { margin-top: 46px; break-inside: avoid; }
+.cd-signatures h3 { margin-bottom: 18px; }
+.cd-signature { margin-bottom: 30px; break-inside: avoid; }
+.cd-signature-mark { min-height: 72px; display: flex; align-items: flex-end; padding-bottom: 12px; border-bottom: 1px solid var(--cd-rule); }
+.cd-signature-mark img { max-height: 72px; max-width: 280px; display: block; }
+.cd-signature-script { font-family: 'Mrs Saint Delafield', cursive; font-size: 46px; line-height: 1; color: #111; }
+.cd-signature-name { margin-top: 12px; font-size: 15px; color: #4a4a4a; }
+.cd-signature-date { font-size: 13px; color: var(--cd-text); }
+@media (max-width: 600px) { .contract-document { padding: 28px 18px 30px; font-size: 14.5px; } .cd-title { font-size: 19px; } .cd-body h3, .cd-signatures h3 { font-size: 17px; margin-top: 34px; } .cd-summary dl { gap: 14px 32px; } }
+@media print { .contract-document { max-width: none; padding: 0; font-size: 11pt; } }
