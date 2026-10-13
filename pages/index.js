@@ -358,7 +358,7 @@ export default function Home() {
   }
 
   const views = {
-    dashboard: <Dashboard {...props} />,
+    dashboard: <Dashboard {...props} openClientCard={c => setCalendarCardModal(c)} />,
     analytics: <Analytics {...props} />,
     projects: <Projects {...props} />,
     clients: <Clients {...props} sessionTypes={data.sessionTypes} />,

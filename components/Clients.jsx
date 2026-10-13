@@ -127,7 +127,7 @@ export default function Clients({ data, setData, toast, sessionTypes }) {
         {filtered.length === 0 && <div style={{ padding: '32px 0', textAlign: 'center', color: C.faint, fontSize: 13 }}>No clients found</div>}
 
         {filtered.map((c, i) => (
-          <div key={c.id} style={{ ...T.dataRow, borderBottom: i === filtered.length - 1 ? 'none' : `1px solid ${C.border}` }}>
+          <div key={c.id} className="data-row-mobile" style={{ ...T.dataRow, borderBottom: i === filtered.length - 1 ? 'none' : `1px solid ${C.border}` }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 13 }}>
               <Avatar name={c.name} size={38} />
               <div>

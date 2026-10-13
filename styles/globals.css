@@ -433,6 +433,12 @@ textarea:focus-visible,
     flex-wrap: wrap;
     gap: 8px;
   }
+  .data-row-mobile > :last-child {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
 
   /* Buttons in page headers fill width on small screens */
   .page-header-wrap > div:last-child {

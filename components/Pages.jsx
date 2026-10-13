@@ -25,7 +25,7 @@ function ContractBody({ body }) {
 }
 
 // ── Dashboard ─────────────────────────────────────────────────────
-export function Dashboard({ data, setView }) {
+export function Dashboard({ data, setView, openClientCard }) {
   const totalRevenue = data.invoices.reduce((s, i) => s + i.paid, 0)
   const outstanding = data.invoices.reduce((s, i) => s + (i.amount - i.paid), 0)
   const active = data.clients.filter(c => !c.archived && c.status !== 'done').length
@@ -53,7 +53,7 @@ export function Dashboard({ data, setView }) {
             <button style={{ ...T.btnGhost, color: C.muted, fontSize: 12 }} onClick={() => setView('clients')}>View all</button>
           </div>
           {data.clients.filter(c => !c.archived).slice(0, 5).map((c, i, arr) => (
-            <div key={c.id} style={{ ...T.dataRow, borderBottom: i === arr.length - 1 ? 'none' : `1px solid ${C.border}` }}>
+            <div key={c.id} className="data-row-mobile" onClick={() => openClientCard?.(c)} role={openClientCard ? 'button' : undefined} tabIndex={openClientCard ? 0 : undefined} onKeyDown={e => { if (openClientCard && (e.key === 'Enter' || e.key === ' ')) openClientCard(c) }} style={{ ...T.dataRow, borderBottom: i === arr.length - 1 ? 'none' : `1px solid ${C.border}`, cursor: openClientCard ? 'pointer' : 'default' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
                 <Avatar name={c.name} size={32} />
                 <div>
@@ -71,7 +71,7 @@ export function Dashboard({ data, setView }) {
             <button style={{ ...T.btnGhost, color: C.muted, fontSize: 12 }} onClick={() => setView('calendar')}>Calendar</button>
           </div>
           {data.bookings.slice(0, 5).map((b, i, arr) => (
-            <div key={b.id} style={{ ...T.dataRow, borderBottom: i === arr.length - 1 ? 'none' : `1px solid ${C.border}` }}>
+            <div key={b.id} className="data-row-mobile" onClick={() => { const client = data.clients.find(c => c.id === b.clientId || c.name === b.client); if (client) openClientCard?.(client) }} style={{ ...T.dataRow, borderBottom: i === arr.length - 1 ? 'none' : `1px solid ${C.border}`, cursor: openClientCard ? 'pointer' : 'default' }}>
               <div>
                 <div style={{ fontWeight: 500, fontSize: 13.5 }}>{b.client}</div>
                 <div style={{ fontSize: 12, color: C.muted }}>{fmtDate(b.date)} · {fmtTime(b.time)}</div>
@@ -471,7 +471,7 @@ export function Invoices({ data, setData, toast }) {
           const pct = inv.amount > 0 ? Math.round(inv.paid / inv.amount * 100) : 0
           const owing = inv.amount - inv.paid
           return (
-            <div key={inv.number || inv.id} style={{ ...T.dataRow, alignItems: 'flex-start', paddingTop: 16, paddingBottom: 16, borderBottom: i === data.invoices.length - 1 ? 'none' : `1px solid ${C.border}` }}>
+            <div key={inv.number || inv.id} className="data-row-mobile" style={{ ...T.dataRow, alignItems: 'flex-start', paddingTop: 16, paddingBottom: 16, borderBottom: i === data.invoices.length - 1 ? 'none' : `1px solid ${C.border}` }}>
               <div style={{ flex: 1 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 5 }}>
                   <div style={{ fontWeight: 500 }}>{inv.number || inv.id}</div>
@@ -573,18 +573,18 @@ export function Contracts({ data, setData, toast }) {
       <div style={T.pageHeader} className="page-header-wrap"><div><div style={T.pageTitle}>Contracts</div><div style={T.pageSub}>{data.contracts.filter(k => k.status === 'signed').length} signed · {data.contracts.filter(k => k.status === 'pending').length} pending</div></div><button style={T.btnPrimary} onClick={() => setModal(true)}>+ New contract</button></div>
       <div style={T.card}>
         {data.contracts.map((k, i) => (
-          <div key={k.id} style={{ ...T.dataRow, borderBottom: i === data.contracts.length - 1 ? 'none' : `1px solid ${C.border}` }}>
+            <div key={k.id} className="data-row-mobile" onClick={() => setViewModal(k)} style={{ ...T.dataRow, borderBottom: i === data.contracts.length - 1 ? 'none' : `1px solid ${C.border}`, cursor: 'pointer' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 13 }}>
               <div style={{ width: 40, height: 40, borderRadius: 10, background: k.status === 'signed' ? C.greenBg : C.surface2, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, color: k.status === 'signed' ? C.green : C.muted, flexShrink: 0 }}>{k.status === 'signed' ? '✓' : '✎'}</div>
               <div><div style={{ fontWeight: 500 }}>{k.type || 'Contract'}</div><div style={{ fontSize: 12, color: C.muted }}>{k.client} · Sent {k.sent}</div></div>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <Badge type={k.status} label={k.status} />
-              <button style={T.btnSm} onClick={() => setViewModal(k)}>View</button>
-              <button style={T.btnSm} onClick={() => sendContract(k)} disabled={sending === k.id}>{sending === k.id ? 'Sending...' : 'Send'}</button>
-              {k.status === 'pending' && <button style={{ ...T.btnSm, color: C.green, borderColor: C.green }} onClick={() => { setSignModal(k); setSignName('') }}>Sign</button>}
+              <button style={T.btnSm} onClick={e => { e.stopPropagation(); setViewModal(k) }}>View</button>
+              <button style={T.btnSm} onClick={e => { e.stopPropagation(); sendContract(k) }} disabled={sending === k.id}>{sending === k.id ? 'Sending...' : 'Send'}</button>
+              {k.status === 'pending' && <button style={{ ...T.btnSm, color: C.green, borderColor: C.green }} onClick={e => { e.stopPropagation(); setSignModal(k); setSignName('') }}>Sign</button>}
               {k.status === 'signed' && k.signedBy && <div style={{ fontSize: 11, color: C.muted }}>Signed by {k.signedBy} · {k.signedAt}</div>}
-              <button style={{ ...T.btnGhost, color: C.faint }} onClick={() => del(k.id)}>×</button>
+              <button style={{ ...T.btnGhost, color: C.faint }} onClick={e => { e.stopPropagation(); del(k.id) }}>×</button>
             </div>
           </div>
         ))}
