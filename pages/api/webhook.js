@@ -1,4 +1,5 @@
 import { createServiceClient } from '../../lib/pibase'
+import { notifyStudio } from '../../lib/push'
 import { defaultStudioId, getStripe, loadStudioConfig } from '../../lib/studioConfig'
 export const config = { api: { bodyParser: false } }
 async function getRawBody(req) {
@@ -46,6 +47,7 @@ export default async function handler(req, res) {
         paid: invoice.amount, status: 'paid', payment_method: 'Stripe', paid_at: new Date().toISOString(),
       }).eq('id', invoiceId).eq('user_id', userId).eq('payment_intent_id', intent.id)
       if (error) return res.status(500).json({ error: 'Unable to update invoice' })
+      await notifyStudio(db, userId, { type: 'payments', title: `💰 Payment received`, body: `$${(intent.amount_received / 100).toLocaleString('en-US', { minimumFractionDigits: 2 })} paid online`, url: '/?view=invoices', tag: `payment-${invoiceId}` })
       break
     }
     case 'payment_intent.payment_failed': {

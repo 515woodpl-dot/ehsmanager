@@ -43,6 +43,18 @@ create table if not exists studio_settings (
   unique (user_id)
 );
 
+-- ── Push notification devices (server-only, no RLS policies) ──
+create table if not exists push_subscriptions (
+  id          uuid primary key default gen_random_uuid(),
+  user_id     uuid not null references profiles(id) on delete cascade,
+  endpoint    text not null unique,
+  keys        jsonb not null,
+  device      text,
+  created_at  timestamptz not null default now(),
+  last_used_at timestamptz
+);
+create index if not exists push_subscriptions_user on push_subscriptions(user_id);
+
 -- ── Studio secrets (encrypted API keys; server-only, no RLS policies) ──
 create table if not exists studio_secrets (
   user_id    uuid primary key references profiles(id) on delete cascade,
@@ -182,6 +194,7 @@ alter table questionnaires     enable row level security;
 alter table messages           enable row level security;
 alter table leads              enable row level security;
 alter table studio_secrets     enable row level security;  -- no policies: server only
+alter table push_subscriptions enable row level security;  -- no policies: server only
 
 -- Profiles: own row only
 create policy "profiles_own" on profiles

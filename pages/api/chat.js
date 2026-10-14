@@ -1,4 +1,5 @@
 import crypto from 'crypto'
+import { notifyStudio } from '../../lib/push'
 import { createServiceClient } from '../../lib/pibase'
 import { verifyChatToken } from '../../lib/signingTokens'
 import { loadStudioConfig, appUrl } from '../../lib/studioConfig'
@@ -63,6 +64,7 @@ export default async function handler(req, res) {
       const result = await sendStudioEmail(config, { to: config.branding.studioEmail, subject: `New chat message from ${chat.client.name}`, html, replyToStudio: false })
       if (result.error) console.error('[chat] notify failed', result.error)
     }
+    await notifyStudio(db, chat.client.user_id, { type: 'messages', title: `💬 ${chat.client.name}`, body: text, url: '/?view=inbox', tag: `messages-${chat.client.id}` })
     return res.status(200).json({ message: { id: entry.id, mine: true, text: entry.text, time: entry.time } })
   }
 

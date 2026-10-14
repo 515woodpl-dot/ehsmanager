@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { T, C } from '../lib/tokens'
 import { pibase } from '../lib/pibase'
-import { canPromptInstall, isIOS, isStandalone, promptInstall, subscribe } from '../lib/pwa'
+import { canPromptInstall, currentSubscription, deviceName, isIOS, isStandalone, promptInstall, pushSupported, subscribe, subscribePush } from '../lib/pwa'
 
 async function api(path, options = {}) {
   const { data: { session } } = await pibase.auth.getSession()
@@ -81,6 +81,100 @@ function CopyField({ label, value, toast, hint }) {
         <button type="button" style={T.btnSm} onClick={async () => { try { await navigator.clipboard.writeText(value); toast('Copied') } catch { toast('Select the text and copy it') } }}>Copy</button>
       </div>
     </Field>
+  )
+}
+
+const NOTIFY_LABELS = {
+  messages: 'Client replies and chat messages',
+  documents: 'Quotes accepted, questionnaires answered, contracts signed',
+  bookings: 'New booking requests and contact-form inquiries',
+  payments: 'Online payments received',
+}
+
+// Push notifications: turn on per device, choose what to hear about.
+function NotificationsSection({ toast, integrations, setIntegrations, saveButton }) {
+  const [info, setInfo] = useState(null) // { publicKey, devices }
+  const [error, setError] = useState('')
+  const [endpoint, setEndpoint] = useState(null)
+  const [hasWorker, setHasWorker] = useState(true)
+  const [working, setWorking] = useState('')
+  const supported = typeof window !== 'undefined' && pushSupported()
+  const iosNeedsInstall = typeof window !== 'undefined' && isIOS() && !isStandalone()
+
+  const load = async () => {
+    try { setInfo(await api('/api/push')); setError('') } catch (err) { setError(err.message) }
+    if (supported) {
+      setHasWorker(!!(await navigator.serviceWorker.getRegistration()))
+      setEndpoint((await currentSubscription())?.endpoint || null)
+    }
+  }
+  useEffect(() => { load() }, [])
+
+  const enabledHere = !!endpoint && !!info?.devices?.some(d => d.endpoint === endpoint)
+  const turnOn = async () => {
+    setWorking('on')
+    try {
+      const subscription = await subscribePush(info.publicKey)
+      await api('/api/push', { method: 'POST', body: JSON.stringify({ subscription: subscription.toJSON(), device: deviceName() }) })
+      toast('Notifications are on for this device'); await load()
+    } catch (err) { toast(err.message) }
+    setWorking('')
+  }
+  const remove = async (target, unsubscribeHere) => {
+    setWorking(target)
+    try {
+      if (unsubscribeHere) await (await currentSubscription())?.unsubscribe()
+      await api('/api/push', { method: 'DELETE', body: JSON.stringify({ endpoint: target }) })
+      toast('Notifications turned off for that device'); await load()
+    } catch (err) { toast(err.message) }
+    setWorking('')
+  }
+  const test = async () => {
+    setWorking('test')
+    try { toast((await api('/api/push', { method: 'POST', body: JSON.stringify({ action: 'test' }) })).message) } catch (err) { toast(err.message) }
+    setWorking('')
+  }
+
+  const notify = { messages: true, documents: true, bookings: true, payments: true, ...(integrations.notify || {}) }
+  return (
+    <Section title="Notifications" status={info ? (info.devices.length > 0) : undefined}
+      subtitle="Get a notification on your phone or computer the moment a client replies, books, signs, accepts or pays — even when the app is closed.">
+      {error && <div className="settings-error">{error}</div>}
+      {!supported ? (
+        <p className="settings-note">This browser can't receive notifications. Try Chrome, Edge, Firefox, or Safari on a Mac{isIOS() ? ', or install the app on your iPhone/iPad first' : ''}.</p>
+      ) : iosNeedsInstall ? (
+        <p className="settings-note">On iPhone and iPad, notifications only work in the installed app: tap <strong>Share → Add to Home Screen</strong>, open EHS Studio from your home screen, and come back here.</p>
+      ) : !hasWorker ? (
+        <p className="settings-note">Notifications work in the live (deployed) app. They can't be turned on in this preview.</p>
+      ) : info && (
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center', marginBottom: 16 }}>
+          {enabledHere
+            ? <><span className="integration-ready">On for this device</span><button style={T.btn} disabled={!!working} onClick={test}>{working === 'test' ? 'Sending…' : 'Send test notification'}</button><button style={{ ...T.btnSm, color: C.red, borderColor: C.red }} disabled={!!working} onClick={() => remove(endpoint, true)}>Turn off here</button></>
+            : <button style={T.btnPrimary} disabled={!!working} onClick={turnOn}>{working === 'on' ? 'Turning on…' : '🔔 Turn on notifications for this device'}</button>}
+        </div>
+      )}
+
+      {info?.devices?.length > 0 && (
+        <Field label={`Devices getting notifications (${info.devices.length})`}>
+          {info.devices.map(d => (
+            <div key={d.endpoint} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: `1px solid ${C.border}`, fontSize: 13.5 }}>
+              <span style={{ flex: 1, minWidth: 0 }}>{d.device || 'Device'}{d.endpoint === endpoint ? <span style={{ color: C.faint }}> · this device</span> : ''}<br /><span style={{ fontSize: 11.5, color: C.faint }}>Added {new Date(d.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}{d.last_used_at ? ` · last notified ${new Date(d.last_used_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` : ''}</span></span>
+              <button style={{ ...T.btnGhost, color: C.red }} disabled={!!working} onClick={() => remove(d.endpoint, d.endpoint === endpoint)}>Remove</button>
+            </div>
+          ))}
+        </Field>
+      )}
+
+      <Field label="Notify me about">
+        {Object.entries(NOTIFY_LABELS).map(([type, label]) => (
+          <label key={type} style={{ display: 'flex', gap: 10, alignItems: 'center', fontSize: 13.5, padding: '5px 0', cursor: 'pointer' }}>
+            <input type="checkbox" checked={notify[type] !== false} onChange={e => setIntegrations({ ...integrations, notify: { ...notify, [type]: e.target.checked } })} />
+            {label}
+          </label>
+        ))}
+      </Field>
+      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>{saveButton('notify', { integrations: { notify } })}</div>
+    </Section>
   )
 }
 
@@ -251,6 +345,8 @@ export default function Settings({ toast = () => {} }) {
           {saveButton('stripe', { keys: keysFor(['stripePublishableKey', 'stripeSecretKey', 'stripeWebhookSecret']) })}
         </div>
       </Section>
+
+      <NotificationsSection toast={toast} integrations={integrations} setIntegrations={setIntegrations} saveButton={saveButton} />
 
       <InstallSection toast={toast} />
 

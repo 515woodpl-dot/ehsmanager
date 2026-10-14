@@ -1,4 +1,5 @@
 import { createServiceClient } from '../../lib/pibase'
+import { notifyStudio } from '../../lib/push'
 import { emailWrap, sendStudioEmail } from '../../lib/email'
 import { loadStudioConfig } from '../../lib/studioConfig'
 
@@ -114,6 +115,7 @@ export default async function handler(req, res) {
         }
       } catch (e) { console.error('[public-form] email failed', e) }
 
+      await notifyStudio(db, studioId, { type: 'bookings', title: `💌 New inquiry from ${safeLead.name}`, body: safeLead.interest || safeLead.message || safeLead.email, url: '/?view=clients', tag: `lead-${safeLead.email}` })
       return res.status(200).json({ ok: true })
     }
 

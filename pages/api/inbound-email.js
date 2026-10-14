@@ -1,4 +1,5 @@
 import { Resend } from 'resend'
+import { notifyStudio } from '../../lib/push'
 import { createServiceClient } from '../../lib/pibase'
 import { clientIdFromReplyAddress, defaultStudioId, getResend, loadStudioConfig } from '../../lib/studioConfig'
 import { appendToConversation, messageTime, stripQuotedReply } from '../../lib/conversations'
@@ -67,8 +68,9 @@ export default async function handler(req, res) {
   }
   if (!text) text = data.subject ? `(Email: ${data.subject})` : '(Empty email)'
 
+  let saved
   try {
-    await appendToConversation(db, {
+    saved = await appendToConversation(db, {
       userId: studioId, client, unread: true,
       entry: { id: `email-${data.email_id || Date.now()}`, from: client.name, text: text.slice(0, 10000), time: messageTime(new Date(event.created_at || Date.now()), config.timezone), at: new Date().toISOString(), out: false, via: 'email' },
     })
@@ -76,5 +78,6 @@ export default async function handler(req, res) {
     console.error('[inbound-email]', error)
     return res.status(500).json({ error: 'Could not save the reply' })
   }
+  if (!saved?.duplicate) await notifyStudio(db, studioId, { type: 'messages', title: `✉️ ${client.name}`, body: text, url: '/?view=inbox', tag: `messages-${client.id}` })
   return res.status(200).json({ received: true })
 }

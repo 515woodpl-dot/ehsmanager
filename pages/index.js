@@ -352,6 +352,20 @@ export default function Home() {
     return () => { clearInterval(timer); window.removeEventListener('focus', refresh); document.removeEventListener('visibilitychange', refresh) }
   }, [dbReady, user?.id])
 
+  // Notifications tapped while the app is open switch to their page.
+  useEffect(() => {
+    const go = event => setActiveView(event.detail)
+    window.addEventListener('ehs:navigate', go)
+    return () => window.removeEventListener('ehs:navigate', go)
+  }, [])
+
+  // Unread conversations as a badge on the installed app's icon.
+  const unreadCount = dbReady ? data.messages.filter(m => m.unread).length : 0
+  useEffect(() => {
+    if (typeof navigator === 'undefined' || !('setAppBadge' in navigator)) return
+    ;(unreadCount ? navigator.setAppBadge(unreadCount) : navigator.clearAppBadge()).catch(() => {})
+  }, [unreadCount])
+
   // Older invoices were stored with only a UUID (or "INV-001"). Give each a
   // "#1xxx" number once after loading; the sync engine above persists it.
   useEffect(() => {

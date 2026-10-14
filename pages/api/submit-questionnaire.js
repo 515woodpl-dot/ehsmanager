@@ -1,4 +1,5 @@
 import { createServiceClient } from '../../lib/pibase'
+import { notifyStudio } from '../../lib/push'
 import { verifyQuestionnaireToken } from '../../lib/signingTokens'
 
 // Public endpoint: the client submits answers from the emailed link.
@@ -9,7 +10,7 @@ export default async function handler(req, res) {
   const db = createServiceClient()
   if (!db) return res.status(503).json({ error: 'Service is not configured' })
 
-  const { data: row } = await db.from('questionnaires').select('id, questions, status').eq('id', parsed.questionnaireId).single()
+  const { data: row } = await db.from('questionnaires').select('id, questions, status, user_id, client_name').eq('id', parsed.questionnaireId).single()
   if (!row) return res.status(404).json({ error: 'Questionnaire not found' })
   if (row.status === 'completed') return res.status(409).json({ error: 'This questionnaire has already been submitted' })
 
@@ -27,5 +28,6 @@ export default async function handler(req, res) {
     .update({ answers: { ...answers, submittedAt: new Date().toISOString() }, status: 'completed' })
     .eq('id', row.id).neq('status', 'completed')
   if (error) return res.status(500).json({ error: 'Your answers could not be saved. Please try again.' })
+  await notifyStudio(db, row.user_id, { type: 'documents', title: `📝 ${row.client_name || 'A client'} answered the questionnaire`, body: row.questions?.title || 'Questionnaire', url: '/?view=projects', tag: `questionnaire-${row.id}` })
   return res.status(200).json({ ok: true })
 }

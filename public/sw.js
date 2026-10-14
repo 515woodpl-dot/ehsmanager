@@ -11,7 +11,7 @@
  *
  * Bump VERSION to drop old caches.
  */
-const VERSION = 'ehs-v2'
+const VERSION = 'ehs-v3'
 const SHELL = `${VERSION}-shell`
 const ASSETS = `${VERSION}-assets`
 const PRECACHE = ['/offline.html', '/icons/icon-192.png', '/icons/icon-512.png']
@@ -84,3 +84,34 @@ async function cacheFirst(request) {
   }
   return response
 }
+
+// ── Push notifications ───────────────────────────────────────────
+// The server sends { title, body, url, tag, icon }. Tapping opens (or
+// focuses) the app on that page.
+self.addEventListener('push', event => {
+  let data = {}
+  try { data = event.data ? event.data.json() : {} } catch { data = { body: event.data?.text() } }
+  event.waitUntil(self.registration.showNotification(data.title || 'EHS Studio', {
+    body: data.body || '',
+    icon: data.icon || '/icons/icon-192.png',
+    badge: '/icons/badge-96.png',
+    tag: data.tag,
+    renotify: !!data.tag,
+    data: { url: data.url || '/' },
+  }))
+})
+
+self.addEventListener('notificationclick', event => {
+  event.notification.close()
+  const target = new URL(event.notification.data?.url || '/', self.location.origin).href
+  event.waitUntil((async () => {
+    const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true })
+    const app = windows.find(client => new URL(client.url).origin === self.location.origin)
+    if (app) {
+      await app.focus()
+      app.postMessage({ type: 'OPEN_URL', url: target })
+      return
+    }
+    await self.clients.openWindow(target)
+  })())
+})

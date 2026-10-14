@@ -785,3 +785,4 @@ body { padding-left: env(safe-area-inset-left); padding-right: env(safe-area-ins
   html, body { overscroll-behavior-y: none; }
   button, .chip-tabs, .inbox-row { -webkit-user-select: none; user-select: none; }
 }
+.settings-note { font-size: 13.5px; color: var(--muted); line-height: 1.6; margin: 0 0 16px; padding: 12px 14px; background: var(--surface2); border-radius: 10px; }

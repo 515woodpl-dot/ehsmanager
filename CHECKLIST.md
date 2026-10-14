@@ -5,6 +5,70 @@ every round of changes, and keep the "Open / follow-ups" list current.
 
 ---
 
+## 2026-10-14 (round 8) — Push notifications
+
+### ⚠️ Before using
+- [ ] Apply **`pibase-migration-004-push.sql`** in PIBASE (adds the
+      server-only `push_subscriptions` table).
+- [ ] `SETTINGS_ENCRYPTION_KEY` must be set (same as round 3). The push keys
+      are created automatically and stored encrypted; nothing else to set up.
+
+### What you get notified about
+- [x] **Messages:** a client replies by email, or sends a chat message.
+- [x] **Documents:** a client accepts a quote (and the invoice is created),
+      answers a questionnaire, or signs a contract.
+- [x] **Bookings:** a new online booking request, or a new contact-form
+      inquiry.
+- [x] **Payments:** an online (Stripe) payment comes in.
+- [x] Each notification opens the right page when tapped (Inbox, Invoices,
+      Contracts, Sessions, Clients). If the app is already open, it switches
+      to that page without reloading.
+- [x] Repeat notifications about the same conversation or document replace
+      each other instead of piling up.
+
+### Settings → Notifications
+- [x] **🔔 Turn on notifications for this device**: asks permission once and
+      registers the phone or computer. Each device is listed by name (e.g.
+      "iPhone · Safari (app)") with Remove.
+- [x] **Send test notification** and **Turn off here**.
+- [x] **Notify me about** checkboxes for the four types above, saved with
+      your settings.
+- [x] Clear guidance when a device can't do it. iPhone/iPad must use the
+      installed app (Share → Add to Home Screen, iOS 16.4+). The preview
+      without a service worker and browsers without push support also
+      explain why.
+
+### Also
+- [x] **Unread badge** on the installed app icon showing how many
+      conversations are unread (where the device supports it).
+- [x] Small white "EH" badge icon for the Android status bar.
+- [x] Devices that uninstall or block notifications are removed
+      automatically the next time a send fails.
+- [x] Retried email webhooks never notify twice.
+- [x] Notifications are sent after the action succeeds and never block or
+      break it.
+- [x] Code: `lib/push.js` (`notifyStudio`), `pages/api/push.js` (devices,
+      test), `public/sw.js` (push + tap handling, cache `ehs-v3`),
+      `lib/pwa.js` (subscribe helpers). Dependency: `web-push`.
+      `.env.local.example` and SESSION-NOTES updated.
+
+### Verified
+- [x] `next build` passes.
+- [x] **Server send** (production build, fake HTTPS push service): the
+      request is VAPID-signed and `aes128gcm`-encrypted with TTL 24h and high
+      urgency; the live device got it; a device answering "410 Gone" was
+      deleted; a type switched off in Settings was skipped.
+- [x] **Showing notifications** (full Chromium, production build): a push
+      delivered to the service worker shows a notification with the right
+      title, text, tag, icon and link.
+- [x] **Settings:** the "Turn on" button shows, the "Notify me about"
+      choices save, and errors show as readable messages.
+- [ ] Subscribing a real device could not be tested here: the test browser
+      can't reach Google's push service. After deploying, turn it on from
+      your phone and press **Send test notification**.
+
+---
+
 ## 2026-10-14 (round 7) — App icon made from your logo
 
 - [x] The installed app's icon now comes from the **logo uploaded in Settings
@@ -494,8 +558,6 @@ every round of changes, and keep the "Open / follow-ups" list current.
 ---
 
 ## Open / follow-ups
-- [ ] Push notifications for new client messages (needs VAPID keys and a
-      place to store subscriptions). The installed app is ready for it.
 - [ ] The public invoice page doesn't take card payments yet. Stripe keys
       can now be saved in Settings, but there's no client-facing "Pay now"
       button.

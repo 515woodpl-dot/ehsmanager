@@ -1,5 +1,5 @@
 import { requireUser } from '../../lib/api-auth'
-import { SECRET_FIELDS, DEFAULT_INTEGRATIONS, canStoreSecrets, saveStudioSecrets, loadStudioConfig, appUrl } from '../../lib/studioConfig'
+import { SECRET_FIELDS, DEFAULT_INTEGRATIONS, NOTIFY_TYPES, canStoreSecrets, saveStudioSecrets, loadStudioConfig, appUrl } from '../../lib/studioConfig'
 
 const BRANDING_FIELDS = ['businessName', 'ownerName', 'studioEmail', 'phone', 'website', 'address', 'signature', 'logo', 'iconBackground']
 const EMAIL_RE = /^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/
@@ -9,7 +9,7 @@ const MAX_LOGO = 400 * 1024
 // only whether each is set, where from, and its last 4 characters.
 function describe(config) {
   const keys = {}
-  for (const field of Object.keys(SECRET_FIELDS)) {
+  for (const field of Object.keys(SECRET_FIELDS).filter(f => !SECRET_FIELDS[f].generated)) {
     const value = config.secrets[field]
     keys[field] = { set: !!value, source: config.sources[field], last4: value ? value.slice(-4) : '' }
   }
@@ -72,6 +72,10 @@ export default async function handler(req, res) {
       next.inboundDomain = domain
     }
     if (typeof integrations.copyRepliesToStudio === 'boolean') next.copyRepliesToStudio = integrations.copyRepliesToStudio
+    if (integrations.notify && typeof integrations.notify === 'object') {
+      next.notify = { ...DEFAULT_INTEGRATIONS.notify, ...(next.notify || {}) }
+      for (const type of Object.keys(NOTIFY_TYPES)) if (typeof integrations.notify[type] === 'boolean') next.notify[type] = integrations.notify[type]
+    }
     const { error } = await auth.db.from('studio_settings').update({ integrations: next, updated_at: new Date().toISOString() }).eq('user_id', auth.user.id)
     if (error) return res.status(500).json({ error: `Unable to save email settings: ${error.message}` })
   }
@@ -80,7 +84,7 @@ export default async function handler(req, res) {
     const changes = {}
     for (const [field, value] of Object.entries(keys)) {
       const spec = SECRET_FIELDS[field]
-      if (!spec) continue
+      if (!spec || spec.generated) continue
       if (value === null) { changes[field] = null; continue }
       if (typeof value !== 'string' || !value.trim()) continue
       const clean = value.trim()

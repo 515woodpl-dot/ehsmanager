@@ -53,6 +53,14 @@ export function PwaManager() {
         // Check for a new version whenever the app comes back to the foreground.
         document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') registration.update().catch(() => {}) })
       }).catch(error => console.error('[pwa] service worker', error))
+      // A tapped notification asks the open app to show a page.
+      navigator.serviceWorker.addEventListener('message', event => {
+        if (event.data?.type !== 'OPEN_URL') return
+        const target = new URL(event.data.url, window.location.origin)
+        const view = target.searchParams.get('view')
+        if (target.pathname === window.location.pathname && view) window.dispatchEvent(new CustomEvent('ehs:navigate', { detail: view }))
+        else window.location.assign(target.href)
+      })
       let reloading = false
       navigator.serviceWorker.addEventListener('controllerchange', () => { if (!reloading) { reloading = true; window.location.reload() } })
     }

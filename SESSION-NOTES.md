@@ -45,3 +45,11 @@ contact form at `/contact`, and client signing pages at `/sign/[token]`.
 Integration secrets must be configured as server environment variables. The
 Settings page reports whether each integration is ready without returning any
 secret value to the browser.
+
+Push notifications: `lib/push.js` → `notifyStudio(db, userId, { type, title,
+body, url, tag })` sends to every device in `push_subscriptions` (migration
+004). Types are `messages`, `documents`, `bookings`, `payments`, and each can be
+switched off in Settings. VAPID keys are generated on first use and stored
+encrypted in `studio_secrets`. The service worker (`public/sw.js`) shows the
+notification and opens `url` when tapped. Call `notifyStudio` after the action
+succeeds; it never throws.
