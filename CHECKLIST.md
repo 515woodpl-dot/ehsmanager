@@ -5,6 +5,74 @@ every round of changes, and keep the "Open / follow-ups" list current.
 
 ---
 
+## 2026-10-14 (round 6) — Discounts on phones, installable app (PWA)
+
+### Discounts and Session Types on phones
+- [x] **Discounts** weren't phone-friendly: each coupon was a desktop table
+      row squeezed into loose columns. On phones each one is now a card:
+      name and value, Active/Inactive badge, the code in a chip, "Used 0 / 30",
+      and Edit / Delete. The Coupons / Gift Cards tabs and the filter sit on
+      one line. Buttons now read "+ New coupon" and "+ New gift card".
+- [x] **Session Types:** tighter cards on phones (no tall empty space).
+      "Availability settings" wording made consistent.
+
+### Installable app (PWA)
+- [x] **Manifest** (`public/manifest.webmanifest`): name, short name, colours,
+      standalone display, and home-screen shortcuts to Inbox, Clients,
+      Invoices and Calendar (long-press the icon).
+- [x] **Icons** (`public/icons/`): 192 and 512 app icons, a 512 maskable
+      icon for Android, a 180 Apple touch icon and a favicon (black "EH"
+      monogram with a blush underline).
+- [x] **Service worker** (`public/sw.js`):
+      - App pages (`/`, `/login`) load from the network first and fall back to
+        the last saved copy, or a friendly **offline page**
+        (`public/offline.html`).
+      - Build files, icons and fonts are cached, so the app opens fast.
+      - **Client links (invoice, quote, chat, sign, questionnaire, booking,
+        contact) and all API calls are never cached**, so private client
+        data never stays on the device.
+      - Old caches are cleared automatically when the version changes.
+- [x] **Install offer:** on Android and desktop Chrome or Edge, an "Install EHS
+      Studio" bar appears with Install / Not now (hidden for 30 days after
+      "Not now"). On iPhone and iPad, a hint says "Tap Share → Add to Home
+      Screen".
+- [x] **Settings → App** shows whether you're using the installed app, with
+      an Install button or instructions.
+- [x] **Updates:** when a new version is deployed, a bar says "A new version
+      of EHS Studio is ready" with a Reload button.
+- [x] **Offline notice:** a bar appears when the connection drops ("Changes
+      will save when you reconnect"). The existing save retry handles the
+      rest. Opening the app offline says you're offline instead of a
+      generic error.
+- [x] **Phones with notches:** the top bar, the conversation view, modals and
+      bottom bars respect the notch and home-indicator areas. In the
+      installed app, the page no longer bounces when pulled down.
+- [x] Only the manager (`/` and `/login`) offers the install. Client-facing
+      pages don't show the manifest, so clients aren't asked to install
+      your studio app.
+- [x] Server headers: `sw.js` is never cached, so updates reach users, and
+      the manifest is served with the correct type. (`next.config.js`)
+- [x] The service worker runs only in production builds, so it never gets
+      in the way during development.
+
+### Verified
+- [x] `next build` passes.
+- [x] Production server + Chrome's own checks (`Page.getAppManifest`,
+      `Page.getInstallabilityErrors`): **no manifest errors, no
+      installability errors**.
+- [x] Service worker registered for `/`. App shell, icons and build files
+      cached.
+- [x] Offline: `/?view=inbox` and `/login` load from the cache and the
+      offline bar shows. Pages never visited aren't served, as intended.
+- [x] Client page `/contact` has no manifest link.
+- [x] Discounts and Session Types at 390px: nothing wider than the screen;
+      checked by screenshot.
+- [ ] Not tried on a physical iPhone or Android phone. After deploying,
+      install it from Safari or Chrome and check the icon, shortcuts and
+      notch spacing.
+
+---
+
 ## 2026-10-14 (round 5) — Mobile-friendly pages, one colour theme, new Inbox
 
 ### One theme everywhere
@@ -383,6 +451,8 @@ every round of changes, and keep the "Open / follow-ups" list current.
 ---
 
 ## Open / follow-ups
+- [ ] Push notifications for new client messages (needs VAPID keys and a
+      place to store subscriptions). The installed app is ready for it.
 - [ ] The public invoice page doesn't take card payments yet. Stripe keys
       can now be saved in Settings, but there's no client-facing "Pay now"
       button.

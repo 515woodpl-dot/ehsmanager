@@ -2,11 +2,15 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/router'
 import '../styles/globals.css'
 import { pibase } from '../lib/pibase'
+import { AppHead, PwaManager } from '../components/AppShell'
 
 const PUBLIC_ROUTES = ['/login', '/contact', '/booking', '/sign', '/invoice', '/quote', '/questionnaire', '/chat']
 
 export default function App({ Component, pageProps }) {
   const router = useRouter()
+  // The manager itself is the installable app; client-facing pages
+  // (booking, contact, invoice/quote/chat links…) are not.
+  const appPage = router.pathname === '/' || router.pathname === '/login'
   const publicRoute = PUBLIC_ROUTES.some(route => router.pathname.startsWith(route))
   const [ready, setReady] = useState(!pibase || publicRoute) // public pages never wait on an auth request
   const [authError, setAuthError] = useState('')
@@ -45,7 +49,7 @@ export default function App({ Component, pageProps }) {
     return () => subscription.unsubscribe()
   }, [router.pathname])
 
-  if (!ready) return <main style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', padding: 24, fontFamily: 'sans-serif', color: '#222' }}>Loading EHS Studio Manager…</main>
+  if (!ready) return <>{appPage && <AppHead />}<main style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', padding: 24, fontFamily: 'sans-serif', color: '#222' }}>Loading EHS Studio Manager…</main></>
 
   if (authError && !isPublicRoute()) {
     return (
@@ -58,5 +62,9 @@ export default function App({ Component, pageProps }) {
     )
   }
 
-  return <Component {...pageProps} />
+  return <>
+    {appPage && <AppHead />}
+    <Component {...pageProps} />
+    {appPage && <PwaManager />}
+  </>
 }

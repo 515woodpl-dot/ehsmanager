@@ -79,3 +79,23 @@
 .sessionDetail span{font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:#999}
 @media(max-width:1050px){.sessionGrid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:700px){.sessionGrid{grid-template-columns:1fr;gap:10px}.sessionCard{min-height:0;padding:16px;flex-direction:row;align-items:center;gap:12px}.sessionCard strong{margin:8px 0 2px;font-size:15.5px}.sessionCard>button{display:none}.sessionCard>div{flex:1}.sessionWhen{font-weight:600;color:#111110 !important}.heading{margin-bottom:18px}.search{max-width:none}}
+
+.dCode{font-family:ui-monospace,Menlo,monospace;font-size:12.5px;letter-spacing:.04em}
+.dUses em{display:none;font-style:normal;color:#7F7E7C}
+.tabLine{gap:12px;flex-wrap:wrap;align-items:center}
+.tabLine .tabs{margin-bottom:0}
+@media(max-width:700px){
+  .list{border-top:0;display:grid;gap:10px;margin-top:16px}
+  .discountRow{grid-template-columns:1fr auto;grid-template-areas:"name active" "code uses" "actions actions";gap:10px 12px;padding:14px 16px;border:1px solid #EAEAEA;border-radius:12px;background:#fff}
+  .dName{grid-area:name;min-width:0}
+  .dActive{grid-area:active;justify-self:end}
+  .dCode{grid-area:code;justify-self:start;background:#F1F1EF;border-radius:6px;padding:4px 8px}
+  .dUses{grid-area:uses;justify-self:end;align-self:center;font-size:13px}
+  .dUses em{display:inline}
+  .dActions{grid-area:actions;justify-content:flex-end !important;border-top:1px solid #EAEAEA;padding-top:6px}
+  .typeCard{min-height:0;padding:16px;gap:12px}
+  .meta{margin-top:6px;font-size:13px}
+  .cardActions{margin-top:12px;gap:4px}
+  .typeGrid{gap:10px}
+  .tabLine{margin-bottom:4px}
+}

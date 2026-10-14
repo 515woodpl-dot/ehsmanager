@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { T, C } from '../lib/tokens'
 import { pibase } from '../lib/pibase'
+import { canPromptInstall, isIOS, isStandalone, promptInstall, subscribe } from '../lib/pwa'
 
 async function api(path, options = {}) {
   const { data: { session } } = await pibase.auth.getSession()
@@ -80,6 +81,27 @@ function CopyField({ label, value, toast, hint }) {
         <button type="button" style={T.btnSm} onClick={async () => { try { await navigator.clipboard.writeText(value); toast('Copied') } catch { toast('Select the text and copy it') } }}>Copy</button>
       </div>
     </Field>
+  )
+}
+
+// Install status and button for the home-screen app.
+function InstallSection({ toast }) {
+  const [, rerender] = useState(0)
+  const [installed, setInstalled] = useState(false)
+  useEffect(() => { setInstalled(isStandalone()); return subscribe(() => rerender(n => n + 1)) }, [])
+  const ios = typeof navigator !== 'undefined' && isIOS()
+  return (
+    <Section title="App" subtitle="Install EHS Studio on your phone, tablet or computer to open it from your home screen, full-screen, like a regular app." status={installed ? true : undefined}>
+      {installed ? (
+        <p style={{ fontSize: 13.5, color: C.muted, margin: 0 }}>You're using the installed app. 🎉</p>
+      ) : canPromptInstall() ? (
+        <button style={T.btnPrimary} onClick={async () => { if (await promptInstall() === 'accepted') toast('Installing EHS Studio…') }}>Install app</button>
+      ) : ios ? (
+        <p style={{ fontSize: 13.5, color: C.muted, margin: 0 }}>In Safari, tap <strong>Share</strong> and choose <strong>Add to Home Screen</strong>.</p>
+      ) : (
+        <p style={{ fontSize: 13.5, color: C.muted, margin: 0 }}>Open your browser menu and choose <strong>Install app</strong> or <strong>Add to Home screen</strong>. (Chrome, Edge and Safari support this.)</p>
+      )}
+    </Section>
   )
 }
 
@@ -215,6 +237,8 @@ export default function Settings({ toast = () => {} }) {
           {saveButton('stripe', { keys: keysFor(['stripePublishableKey', 'stripeSecretKey', 'stripeWebhookSecret']) })}
         </div>
       </Section>
+
+      <InstallSection toast={toast} />
 
       <p style={{ fontSize: 12, color: C.faint, marginTop: 4 }}>Keys are encrypted on the server and never shown again after saving — only their last 4 characters.</p>
     </div>

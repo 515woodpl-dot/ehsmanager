@@ -760,3 +760,28 @@ textarea:focus-visible,
 .client-card-grid > * { min-width: 0; }
 @media (max-width: 600px) { .client-card-grid { grid-template-columns: minmax(0, 1fr) !important; } }
 @media (max-width: 768px) { .contact-stat-grid > div:not(:first-child) { display: none; } }
+
+/* ── Installable app (PWA) ── */
+.pwa-bar { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(16px + env(safe-area-inset-bottom)); z-index: 250; width: min(520px, calc(100vw - 24px)); display: flex; align-items: center; gap: 12px; padding: 12px 14px; background: #fff; border: 1px solid var(--border); border-radius: 14px; box-shadow: 0 16px 40px rgba(0,0,0,.14); font-size: 13px; line-height: 1.4; }
+.pwa-bar img { width: 40px; height: 40px; border-radius: 10px; flex: none; }
+.pwa-bar > span { flex: 1; min-width: 0; color: var(--muted); }
+.pwa-bar strong { color: var(--text); }
+.pwa-bar button { flex: none; border: 1px solid var(--border2); background: #fff; color: var(--text); border-radius: 8px; padding: 8px 12px; font: inherit; font-weight: 500; cursor: pointer; }
+.pwa-bar .pwa-primary { background: var(--text); border-color: var(--text); color: #fff; }
+.pwa-offline { position: fixed; top: env(safe-area-inset-top); left: 0; right: 0; z-index: 260; background: #111110; color: #fff; text-align: center; font-size: 12.5px; padding: 7px 12px; }
+
+/* Notches and home indicators when installed */
+body { padding-left: env(safe-area-inset-left); padding-right: env(safe-area-inset-right); }
+@media (max-width: 768px) {
+  .topbar-wrap { padding-top: calc(12px + env(safe-area-inset-top)) !important; }
+  .layout-main { padding-top: calc(72px + env(safe-area-inset-top)) !important; padding-bottom: calc(24px + env(safe-area-inset-bottom)) !important; }
+  .sidebar-nav { padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); }
+  .modal-inner { padding-bottom: calc(24px + env(safe-area-inset-bottom)) !important; }
+  .inbox-thread-open .inbox-thread-head { padding-top: calc(12px + env(safe-area-inset-top)); }
+  .inbox-thread-open .inbox-compose { padding-bottom: calc(12px + env(safe-area-inset-bottom)); }
+}
+/* Installed app: no pull-to-refresh bounce or text-selection on taps */
+@media (display-mode: standalone) {
+  html, body { overscroll-behavior-y: none; }
+  button, .chip-tabs, .inbox-row { -webkit-user-select: none; user-select: none; }
+}

@@ -378,7 +378,7 @@ export default function Home() {
   if (!dbReady) {
     return <main style={{ maxWidth: 520, margin: '12vh auto', padding: 24, fontFamily: 'sans-serif' }}>
       <h1>EHS Studio Manager</h1>
-      <p>{loadError || (authChecked ? 'Sign in to access your studio data.' : 'Loading studio data...')}</p>
+      <p>{typeof navigator !== 'undefined' && !navigator.onLine ? 'You\'re offline. Connect to the internet to load your studio.' : loadError || (authChecked ? 'Sign in to access your studio data.' : 'Loading studio data...')}</p>
       {authChecked && <a href="/login">Go to sign in</a>}
     </main>
   }
@@ -411,8 +411,6 @@ export default function Home() {
     <>
       <Head>
         <title>EHS Studio Manager</title>
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>📷</text></svg>" />
       </Head>
 
       <div style={{ display: 'flex', minHeight: '100vh', background: C.bg }}>
