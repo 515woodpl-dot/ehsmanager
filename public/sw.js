@@ -2,18 +2,19 @@
  *
  * - App pages ("/", "/login"): network first, last good copy or the
  *   offline page when there's no connection.
- * - Build assets (/_next/static, /icons, fonts): cache first — their
- *   file names change on every deploy, so cached copies never go stale.
+ * - Build assets (/_next/static, /icons, fonts) and logo app icons
+ *   (/api/app-icon/…?v=…): cache first — their URLs change whenever their
+ *   content does, so cached copies never go stale.
  * - Everything else (API, client links like /invoice, /chat, /sign,
  *   /quote, /questionnaire, /booking, /contact): straight to the network,
  *   never cached, so private client data is never stored on the device.
  *
  * Bump VERSION to drop old caches.
  */
-const VERSION = 'ehs-v1'
+const VERSION = 'ehs-v2'
 const SHELL = `${VERSION}-shell`
 const ASSETS = `${VERSION}-assets`
-const PRECACHE = ['/offline.html', '/icons/icon-192.png', '/icons/icon-512.png', '/manifest.webmanifest']
+const PRECACHE = ['/offline.html', '/icons/icon-192.png', '/icons/icon-512.png']
 const APP_PAGES = new Set(['/', '/login'])
 const MAX_ASSETS = 200
 
@@ -66,7 +67,8 @@ self.addEventListener('fetch', event => {
     return
   }
 
-  if (url.pathname.startsWith('/_next/static/') || url.pathname.startsWith('/icons/')) {
+  // App icons made from the logo carry a version in their URL.
+  if (url.pathname.startsWith('/_next/static/') || url.pathname.startsWith('/icons/') || (url.pathname.startsWith('/api/app-icon/') && url.searchParams.has('v'))) {
     event.respondWith(cacheFirst(request))
   }
 })

@@ -5,6 +5,49 @@ every round of changes, and keep the "Open / follow-ups" list current.
 
 ---
 
+## 2026-10-14 (round 7) — App icon made from your logo
+
+- [x] The installed app's icon now comes from the **logo uploaded in Settings
+      → Business profile**. The server builds every size (192, 512, Android
+      maskable 512, Apple 180, favicon 32): it trims empty margins from the
+      logo, fits it and centres it on a background colour.
+      (`lib/appIcon.js`, `/api/app-icon/<name>`)
+- [x] **Settings → App icon:** live preview at two sizes plus a
+      **Background** colour picker (default white), saved with the business
+      profile.
+- [x] The manifest is now generated (`/api/manifest`): the app name and short
+      name come from your business name, and icon links include a version
+      that changes with the logo or colour, so updates aren't stuck in caches.
+      The static `public/manifest.webmanifest` was removed.
+- [x] With no logo uploaded, the built-in black "EH" icons are still used.
+- [x] The install banner, favicon and Apple home-screen icon all use the
+      logo icon.
+- [x] Service worker caches versioned logo icons (cache version `ehs-v2`).
+- [x] `sharp` (image processing) is now a direct dependency. It was already
+      installed with Next.js.
+- [x] Uses `STUDIO_OWNER_USER_ID` to know whose logo to show, since the
+      install happens before sign-in. This is already required for the
+      contact form and booking.
+
+### Verified
+- [x] `next build` passes.
+- [x] Rendered all five sizes from a sample wide, transparent logo on a
+      blush background: trimmed and centred, with the maskable version
+      inside the safe zone. Without a logo, the "EH" icon is returned.
+- [x] Production server + Chrome checks with the new `/api/manifest`: no
+      manifest errors and no installability errors. Page head uses the logo
+      favicon and Apple icon.
+
+### Good to know
+- [ ] **iPhone/iPad** keep the icon from when the app was installed. After
+      changing the logo, remove the app and add it to the Home Screen again.
+      Android and desktop Chrome update the icon on their own, usually
+      within a day.
+- [ ] Wide logos (text logos) come out small on a square icon. A square mark
+      or monogram version of the logo looks best.
+
+---
+
 ## 2026-10-14 (round 6) — Discounts on phones, installable app (PWA)
 
 ### Discounts and Session Types on phones

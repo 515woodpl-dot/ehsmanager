@@ -177,6 +177,20 @@ export default function Settings({ toast = () => {} }) {
             <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp" style={{ display: 'none' }} onChange={uploadLogo} />
           </div>
         </Field>
+        <Field label="App icon" hint="Your phone's home-screen icon is made from your logo on this background. Phones that already installed the app may need it reinstalled to pick up a new icon (iPhone always does).">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+            {[{ size: 64, radius: 14 }, { size: 40, radius: 10 }].map(({ size, radius }) => (
+              <div key={size} aria-hidden="true" style={{ width: size, height: size, borderRadius: radius, background: branding.logo ? (branding.iconBackground || '#ffffff') : '#111110', border: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', flex: 'none' }}>
+                {branding.logo ? <img src={branding.logo} alt="" style={{ maxWidth: '74%', maxHeight: '74%' }} /> : <span style={{ color: '#fff', fontFamily: 'Georgia, serif', fontSize: size * 0.38 }}>EH</span>}
+              </div>
+            ))}
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: C.muted }}>
+              Background
+              <input type="color" value={branding.iconBackground || '#ffffff'} onChange={e => setBranding({ ...branding, iconBackground: e.target.value })} style={{ width: 40, height: 32, border: `1px solid ${C.border2}`, borderRadius: 6, padding: 2, background: '#fff' }} />
+            </label>
+            {!branding.logo && <span style={{ fontSize: 12, color: C.faint }}>Upload a logo above to use it as the icon.</span>}
+          </div>
+        </Field>
         <div style={T.formRow} className="form-row-2">
           <Field label="Business name">{b('businessName')}</Field>
           <Field label="Your name">{b('ownerName')}</Field>

@@ -16,9 +16,9 @@ export function AppHead() {
       <meta name="apple-mobile-web-app-capable" content="yes" />
       <meta name="apple-mobile-web-app-title" content="EHS Studio" />
       <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-      <link rel="manifest" href="/manifest.webmanifest" />
-      <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png" />
-      <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+      <link rel="manifest" href="/api/manifest" />
+      <link rel="icon" type="image/png" sizes="32x32" href="/api/app-icon/favicon-32.png" />
+      <link rel="apple-touch-icon" href="/api/app-icon/apple-touch-icon.png" />
     </Head>
   )
 }
@@ -72,7 +72,7 @@ export function PwaManager() {
       )}
       {!waiting && installable && (
         <div className="pwa-bar" role="dialog" aria-label="Install app">
-          <img src="/icons/icon-192.png" alt="" />
+          <img src="/api/app-icon/icon-192.png" alt="" />
           <span><strong>Install EHS Studio</strong><br />Open it from your home screen like an app.</span>
           <button onClick={dismiss}>Not now</button>
           <button className="pwa-primary" onClick={async () => { const outcome = await promptInstall(); if (outcome !== 'accepted') dismiss() }}>Install</button>
@@ -80,7 +80,7 @@ export function PwaManager() {
       )}
       {!waiting && !installable && iosHint && (
         <div className="pwa-bar" role="dialog" aria-label="Install app">
-          <img src="/icons/icon-192.png" alt="" />
+          <img src="/api/app-icon/icon-192.png" alt="" />
           <span><strong>Install EHS Studio</strong><br />Tap <b>Share</b> <span aria-hidden="true">⎋</span> then <b>Add to Home Screen</b>.</span>
           <button onClick={dismiss}>Got it</button>
         </div>
