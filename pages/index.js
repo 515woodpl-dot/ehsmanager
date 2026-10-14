@@ -402,7 +402,7 @@ export default function Home() {
     discounts: <Discounts {...props} />,
     invoices: <Invoices {...props} />,
     contracts: <Contracts {...props} />,
-    inbox: <Inbox {...props} />,
+    inbox: <Inbox {...props} openClientCard={c => setCalendarCardModal(c)} />,
     contactform: <ContactFormSettings {...props} />,
     settings: <Settings {...props} />,
   }

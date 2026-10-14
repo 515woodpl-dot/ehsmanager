@@ -5,6 +5,93 @@ every round of changes, and keep the "Open / follow-ups" list current.
 
 ---
 
+## 2026-10-14 (round 5) — Mobile-friendly pages, one colour theme, new Inbox
+
+### One theme everywhere
+- [x] Sessions, Session Types and Discounts used their own teal theme
+      (`#19b99f` buttons, Arial, square corners). They now match the rest of
+      the app: black primary buttons, white outline buttons, DM Sans,
+      rounded cards and inputs, and black pill tabs.
+      (`styles/BookingAdmin.module.css`)
+- [x] Button labels are consistent ("+ New session", "+ New session type").
+
+### Page headers (all pages, phones)
+- [x] The title stays on the left with the main action on the right, and
+      both drop to a second line only when they don't fit, instead of
+      always stacking.
+
+### Projects
+- [x] "⚙ Stages" and "+ New project" moved into the page header.
+- [x] On phones, filters are compact: Board/List/Archive, then search, then
+      type and sort side by side.
+- [x] **On phones, the board shows one stage at a time** with stage tabs and
+      counts, instead of a sideways-scrolling board with half-hidden
+      columns. Each card has a **stage picker** to move it (touch screens
+      can't drag). Desktop keeps the drag-and-drop board.
+
+### Clients
+- [x] Cards are compact, with no big empty gap: name, email and phone (tap
+      to email or call), stage badge, then session type and date with edit
+      and delete buttons.
+- [x] Tapping a card opens client details. This already worked.
+- [x] The search bar no longer takes up a card slot on desktop, and the
+      status filter lists your actual stages.
+- [x] Fixed a long email or phone line making the list wider than the screen.
+
+### Sessions
+- [x] Dates read "Sat, Jul 4, 2026 · 7:00 PM" instead of "2026-07-04 at 19:00",
+      on cards and in details.
+- [x] Compact cards on phones with a › chevron. The tabs are scrollable pills.
+
+### Invoices
+- [x] New card layout: number and status, client, due date, amount on the
+      right, a full-width progress bar, and big, even action buttons on
+      phones (Mark paid · Edit · Send).
+- [x] Filter tabs: **All · Waiting · Paid**, with counts.
+- [x] The small "×" delete button was removed from cards. Delete is in the
+      invoice details and editor.
+
+### Contracts
+- [x] Each contract is its own colour-coded card (green when signed, orange
+      while waiting) instead of rows inside a box. Buttons: **View · Send to
+      sign · Sign in person**.
+- [x] "Send to sign" opens the editable email step directly. Copying the
+      signing link and deleting are in the contract viewer.
+- [x] Removed the old unused contract helper code from the page.
+
+### Inbox (redesigned)
+- [x] Messaging-app layout: a conversation list with avatars, last message,
+      time, unread dots, and ✉/💬 icons for email or chat replies.
+- [x] **Search** conversations and filter **All / Unread**. Newest
+      conversations first.
+- [x] Conversation view: header with client email, a **Chat link** button
+      (copies their private chat link) and a **Client** button (opens client
+      details). Chat bubbles show whether each reply came by email or chat.
+- [x] **Quick replies:** one tap inserts common answers ("Your gallery is
+      ready! 🎉", "Looking forward to your session!", …), in replies and in
+      "+ New message".
+- [x] **On phones the list and the conversation are separate screens**, with
+      a ‹ back button, like a messaging app. Opening a conversation marks it
+      read.
+- [x] "+ New message" uses a proper client picker instead of type-to-match.
+
+### Contact form
+- [x] Fixed the page being wider than the screen. The settings and preview
+      stack on phones, the shareable link wraps with full-width Copy/Open
+      buttons, and the two technical info cards are hidden on phones.
+
+### Verified
+- [x] `next build` passes.
+- [x] Screenshots at 390px (phone) for Projects, Clients, Sessions, Session
+      Types, Discounts, Invoices, Contracts, Inbox and Contact form: nothing
+      is wider than the screen.
+- [x] Desktop screenshots of Projects, Clients, Sessions and Inbox look right.
+- [x] Inbox on a phone: opening a conversation shows it full-screen, a quick
+      reply fills the message box, back returns to the list, and the opened
+      conversation is marked read.
+
+---
+
 ## 2026-10-14 — Remove Supabase naming (keep only the core client)
 
 - [x] Renamed the database files:

@@ -423,6 +423,12 @@ function NewProjectModal({ stages, sessionTypes, onAdd, onClose, onAddType }) {
 function BoardView({ clients, stages, onCardClick, setData, toast }) {
   const [dragging, setDragging] = useState(null)
   const [over, setOver] = useState(null)
+  const [mobileStage, setMobileStage] = useState(stages[0]?.id)
+  const currentStage = stages.find(s => s.id === mobileStage) || stages[0]
+  const moveTo = (client, stageId) => {
+    setData(d => ({ ...d, clients: d.clients.map(c => c.id === client.id ? { ...c, status: stageId } : c) }))
+    toast(`${client.name} moved to ${stages.find(s => s.id === stageId)?.label}`)
+  }
 
   const drop = (e, stageId) => {
     e.preventDefault()
@@ -433,6 +439,31 @@ function BoardView({ clients, stages, onCardClick, setData, toast }) {
   }
 
   return (
+    <>
+    {/* Phones: one stage at a time, picked from tabs; touch can't drag, so
+        each card has a "Move to" picker instead. */}
+    <div className="kanban-mobile">
+      <div className="chip-tabs" role="tablist">
+        {stages.map(stage => (
+          <button key={stage.id} role="tab" aria-selected={currentStage?.id === stage.id} className={currentStage?.id === stage.id ? 'active' : ''} onClick={() => setMobileStage(stage.id)}>
+            {stage.label} <span>{clients.filter(c => c.status === stage.id).length}</span>
+          </button>
+        ))}
+      </div>
+      {clients.filter(c => c.status === currentStage?.id).map(c => (
+        <div key={c.id} className="mobile-project-card" onClick={() => onCardClick(c)}>
+          <Avatar name={c.name} size={38} />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div className="mobile-project-name">{c.name}</div>
+            <div className="mobile-project-meta">{c.type} · {fmtDate(c.date)}</div>
+          </div>
+          <select aria-label={`Move ${c.name} to stage`} value={c.status} onClick={e => e.stopPropagation()} onChange={e => moveTo(c, e.target.value)}>
+            {stages.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
+          </select>
+        </div>
+      ))}
+      {clients.filter(c => c.status === currentStage?.id).length === 0 && <div className="mobile-empty">No projects in {currentStage?.label}</div>}
+    </div>
     <div style={{ display: 'grid', gridTemplateColumns: `repeat(${stages.length}, minmax(200px, 1fr))`, gap: 10, alignItems: 'start', overflowX: 'auto', paddingBottom: 8 }} className="kanban-board">
       {stages.map(stage => {
         const cards = clients.filter(c => c.status === stage.id)
@@ -467,6 +498,7 @@ function BoardView({ clients, stages, onCardClick, setData, toast }) {
         )
       })}
     </div>
+    </>
   )
 }
 
@@ -577,15 +609,19 @@ export default function Projects({ data, setData, toast }) {
   return (
     <div>
       {/* Header */}
-      <div className="projects-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+      <div className="projects-header page-header-wrap" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 20, gap: 12 }}>
         <div>
           <div style={T.pageTitle}>Projects</div>
           <div style={T.pageSub}>{activeClients.length} active · {archivedClients.length} archived</div>
         </div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button style={T.btn} onClick={() => setStageModal(true)} title="Manage stages">⚙ Stages</button>
+          <button style={T.btnPrimary} onClick={() => setNewModal(true)}>+ New project</button>
+        </div>
       </div>
 
       {/* Toolbar */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20, flexWrap: 'wrap' }} className="toolbar-wrap">
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20, flexWrap: 'wrap' }} className="projects-toolbar">
         {/* View toggle */}
         <Seg
           options={[{ value: 'board', label: 'Board' }, { value: 'list', label: 'List' }, { value: 'archive', label: `Archive${archivedClients.length > 0 ? ` (${archivedClients.length})` : ''}` }]}
@@ -618,8 +654,6 @@ export default function Projects({ data, setData, toast }) {
           </>
         )}
 
-        <button style={T.btn} onClick={() => setStageModal(true)}>⚙ Stages</button>
-        <button style={T.btnPrimary} onClick={() => setNewModal(true)}>+ New project</button>
       </div>
 
       {/* Views */}

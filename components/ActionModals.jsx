@@ -150,8 +150,8 @@ export function QuoteModal({ client: clientProp, quote, data, setData, toast, on
 // ── Contract ──────────────────────────────────────────────────────
 // Without `contract`: build a new one, then offer to email it.
 // With `contract`: view it, email it, copy the signing link, edit or delete.
-export function ContractModal({ client: clientProp, contract, data, setData, toast, onClose, onSaved }) {
-  const [mode, setMode] = useState(contract ? 'view' : 'build') // build | view | send
+export function ContractModal({ client: clientProp, contract, startMode = 'view', data, setData, toast, onClose, onSaved }) {
+  const [mode, setMode] = useState(contract ? startMode : 'build') // build | view | send
   const [current, setCurrent] = useState(contract || null)
   const [link, setLink] = useState('')
   const [busy, setBusy] = useState(false)
@@ -192,7 +192,7 @@ export function ContractModal({ client: clientProp, contract, data, setData, toa
 
   if (mode === 'send') {
     return <SendEmailModal endpoint="/api/email-contract" payload={{ contract: { id: live.id } }} client={client} clientName={clientName} toast={toast}
-      onClose={result => (result?.sent || !contract ? onClose() : setMode('view'))} justCreated={!contract}
+      onClose={result => (result?.sent || !contract || startMode === 'send' ? onClose() : setMode('view'))} justCreated={!contract}
       title={!contract ? `Contract saved — email it to ${clientName} to sign?` : `Email contract to ${clientName}`} sentToast="Contract emailed"
       initialSubject={`Your ${live.type || 'photography agreement'} is ready to sign`}
       initialMessage={`Hi ${firstName(clientName)},\n\nYour ${live.type || 'photography agreement'} is ready. Please review it and sign securely using the button below.\n\nIf you have any questions about the terms, just reply to this email before signing.`}

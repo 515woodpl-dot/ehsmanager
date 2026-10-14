@@ -95,14 +95,14 @@ export default function Clients({ data, setData, toast, sessionTypes }) {
     setImportModal(false); setImportPreview([])
   }
 
-  const iconSize = 19 // 20% larger than 16
+  const iconSize = 19
 
   return (
     <div>
       <div style={T.pageHeader} className="page-header-wrap">
         <div>
           <div style={T.pageTitle}>Clients</div>
-          <div style={T.pageSub}>{filtered.length} clients</div>
+          <div style={T.pageSub}>{filtered.length} client{filtered.length === 1 ? '' : 's'}</div>
         </div>
         <div style={{ display: 'flex', gap: 10 }}>
           <button style={T.btn} onClick={() => fileRef.current.click()}>↑ Import CSV</button>
@@ -115,48 +115,45 @@ export default function Clients({ data, setData, toast, sessionTypes }) {
         <div style={{ background: C.redBg, border: `1px solid ${C.red}`, borderRadius: 8, padding: '10px 16px', fontSize: 13, color: C.red, marginBottom: 16 }}>{importError}</div>
       )}
 
-      <div className="client-card-grid">
-        <div style={{ display: 'flex', gap: 10, marginBottom: 20 }}>
-          <SearchBar value={search} onChange={setSearch} placeholder="Search clients..." />
-          <select style={{ ...T.formInput, width: 150 }} value={filter} onChange={e => setFilter(e.target.value)}>
-            <option value="all">All statuses</option>
-            <option value="inquiry">Inquiry</option>
-            <option value="booked">Booked</option>
-            <option value="postpro">Post-pro</option>
-            <option value="done">Done</option>
-          </select>
-        </div>
+      <div className="client-toolbar" style={{ display: 'flex', gap: 10, marginBottom: 20 }}>
+        <SearchBar value={search} onChange={setSearch} placeholder="Search clients..." />
+        <select style={{ ...T.formInput, width: 150 }} value={filter} onChange={e => setFilter(e.target.value)}>
+          <option value="all">All statuses</option>
+          {(data.stages || []).map(stage => <option key={stage.id} value={stage.id}>{stage.label}</option>)}
+        </select>
+      </div>
 
+      <div className="client-card-grid">
         {filtered.length === 0 && <div style={{ padding: '32px 0', textAlign: 'center', color: C.faint, fontSize: 13 }}>No clients found</div>}
 
-        {filtered.map((c, i) => (
+        {filtered.map(c => (
           <article key={c.id} className="client-summary-card" role="button" tabIndex={0} onClick={() => setDetailsClient(c)} onKeyDown={event => { if (event.key === 'Enter') setDetailsClient(c) }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 13 }}>
-              <Avatar name={c.name} size={38} />
-              <div>
-                <div style={{ fontWeight: 500, fontSize: 14 }}>{c.name}</div>
-                <div style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>{c.email || '—'} · {c.phone || '—'}</div>
+            <div className="client-card-top">
+              <Avatar name={c.name} size={40} />
+              <div className="client-card-id">
+                <div className="client-card-name">{c.name}</div>
+                <div className="client-card-contact">
+                  {c.email ? <a href={`mailto:${c.email}`} onClick={e => e.stopPropagation()}>{c.email}</a> : '—'}
+                  {c.phone && <> · <a href={`tel:${c.phone.replace(/[^\d+]/g, '')}`} onClick={e => e.stopPropagation()}>{c.phone}</a></>}
+                </div>
               </div>
+              <Badge type={c.status} label={(data.stages || []).find(s => s.id === c.status)?.label || c.status} />
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-              <div style={{ textAlign: 'right', fontSize: 13 }}>
-                <div style={{ fontWeight: 400, color: C.muted }}>{c.type}</div>
-                <div style={{ fontSize: 12, color: C.faint }}>{fmtDate(c.date)}</div>
+            <div className="client-card-bottom">
+              <div className="client-card-meta">{c.type || 'No session type'} · {fmtDate(c.date)}</div>
+              <div className="client-card-actions">
+                <button style={{ ...T.btnGhost, padding: '6px 8px' }} onClick={event => { event.stopPropagation(); setEditModal({ ...c }) }} title="Quick edit" aria-label={`Edit ${c.name}`}>
+                  <svg width={iconSize} height={iconSize} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
+                    <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                  </svg>
+                </button>
+                <button style={{ ...T.btnGhost, padding: '6px 8px', color: C.red }} onClick={event => { event.stopPropagation(); del(c.id) }} title="Delete" aria-label={`Delete ${c.name}`}>
+                  <svg width={iconSize} height={iconSize} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/>
+                  </svg>
+                </button>
               </div>
-              <Badge type={c.status} label={c.status} />
-              {/* Edit — 20% larger */}
-              <button style={{ ...T.btnGhost, padding: '5px 9px' }} onClick={event => { event.stopPropagation(); setEditModal({ ...c }) }} title="Edit">
-                <svg width={iconSize} height={iconSize} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
-                  <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
-                </svg>
-              </button>
-              {/* Delete — 20% larger */}
-              <button style={{ ...T.btnGhost, padding: '5px 9px', color: C.red }} onClick={event => { event.stopPropagation(); del(c.id) }} title="Delete">
-                <svg width={iconSize} height={iconSize} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/>
-                </svg>
-              </button>
             </div>
           </article>
         ))}
