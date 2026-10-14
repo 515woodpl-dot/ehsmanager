@@ -1,5 +1,5 @@
 -- EHS booking catalog, public reservations, availability and discounts.
--- Apply once to an existing PIBASE project; a fresh project only needs supabase-schema.sql.
+-- Apply once to an existing PIBASE project; a fresh project only needs pibase-schema.sql.
 
 alter table studio_settings add column if not exists availability jsonb not null default '{"timezone":"America/New_York","noticeDays":1,"horizonDays":90,"bufferMinutes":0,"weekdays":{"0":[],"1":[{"start":"09:00","end":"17:00"}],"2":[{"start":"09:00","end":"17:00"}],"3":[{"start":"09:00","end":"17:00"}],"4":[{"start":"09:00","end":"17:00"}],"5":[{"start":"09:00","end":"17:00"}],"6":[]},"blockedDates":[],"blockedTimes":[]}'::jsonb;
 

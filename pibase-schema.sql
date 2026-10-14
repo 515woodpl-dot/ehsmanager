@@ -1,6 +1,6 @@
 -- ================================================================
--- EHS Studio Manager — PIBASE/Supabase-compatible Schema
--- Apply as a project owner migration in PIBASE, or in Supabase SQL Editor.
+-- EHS Studio Manager — PIBASE schema
+-- Apply as a project owner migration in PIBASE.
 -- ================================================================
 
 -- PostgreSQL's built-in gen_random_uuid() avoids extension DDL, which PIBASE
@@ -227,7 +227,7 @@ create trigger on_auth_user_created
   after insert on auth.users
   for each row execute procedure handle_new_user();
 -- EHS booking catalog, public reservations, availability and discounts.
--- Apply once to an existing PIBASE project; a fresh project only needs supabase-schema.sql.
+-- Apply once to an existing PIBASE project; a fresh project only needs pibase-schema.sql.
 
 alter table studio_settings add column if not exists availability jsonb not null default '{"timezone":"America/New_York","noticeDays":1,"horizonDays":90,"bufferMinutes":0,"weekdays":{"0":[],"1":[{"start":"09:00","end":"17:00"}],"2":[{"start":"09:00","end":"17:00"}],"3":[{"start":"09:00","end":"17:00"}],"4":[{"start":"09:00","end":"17:00"}],"5":[{"start":"09:00","end":"17:00"}],"6":[]},"blockedDates":[],"blockedTimes":[]}'::jsonb;
 

@@ -138,7 +138,7 @@ export default function Settings({ toast = () => {} }) {
       {header}
 
       {state.migrationNeeded && (
-        <div className="settings-error">Your database needs one update before settings can be saved: apply <code>supabase-migration-003-settings-inbox.sql</code> in PIBASE.</div>
+        <div className="settings-error">Your database needs one update before settings can be saved: apply <code>pibase-migration-003-settings-inbox.sql</code> in PIBASE.</div>
       )}
       {!state.canStoreSecrets && (
         <div className="settings-error">To save API keys here, the server needs a <code>SETTINGS_ENCRYPTION_KEY</code> (a long random value). Until then, keys come from the server environment.</div>

@@ -5,9 +5,11 @@
 PIBASE is the only backend for authentication, database access, public booking,
 contact leads, contracts, invoices, and application settings.
 
-The app uses the `@supabase/supabase-js` package only as a protocol compatible
-JavaScript client for PIBASE. It does not connect to or require a Supabase
-project.
+The `@supabase/supabase-js` package is the only Supabase-related dependency and
+is core: PIBASE implements the same API protocol, so the package is used as
+PIBASE's JavaScript client. Import it only in `lib/pibase.js`; everything else
+uses `pibase` / `createServiceClient` from there. No Supabase project or account
+is used. Don't add new Supabase names to files, docs or code.
 
 Required server configuration is documented in `.env.local.example`.
 Business details, logo, and Resend/Stripe keys can be entered on the
@@ -26,9 +28,8 @@ private chat page at `/chat/<token>`.
 ## Local development
 
 1. Run PIBASE on `http://localhost:18080`.
-2. Create a PIBASE project and apply `supabase-schema.sql` (existing projects:
-   apply the numbered `supabase-migration-*.sql` files in order). The filename is
-   historical; the schema targets PIBASE.
+2. Create a PIBASE project and apply `pibase-schema.sql` (existing projects:
+   apply the numbered `pibase-migration-*.sql` files in order).
 3. Copy `.env.local.example` to `.env.local` and add the PIBASE project keys.
 4. Run `npm ci` and `npm run dev`.
 

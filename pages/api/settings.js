@@ -37,7 +37,7 @@ export default async function handler(req, res) {
   if (!auth) return
   if (req.method === 'GET') return res.status(200).json(describe(auth.config))
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
-  if (auth.config.migrationNeeded) return res.status(409).json({ error: 'Apply supabase-migration-003-settings-inbox.sql to your database first.' })
+  if (auth.config.migrationNeeded) return res.status(409).json({ error: 'Apply pibase-migration-003-settings-inbox.sql to your database first.' })
 
   const { branding = null, integrations = null, keys = null } = req.body || {}
 

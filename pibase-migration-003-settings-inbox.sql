@@ -1,6 +1,6 @@
 -- Studio settings page (business details, logo, integration keys) and
 -- client replies (email + chat). Apply once to an existing PIBASE project;
--- supabase-schema.sql already includes this for fresh projects.
+-- pibase-schema.sql already includes this for fresh projects.
 
 -- Business details and logo shown on emails and client pages.
 alter table studio_settings add column if not exists branding jsonb not null default '{}'::jsonb;

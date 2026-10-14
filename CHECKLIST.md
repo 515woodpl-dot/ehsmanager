@@ -5,10 +5,28 @@ every round of changes, and keep the "Open / follow-ups" list current.
 
 ---
 
+## 2026-10-14 — Remove Supabase naming (keep only the core client)
+
+- [x] Renamed the database files:
+      `supabase-schema.sql` → **`pibase-schema.sql`**,
+      `supabase-migration-001/002/003…sql` → **`pibase-migration-001/002/003…sql`**.
+      The file contents are unchanged, apart from comments.
+- [x] Removed the "Supabase Dashboard / SQL Editor" instructions and the
+      "PIBASE/Supabase-compatible" wording from the SQL files.
+- [x] Updated every reference to the new file names: README, SESSION-NOTES,
+      docs/cloud-development, Settings page, settings API and this checklist.
+- [x] **Kept (core):** the `@supabase/supabase-js` package. PIBASE speaks the
+      same API protocol, so this package is how the app logs in and
+      reads/writes PIBASE. It's imported in exactly one place,
+      `lib/pibase.js`. SESSION-NOTES now says to keep it that way.
+- [x] `next build` passes.
+
+---
+
 ## 2026-10-13 (round 3) — Settings page, client replies in the app, client chat
 
 ### ⚠️ Before using this round
-- [ ] Apply **`supabase-migration-003-settings-inbox.sql`** in PIBASE (adds
+- [ ] Apply **`pibase-migration-003-settings-inbox.sql`** in PIBASE (adds
       `studio_settings.branding`, `studio_settings.integrations` and the
       server-only `studio_secrets` table). Settings shows a banner until
       this is done.

@@ -1,6 +1,6 @@
 -- ================================================================
 -- Migration 001 — run this if you already ran the original schema
--- Supabase Dashboard → SQL Editor → New query
+-- Apply in PIBASE with the owner SQL or migration-apply tool
 -- ================================================================
 
 -- Invoices: switch from text PK ("INV-001") to uuid PK + display number.
