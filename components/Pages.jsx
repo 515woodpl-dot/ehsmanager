@@ -2,8 +2,10 @@ import { useState, useRef, useEffect } from 'react'
 import { T, C } from '../lib/tokens'
 import { pibase } from '../lib/pibase'
 import { Modal, Badge, Avatar, SearchBar } from './UI'
-import ContractBuilder from './ContractBuilder'
-import ContractDocument from './ContractDocument'
+import { InvoiceModal, SendInvoiceModal } from './InvoiceModals'
+import { invoiceLabel } from '../lib/invoices'
+import { docTone } from '../lib/documents'
+import { ContractModal } from './ActionModals'
 
 const uid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => { const r = Math.random() * 16 | 0; return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16) })
 const fmtDate = iso => { if (!iso) return 'TBD'; const d = new Date(iso + 'T00:00:00'); return isNaN(d) ? iso : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) }
@@ -269,10 +271,10 @@ export function Analytics({ data }) {
           {data.invoices.length === 0
             ? <div style={{ color: C.faint, fontSize: 13 }}>No invoices yet</div>
             : data.invoices.map((inv, i, arr) => (
-              <div key={inv.number || inv.id} style={{ ...T.dataRow, borderBottom: i === arr.length - 1 ? 'none' : `1px solid ${C.border}` }}>
+              <div key={inv.id} style={{ ...T.dataRow, borderBottom: i === arr.length - 1 ? 'none' : `1px solid ${C.border}` }}>
                 <div>
                   <div style={{ fontWeight: 500, fontSize: 13.5 }}>{inv.client}</div>
-                  <div style={{ fontSize: 12, color: C.muted }}>{inv.number || inv.id} · Due {fmtDate(inv.due)}</div>
+                  <div style={{ fontSize: 12, color: C.muted }}>{invoiceLabel(inv)} · Due {fmtDate(inv.due)}</div>
                 </div>
                 <div style={{ textAlign: 'right' }}>
                   <div style={{ fontWeight: 500, fontSize: 13.5 }}>{fmt$(inv.amount)}</div>
@@ -450,76 +452,63 @@ export function Invoices({ data, setData, toast }) {
   const [modal, setModal] = useState(false)
   const [payModal, setPayModal] = useState(null) // invoice being marked paid
   const [payMethod, setPayMethod] = useState(null)
-  const [sending, setSending] = useState(null) // invoiceId being emailed
-  const [viewInvoice, setViewInvoice] = useState(null)
-  const blank = { client: '', amount: '', due: '', note: '' }
-  const [form, setForm] = useState(blank)
-  const sendInvoice = async (inv) => {
-    const client = data.clients.find(c => c.id === inv.clientId || c.name === inv.client)
-    if (!client?.email) { toast('No email address for this client'); return }
-    setSending(inv.id)
-    try {
-      const { data: { session } } = await pibase.auth.getSession()
-      const r = await fetch('/api/email-invoice', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token || ''}` }, body: JSON.stringify({ invoice: inv, clientEmail: client.email, clientName: client.name }) })
-      if (r.ok) { toast('Invoice sent to ' + client.email) } else { toast('Failed to send email') }
-    } catch { toast('Failed to send email') }
-    setSending(null)
-  }
-  const add = () => { const client = data.clients.find(c => c.name === form.client); if (!client) { toast('Select an existing client'); return }; if (!(Number(form.amount) > 0)) { toast('Enter a positive amount'); return }; setData(d => ({ ...d, invoices: [...d.invoices, { id: uid(), number: 'INV-' + String(d.invoices.length + 1).padStart(3, '0'), client: form.client, clientId: client.id, amount: Number(form.amount), due: form.due, status: 'unpaid', paid: 0, note: form.note, paymentIntentId: null }] })); toast('Invoice created'); setModal(false); setForm(blank) }
+  const [sendFor, setSendFor] = useState(null) // invoice being emailed
+  const [editFor, setEditFor] = useState(null) // invoice being edited
+  const [viewId, setViewId] = useState(null)
+  const [show, setShow] = useState('all') // all | open | paid
+  const viewInvoice = viewId ? data.invoices.find(i => i.id === viewId) : null
+  const clientFor = inv => data.clients.find(c => c.id === inv.clientId) || data.clients.find(c => c.name === inv.client)
   const confirmPaid = () => {
     if (!payMethod) { toast('Select a payment method'); return }
     const now = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
     setData(d => ({ ...d, invoices: d.invoices.map(i => i.id === payModal.id ? { ...i, status: 'paid', paid: i.amount, paymentMethod: payMethod, paidAt: now } : i) }))
     toast(`Marked as paid · ${payMethod}`); setPayModal(null); setPayMethod(null)
   }
-  const del = id => { if (!confirm('Delete invoice?')) return; setData(d => ({ ...d, invoices: d.invoices.filter(i => i.id !== id) })); toast('Deleted') }
+  const del = inv => { if (!confirm(`Delete ${invoiceLabel(inv)}? This cannot be undone.`)) return; setData(d => ({ ...d, invoices: d.invoices.filter(i => i.id !== inv.id) })); setViewId(null); toast(`${invoiceLabel(inv)} deleted`) }
   const total = data.invoices.reduce((s, i) => s + i.amount, 0)
   const collected = data.invoices.reduce((s, i) => s + i.paid, 0)
   return (
     <div>
       <div style={T.pageHeader} className="page-header-wrap"><div><div style={T.pageTitle}>Invoices</div><div style={T.pageSub}>{fmt$(collected)} collected · {fmt$(total - collected)} outstanding</div></div><button style={T.btnPrimary} onClick={() => setModal(true)}>+ New invoice</button></div>
+      <div className="chip-tabs" role="tablist" style={{ marginBottom: 16 }}>
+        {[['all', 'All', data.invoices.length], ['open', 'Waiting', data.invoices.filter(i => i.status !== 'paid').length], ['paid', 'Paid', data.invoices.filter(i => i.status === 'paid').length]].map(([value, label, count]) => (
+          <button key={value} role="tab" aria-selected={show === value} className={show === value ? 'active' : ''} onClick={() => setShow(value)}>{label} <span>{count}</span></button>
+        ))}
+      </div>
       <div className="invoice-card-grid">
-        {data.invoices.map((inv, i) => {
+        {data.invoices.filter(i => show === 'all' || (show === 'paid') === (i.status === 'paid')).map(inv => {
           const pct = inv.amount > 0 ? Math.round(inv.paid / inv.amount * 100) : 0
           const owing = inv.amount - inv.paid
           return (
-            <article key={inv.number || inv.id} className="invoice-summary-card" onClick={() => setViewInvoice(inv)}>
-              <div style={{ flex: 1 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 5 }}>
-                  <div style={{ fontWeight: 500 }}>{inv.number || inv.id}</div>
-                  <div style={{ color: C.text }}>{inv.client}</div>
-                  <Badge type={inv.status} label={inv.status} />
+            <article key={inv.id} className={`invoice-summary-card doc-card-${docTone('invoice', inv)}`} onClick={() => setViewId(inv.id)}>
+              <div className="inv-card-top">
+                <div style={{ minWidth: 0 }}>
+                  <div className="inv-card-num">{invoiceLabel(inv)} <Badge type={inv.status} label={inv.status} /></div>
+                  <div className="inv-card-client">{inv.client}</div>
+                  <div className="inv-card-meta">Due {fmtDate(inv.due)}{inv.paymentMethod ? ` · Paid via ${inv.paymentMethod}` : ''}</div>
                 </div>
-                <div style={{ fontSize: 12, color: C.muted }}>Due {fmtDate(inv.due)}{inv.note ? ` · ${inv.note}` : ''}{inv.paymentMethod ? ` · Paid via ${inv.paymentMethod}` : ''}{inv.paidAt ? ` · ${inv.paidAt}` : ''}</div>
-                <div style={{ width: 160 }}><div style={T.progress}><div style={{ height: '100%', borderRadius: 2, background: inv.status === 'paid' ? C.green : inv.status === 'partial' ? C.amber : C.border2, width: pct + '%', transition: 'width 0.4s' }} /></div></div>
+                <div className="inv-card-amount">
+                  <div>{fmt$(inv.amount)}</div>
+                  {inv.status === 'partial' && <small>{fmt$(inv.paid)} paid</small>}
+                </div>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginLeft: 24 }}>
-                <div style={{ textAlign: 'right' }}>
-                  <div style={{ fontFamily: "'DM Serif Display', Georgia, serif", fontSize: 20, letterSpacing: '-0.3px' }}>{fmt$(inv.amount)}</div>
-                  {inv.status === 'partial' && <div style={{ fontSize: 11, color: C.muted }}>{fmt$(inv.paid)} paid</div>}
-                </div>
+              <div style={T.progress}><div style={{ height: '100%', borderRadius: 2, background: inv.status === 'paid' ? C.green : inv.status === 'partial' ? C.amber : C.border2, width: pct + '%', transition: 'width 0.4s' }} /></div>
+              <div className="card-actions">
                 {inv.status !== 'paid' && owing > 0 && <button style={{ ...T.btnSm, color: C.green, borderColor: C.green }} onClick={event => { event.stopPropagation(); setPayModal(inv); setPayMethod(null) }}>Mark paid</button>}
-                <button style={T.btnSm} onClick={event => { event.stopPropagation(); sendInvoice(inv) }} disabled={sending === inv.id}>{sending === inv.id ? 'Sending...' : 'Send'}</button>
-                <button style={{ ...T.btnGhost, color: C.faint }} onClick={event => { event.stopPropagation(); del(inv.id) }}>×</button>
+                <button style={T.btnSm} onClick={event => { event.stopPropagation(); setEditFor(inv) }}>Edit</button>
+                <button style={T.btnSm} onClick={event => { event.stopPropagation(); setSendFor(inv) }}>Send</button>
               </div>
             </article>
           )
         })}
       </div>
-      {modal && (
-        <Modal title="New invoice" onClose={() => setModal(false)} footer={<><button style={T.btn} onClick={() => setModal(false)}>Cancel</button><button style={T.btnPrimary} onClick={add}>Create</button></>}>
-          <div style={T.formRow} className="form-row-2">
-            <div style={T.formGroup}><label style={T.formLabel}>Client</label><input style={T.formInput} list="cl2" value={form.client} onChange={e => setForm({ ...form, client: e.target.value })} /><datalist id="cl2">{data.clients.map(c => <option key={c.id} value={c.name} />)}</datalist></div>
-            <div style={T.formGroup}><label style={T.formLabel}>Amount ($)</label><input style={T.formInput} type="number" value={form.amount} onChange={e => setForm({ ...form, amount: e.target.value })} /></div>
-          </div>
-          <div style={T.formGroup}><label style={T.formLabel}>Due date</label><input style={T.formInput} type="date" value={form.due} onChange={e => setForm({ ...form, due: e.target.value })} /></div>
-          <div style={T.formGroup}><label style={T.formLabel}>Note</label><input style={T.formInput} value={form.note} onChange={e => setForm({ ...form, note: e.target.value })} /></div>
-        </Modal>
-      )}
-      {viewInvoice && <Modal title={`${viewInvoice.number || viewInvoice.id} · ${viewInvoice.client}`} onClose={() => setViewInvoice(null)} wide footer={<><button style={T.btn} onClick={() => setViewInvoice(null)}>Close</button>{viewInvoice.status !== 'paid' && <button style={T.btnPrimary} onClick={() => { setPayModal(viewInvoice); setPayMethod(null); setViewInvoice(null) }}>Record payment</button>}</>}>
+      {modal && <InvoiceModal data={data} setData={setData} toast={toast} onClose={() => setModal(false)} />}
+      {editFor && <InvoiceModal invoice={editFor} client={clientFor(editFor)} data={data} setData={setData} toast={toast} onClose={() => setEditFor(null)} />}
+      {sendFor && <SendInvoiceModal invoice={sendFor} client={clientFor(sendFor)} toast={toast} onClose={() => setSendFor(null)} />}
+      {viewInvoice && <Modal title={`${invoiceLabel(viewInvoice)} · ${viewInvoice.client}`} onClose={() => setViewId(null)} wide footer={<><button style={{ ...T.btn, color: C.red, borderColor: C.red }} onClick={() => del(viewInvoice)}>Delete</button><div style={{ flex: 1 }} /><button style={T.btn} onClick={() => { setEditFor(viewInvoice); setViewId(null) }}>Edit</button><button style={T.btn} onClick={() => { setSendFor(viewInvoice); setViewId(null) }}>Email client</button>{viewInvoice.status !== 'paid' && <button style={T.btnPrimary} onClick={() => { setPayModal(viewInvoice); setPayMethod(null); setViewId(null) }}>Record payment</button>}</>}>
         <div className="invoice-detail-grid"><div><span>Status</span><Badge type={viewInvoice.status} label={viewInvoice.status} /></div><div><span>Total</span><strong>{fmt$(viewInvoice.amount)}</strong></div><div><span>Paid</span><strong>{fmt$(viewInvoice.paid)}</strong></div><div><span>Balance</span><strong>{fmt$(viewInvoice.amount - viewInvoice.paid)}</strong></div><div><span>Due date</span><strong>{fmtDate(viewInvoice.due)}</strong></div><div><span>Payment</span><strong>{viewInvoice.paymentMethod || 'Not recorded'}</strong></div></div>
         {viewInvoice.note && <div className="invoice-note"><span>Invoice note</span><p>{viewInvoice.note}</p></div>}
-        {!!viewInvoice.lineData?.items?.length && <div className="invoice-line-items"><h3>Items</h3>{viewInvoice.lineData.items.map(item => <div key={item.id}><span>{item.name || 'Item'}{item.description ? ` · ${item.description}` : ''}</span><strong>{item.qty} × {fmt$(item.price)}</strong></div>)}</div>}
+        {!!viewInvoice.lineData?.items?.length && <div className="invoice-line-items"><h3>Items</h3>{viewInvoice.lineData.items.map(item => <div key={item.id}><span><strong style={{ fontWeight: 500 }}>{item.name || 'Item'}</strong>{item.description ? <><br /><small style={{ color: C.muted, whiteSpace: 'pre-wrap' }}>{item.description}</small></> : null}</span><strong>{item.qty} × {fmt$(item.price)}</strong></div>)}</div>}
       </Modal>}
 
       {/* 1.6 — Payment method modal */}
@@ -527,7 +516,7 @@ export function Invoices({ data, setData, toast }) {
         <Modal title="How was this payment received?" onClose={() => { setPayModal(null); setPayMethod(null) }}
           footer={<><button style={T.btn} onClick={() => { setPayModal(null); setPayMethod(null) }}>Cancel</button><button style={T.btnPrimary} onClick={confirmPaid}>Confirm payment</button></>}>
           <div style={{ marginBottom: 16, padding: '12px 16px', background: C.surface2, borderRadius: 10, fontSize: 13 }}>
-            <div style={{ fontWeight: 500 }}>{payModal.id} · {payModal.client}</div>
+            <div style={{ fontWeight: 500 }}>{invoiceLabel(payModal)} · {payModal.client}</div>
             <div style={{ color: C.muted, marginTop: 2 }}>Amount: <strong style={{ color: C.text }}>${payModal.amount.toLocaleString()}</strong></div>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -561,104 +550,41 @@ export function Invoices({ data, setData, toast }) {
 export function Contracts({ data, setData, toast }) {
   const [modal, setModal] = useState(false)
   const [viewModal, setViewModal] = useState(null)
+  const [sendModal, setSendModal] = useState(null)
   const [signModal, setSignModal] = useState(null)
   const [signName, setSignName] = useState('')
-  const [sending, setSending] = useState(null)
-  const [linkModal, setLinkModal] = useState(null)
-  const copyText = async value => {
-    try { await navigator.clipboard.writeText(value); return true } catch {}
-    const input = document.createElement('textarea')
-    input.value = value; input.style.position = 'fixed'; input.style.opacity = '0'; document.body.appendChild(input); input.select()
-    const copied = document.execCommand('copy'); input.remove(); return copied
-  }
-  const copySigningLink = async (contract) => {
-    setSending(contract.id)
-    try {
-      const { data: { session } } = await pibase.auth.getSession()
-      const response = await fetch('/api/contract-link', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token || ''}` },
-        body: JSON.stringify({ contractId: contract.id }),
-      })
-      const result = await response.json()
-      if (!response.ok) throw new Error(result.error || 'Could not create signing link')
-      const copied = await copyText(result.url)
-      setLinkModal({ contract, url: result.url })
-      toast(copied ? 'Signing link copied' : 'Signing link ready')
-    } catch (error) { toast(error.message || 'Could not copy signing link') }
-    setSending(null)
-  }
-  const blank = { client: '', type: '', body: '' }
-  const [form, setForm] = useState(blank)
-  const sendContract = async (k) => {
-    const client = data.clients.find(c => c.id === k.clientId || c.name === k.client)
-    if (!client?.email) { toast('No email address for this client'); return }
-    setSending(k.id)
-    try {
-      const { data: { session } } = await pibase.auth.getSession()
-      const r = await fetch('/api/email-contract', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token || ''}` }, body: JSON.stringify({ contract: k, clientEmail: client.email, clientName: client.name }) })
-      if (r.ok) { toast('Contract sent to ' + client.email) } else { toast('Failed to send email') }
-    } catch { toast('Failed to send email') }
-    setSending(null)
-  }
-  const add = () => { if (!form.client.trim()) return; setData(d => ({ ...d, contracts: [...d.contracts, { id: uid(), ...form, clientId: null, sent: todayLabel(), status: 'pending' }] })); toast('Contract created'); setModal(false); setForm(blank) }
   const confirmSign = () => {
     if (!signName.trim()) { toast('Please type your full name to sign'); return }
     const signedAt = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
     setData(d => ({ ...d, contracts: d.contracts.map(k => k.id === signModal.id ? { ...k, status: 'signed', signedBy: signName.trim(), signedAt } : k) }))
     toast('Contract signed'); setSignModal(null); setSignName('')
   }
-  const del = id => { if (!confirm('Delete contract?')) return; setData(d => ({ ...d, contracts: d.contracts.filter(k => k.id !== id) })); toast('Deleted') }
   return (
     <div>
       <div style={T.pageHeader} className="page-header-wrap"><div><div style={T.pageTitle}>Contracts</div><div style={T.pageSub}>{data.contracts.filter(k => k.status === 'signed').length} signed · {data.contracts.filter(k => k.status === 'pending').length} pending</div></div><button style={T.btnPrimary} onClick={() => setModal(true)}>+ New contract</button></div>
-      <div style={T.card}>
-        {data.contracts.map((k, i) => (
-            <div key={k.id} className="data-row-mobile" onClick={() => setViewModal(k)} style={{ ...T.dataRow, borderBottom: i === data.contracts.length - 1 ? 'none' : `1px solid ${C.border}`, cursor: 'pointer' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 13 }}>
-              <div style={{ width: 40, height: 40, borderRadius: 10, background: k.status === 'signed' ? C.greenBg : C.surface2, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, color: k.status === 'signed' ? C.green : C.muted, flexShrink: 0 }}>{k.status === 'signed' ? '✓' : '✎'}</div>
-              <div><div style={{ fontWeight: 500 }}>{k.type || 'Contract'}</div><div style={{ fontSize: 12, color: C.muted }}>{k.client} · Sent {k.sent}</div></div>
+      <div className="invoice-card-grid">
+        {data.contracts.length === 0 && <div style={{ ...T.card, color: C.faint, textAlign: 'center' }}>No contracts yet</div>}
+        {data.contracts.map(k => (
+          <article key={k.id} className={`invoice-summary-card doc-card-${docTone('contract', k)}`} onClick={() => setViewModal(k)}>
+            <div className="inv-card-top">
+              <div style={{ minWidth: 0 }}>
+                <div className="inv-card-num">{k.type || 'Contract'}</div>
+                <div className="inv-card-client">{k.client}</div>
+                <div className="inv-card-meta">{k.status === 'signed' ? `Signed${k.signedBy ? ` by ${k.signedBy}` : ''}${k.signedAt ? ` · ${k.signedAt}` : ''}` : `Created ${k.sent || '—'} · waiting for signature`}</div>
+              </div>
+              <Badge type={k.status} label={k.status === 'signed' ? 'signed' : 'awaiting'} />
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <Badge type={k.status} label={k.status} />
+            <div className="card-actions">
               <button style={T.btnSm} onClick={e => { e.stopPropagation(); setViewModal(k) }}>View</button>
-              {k.status === 'pending' && <button style={T.btnSm} onClick={e => { e.stopPropagation(); copySigningLink(k) }} disabled={sending === k.id}>{sending === k.id ? 'Preparing…' : 'Copy signing link'}</button>}
-              <button style={T.btnSm} onClick={e => { e.stopPropagation(); sendContract(k) }} disabled={sending === k.id}>{sending === k.id ? 'Sending...' : 'Send'}</button>
-              {k.status === 'pending' && <button style={{ ...T.btnSm, color: C.green, borderColor: C.green }} onClick={e => { e.stopPropagation(); setSignModal(k); setSignName('') }}>Sign</button>}
-              {k.status === 'signed' && k.signedBy && <div style={{ fontSize: 11, color: C.muted }}>Signed by {k.signedBy} · {k.signedAt}</div>}
-              <button style={{ ...T.btnGhost, color: C.faint }} onClick={e => { e.stopPropagation(); del(k.id) }}>×</button>
+              {k.status === 'pending' && <button style={T.btnSm} onClick={e => { e.stopPropagation(); setSendModal(k) }}>Send to sign</button>}
+              {k.status === 'pending' && <button style={{ ...T.btnSm, color: C.green, borderColor: C.green }} onClick={e => { e.stopPropagation(); setSignModal(k); setSignName('') }}>Sign in person</button>}
             </div>
-          </div>
+          </article>
         ))}
       </div>
-      {modal && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.22)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20, backdropFilter: 'blur(4px)' }} className="modal-wrap"
-          onClick={e => { if (e.target === e.currentTarget) setModal(false) }}>
-          <div style={{ background: C.surface, borderRadius: 16, padding: 30, width: '100%', maxWidth: 740, maxHeight: '92vh', overflowY: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,0.14)' }} className="modal-inner">
-            <ContractBuilder
-              client={null}
-              data={data}
-              onSave={k => { setData(d => ({ ...d, contracts: [...d.contracts, k] })); toast('Contract created'); setModal(false) }}
-              onClose={() => setModal(false)}
-            />
-          </div>
-        </div>
-      )}
-      {viewModal && (
-        <Modal title={viewModal.type || 'Contract'} onClose={() => setViewModal(null)} wide footer={<><div style={{ fontSize: 12, color: C.muted }}>Sent {viewModal.sent}{viewModal.signedAt ? ` · Signed ${viewModal.signedAt}` : ''}</div><div style={{ flex: 1 }} /><button style={T.btn} onClick={() => setViewModal(null)}>Close</button></>}>
-          <div style={{ marginBottom: 12, display: 'flex', gap: 8, alignItems: 'center' }}>
-            <Badge type={viewModal.status} label={viewModal.status} />
-            {viewModal.signedBy && <span style={{ fontSize: 12, color: C.muted }}>Signed by {viewModal.signedBy} · {viewModal.signedAt}</span>}
-          </div>
-          <div style={{ background: C.surface2, borderRadius: 10, padding: 12 }}>
-            <ContractDocument body={viewModal.body} signedBy={viewModal.signedBy} signedAt={viewModal.signedAt} signatureData={viewModal.fields?.signatureData} headerImageUrl={viewModal.fields?.headerImageUrl} />
-          </div>
-        </Modal>
-      )}
-      {linkModal && <Modal title="Client signing link" onClose={() => setLinkModal(null)} footer={<><button style={T.btn} onClick={() => setLinkModal(null)}>Done</button><button style={T.btnPrimary} onClick={async () => toast(await copyText(linkModal.url) ? 'Signing link copied' : 'Select and copy the link')}>Copy link</button></>}>
-        <p style={{ color: C.muted, fontSize: 13, marginBottom: 12 }}>Share this secure link with {linkModal.contract.client}. It remains valid until the contract is signed.</p>
-        <input aria-label="Signing link" style={T.formInput} readOnly value={linkModal.url} onFocus={event => event.currentTarget.select()} />
-      </Modal>}
+      {modal && <ContractModal data={data} setData={setData} toast={toast} onClose={() => setModal(false)} />}
+      {viewModal && <ContractModal contract={viewModal} data={data} setData={setData} toast={toast} onClose={() => setViewModal(null)} />}
+      {sendModal && <ContractModal contract={sendModal} startMode="send" data={data} setData={setData} toast={toast} onClose={() => setSendModal(null)} />}
       {signModal && (
         <Modal title="Sign contract" onClose={() => { setSignModal(null); setSignName('') }}
           footer={<><button style={T.btn} onClick={() => { setSignModal(null); setSignName('') }}>Cancel</button><button style={T.btnPrimary} onClick={confirmSign}>Sign contract</button></>}>
@@ -686,13 +612,47 @@ export function Contracts({ data, setData, toast }) {
 }
 
 // ── Inbox ─────────────────────────────────────────────────────────
-export function Inbox({ data, setData, toast }) {
-  const [activeId, setActiveId] = useState(data.messages[0]?.id || null)
+// One conversation per client: emails you send, their email replies and
+// their chat messages. On phones the list and the conversation are two
+// screens, like a messaging app.
+const QUICK_REPLIES = [
+  'Thank you so much! I\'ll get back to you shortly.',
+  'Your gallery is ready! 🎉',
+  'Looking forward to your session!',
+  'Could you share a few dates and times that work for you?',
+]
+const initials = name => (name || '?').split(/\s+/).slice(0, 2).map(w => w[0]).join('').toUpperCase()
+
+export function Inbox({ data, setData, toast, openClientCard }) {
+  const [activeId, setActiveId] = useState(null)
+  const [mobileThread, setMobileThread] = useState(false)
+  const [filter, setFilter] = useState('all') // all | unread
+  const [search, setSearch] = useState('')
   const [draft, setDraft] = useState('')
   const [newModal, setNewModal] = useState(false)
-  const [nf, setNf] = useState({ to: '', body: '' })
+  const [nf, setNf] = useState({ clientId: '', body: '' })
   const [sending, setSending] = useState(false)
-  const active = data.messages.find(m => m.id === activeId)
+  const endRef = useRef(null)
+
+  const lastOf = m => m.thread?.[m.thread.length - 1]
+  const conversations = [...data.messages]
+    .sort((a, b) => (lastOf(b)?.at || '').localeCompare(lastOf(a)?.at || ''))
+    .filter(m => filter === 'all' || m.unread)
+    .filter(m => !search.trim() || `${m.from} ${lastOf(m)?.text || ''}`.toLowerCase().includes(search.toLowerCase()))
+  // Desktop shows the newest conversation straight away; phones start on the list.
+  const [wide, setWide] = useState(false)
+  useEffect(() => {
+    const query = window.matchMedia('(min-width: 769px)')
+    const update = () => setWide(query.matches)
+    update(); query.addEventListener('change', update)
+    return () => query.removeEventListener('change', update)
+  }, [])
+  const active = data.messages.find(m => m.id === activeId) || (wide ? conversations[0] : null)
+  const activeClient = active ? data.clients.find(c => c.id === active.clientId) || data.clients.find(c => c.name === active.from) : null
+  const unreadCount = data.messages.filter(m => m.unread).length
+
+  useEffect(() => { endRef.current?.scrollIntoView({ block: 'end' }) }, [active?.id, active?.thread?.length])
+
   const deliver = async ({ clientId, clientName, message }) => {
     const { data: { session } } = await pibase.auth.getSession()
     const response = await fetch('/api/email-message', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token || ''}` }, body: JSON.stringify({ clientId, clientName, message }) })
@@ -700,67 +660,137 @@ export function Inbox({ data, setData, toast }) {
     if (!response.ok) throw new Error(payload.error || 'Message could not be sent')
     return payload.client
   }
+  const entry = text => ({ id: uid(), from: 'You', text, time: new Date().toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }), at: new Date().toISOString(), out: true, via: 'email' })
+  const open = m => {
+    setActiveId(m.id); setMobileThread(true)
+    if (m.unread) setData(d => ({ ...d, messages: d.messages.map(x => x.id === m.id ? { ...x, unread: false } : x) }))
+  }
   const send = async () => {
     if (!draft.trim() || !active || sending) return
-    const client = data.clients.find(c => c.id === active.clientId || c.name === active.from)
     setSending(true)
     try {
-      await deliver({ clientId: client?.id, clientName: active.from, message: draft })
-      setData(d => ({ ...d, messages: d.messages.map(m => m.id === activeId ? { ...m, clientId: client?.id || m.clientId, thread: [...m.thread, { id: uid(), from: 'You', text: draft, time: 'Just now', out: true }], unread: false } : m) }))
+      await deliver({ clientId: activeClient?.id, clientName: active.from, message: draft })
+      setData(d => ({ ...d, messages: d.messages.map(m => m.id === active.id ? { ...m, clientId: activeClient?.id || m.clientId, thread: [...m.thread, entry(draft)], unread: false } : m) }))
       setDraft(''); toast('Email sent')
     } catch (error) { toast(error.message) }
     setSending(false)
   }
-  const markRead = id => setData(d => ({ ...d, messages: d.messages.map(m => m.id === id ? { ...m, unread: false } : m) }))
   const sendNew = async () => {
-    if (!nf.to.trim() || !nf.body.trim() || sending) return
-    const selected = data.clients.find(c => c.name === nf.to)
-    if (!selected) return toast('Choose an existing client')
+    const selected = data.clients.find(c => c.id === nf.clientId)
+    if (!selected) return toast('Choose a client')
+    if (!nf.body.trim() || sending) return
     setSending(true)
     try {
-      const client = await deliver({ clientId: selected.id, clientName: selected.name, message: nf.body })
-      const nm = { id: uid(), clientId: client.id, from: client.name, thread: [{ id: uid(), from: 'You', text: nf.body, time: 'Just now', out: true }], unread: false }
-      setData(d => ({ ...d, messages: [nm, ...d.messages] })); setActiveId(nm.id); setNewModal(false); setNf({ to: '', body: '' }); toast('Email sent')
+      await deliver({ clientId: selected.id, clientName: selected.name, message: nf.body })
+      const existing = data.messages.find(m => m.clientId === selected.id)
+      if (existing) {
+        setData(d => ({ ...d, messages: d.messages.map(m => m.id === existing.id ? { ...m, thread: [...m.thread, entry(nf.body)] } : m) }))
+        setActiveId(existing.id)
+      } else {
+        const nm = { id: uid(), clientId: selected.id, from: selected.name, thread: [entry(nf.body)], unread: false }
+        setData(d => ({ ...d, messages: [nm, ...d.messages] })); setActiveId(nm.id)
+      }
+      setMobileThread(true); setNewModal(false); setNf({ clientId: '', body: '' }); toast('Email sent')
     } catch (error) { toast(error.message) }
     setSending(false)
   }
+  const copyChat = async () => {
+    if (!activeClient) return toast('This conversation has no linked client')
+    try {
+      const { data: { session } } = await pibase.auth.getSession()
+      const response = await fetch('/api/chat-link', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token || ''}` }, body: JSON.stringify({ clientId: activeClient.id }) })
+      const body = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(body.error || 'Could not create chat link')
+      try { await navigator.clipboard.writeText(body.url); toast('Chat link copied') } catch { toast(body.url) }
+    } catch (error) { toast(error.message) }
+  }
+
   return (
-    <div>
-      <div style={T.pageHeader} className="page-header-wrap"><div><div style={T.pageTitle}>Inbox</div><div style={T.pageSub}>Outbound email through Resend · replies go to your studio email</div></div><button style={T.btnPrimary} onClick={() => setNewModal(true)}>+ Compose</button></div>
-      <div style={{ display: 'grid', gridTemplateColumns: '270px 1fr', border: `1px solid ${C.border}`, borderRadius: 12, overflow: 'hidden', minHeight: 500 }} className="inbox-grid-wrap">
-        <div style={{ borderRight: `1px solid ${C.border}`, overflowY: 'auto' }}>
-          {data.messages.map(m => (
-            <div key={m.id} onClick={() => { setActiveId(m.id); markRead(m.id) }} style={{ padding: '13px 16px', borderBottom: `1px solid ${C.border}`, cursor: 'pointer', background: activeId === m.id ? C.surface2 : C.surface }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
-                <div style={{ fontWeight: m.unread ? 600 : 400, fontSize: 13.5, display: 'flex', alignItems: 'center', gap: 6 }}>
-                  {m.unread && <span style={{ display: 'inline-block', width: 6, height: 6, borderRadius: '50%', background: C.text, flexShrink: 0 }} />}
-                  {m.from}
-                </div>
-                <span style={{ fontSize: 11, color: C.faint }}>{m.thread[m.thread.length - 1]?.time}</span>
-              </div>
-              <div style={{ fontSize: 12, color: C.muted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.thread[m.thread.length - 1]?.text}</div>
+    <div className={`inbox${mobileThread && active ? ' inbox-thread-open' : ''}`}>
+      <div style={T.pageHeader} className="page-header-wrap inbox-header">
+        <div><div style={T.pageTitle}>Inbox</div><div style={T.pageSub}>{unreadCount ? `${unreadCount} unread · ` : ''}Email and chat with your clients, all in one place</div></div>
+        <button style={T.btnPrimary} onClick={() => setNewModal(true)}>+ New message</button>
+      </div>
+      <div className="inbox-shell">
+        {/* Conversation list */}
+        <aside className="inbox-list">
+          <div className="inbox-list-tools">
+            <input aria-label="Search conversations" placeholder="Search conversations…" value={search} onChange={e => setSearch(e.target.value)} />
+            <div className="chip-tabs">
+              <button className={filter === 'all' ? 'active' : ''} onClick={() => setFilter('all')}>All <span>{data.messages.length}</span></button>
+              <button className={filter === 'unread' ? 'active' : ''} onClick={() => setFilter('unread')}>Unread <span>{unreadCount}</span></button>
             </div>
-          ))}
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column', background: C.surface }}>
+          </div>
+          {conversations.length === 0 && <div className="inbox-empty-list">{filter === 'unread' ? 'You\'re all caught up ✨' : 'No conversations yet'}</div>}
+          {conversations.map(m => {
+            const last = lastOf(m)
+            return (
+              <button key={m.id} className={`inbox-row${active?.id === m.id ? ' active' : ''}${m.unread ? ' unread' : ''}`} onClick={() => open(m)}>
+                <span className="inbox-avatar">{initials(m.from)}</span>
+                <span className="inbox-row-body">
+                  <span className="inbox-row-top"><strong>{m.from}</strong><small>{last?.time || ''}</small></span>
+                  <span className="inbox-row-preview">{last?.via === 'chat' ? '💬 ' : last && !last.out ? '✉ ' : ''}{last ? `${last.out ? 'You: ' : ''}${last.text}` : 'No messages yet'}</span>
+                </span>
+                {m.unread && <span className="inbox-dot" aria-label="Unread" />}
+              </button>
+            )
+          })}
+        </aside>
+
+        {/* Conversation */}
+        <section className="inbox-thread">
           {active ? (
             <>
-              <div style={{ padding: '16px 22px', borderBottom: `1px solid ${C.border}` }}><div style={{ fontWeight: 500, fontSize: 14 }}>{active.from}</div></div>
-              <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', padding: '18px 22px', gap: 2 }}>
-                {active.thread.map(msg => <div key={msg.id} style={T.msgBubble(msg.out)}>{msg.text}<div style={{ fontSize: 10, opacity: 0.5, marginTop: 4, textAlign: msg.out ? 'right' : 'left' }}>{msg.time}</div></div>)}
+              <header className="inbox-thread-head">
+                <button className="inbox-back" onClick={() => setMobileThread(false)} aria-label="Back to conversations">‹</button>
+                <span className="inbox-avatar">{initials(active.from)}</span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <strong>{active.from}</strong>
+                  <small>{activeClient?.email || 'No email on file'}</small>
+                </div>
+                <button style={T.btnSm} onClick={copyChat} title="Copy this client's private chat link">Chat link</button>
+                {activeClient && openClientCard && <button style={T.btnSm} onClick={() => openClientCard(activeClient)}>Client</button>}
+              </header>
+              <div className="inbox-messages">
+                {active.thread.map(msg => (
+                  <div key={msg.id} className={`inbox-bubble ${msg.out ? 'out' : 'in'}`}>
+                    <div>{msg.text}</div>
+                    <small>{msg.time}{msg.via ? ` · ${msg.via === 'chat' ? 'chat' : 'email'}` : ''}</small>
+                  </div>
+                ))}
+                <div ref={endRef} />
               </div>
-              <div style={{ padding: '14px 22px', borderTop: `1px solid ${C.border}`, display: 'flex', gap: 10 }}>
-                <textarea rows={2} style={{ ...T.formInput, flex: 1, resize: 'none', background: C.surface2 }} placeholder="Reply... (Ctrl+Enter)" value={draft} onChange={e => setDraft(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) send() }} />
-                <button aria-label="Send email" disabled={sending} style={{ ...T.btnPrimary, alignSelf: 'flex-end', padding: '8px 14px' }} onClick={send}>{sending ? '…' : '→'}</button>
+              <div className="inbox-compose">
+                <div className="inbox-quick">
+                  {QUICK_REPLIES.map(text => <button key={text} onClick={() => setDraft(d => d ? `${d} ${text}` : text)}>{text}</button>)}
+                </div>
+                <div className="inbox-compose-row">
+                  <textarea rows={2} placeholder={`Reply to ${active.from.split(' ')[0]}…`} value={draft} onChange={e => setDraft(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) send() }} />
+                  <button aria-label="Send email" disabled={sending || !draft.trim()} style={{ ...T.btnPrimary, opacity: sending || !draft.trim() ? 0.5 : 1 }} onClick={send}>{sending ? '…' : 'Send'}</button>
+                </div>
+                <small className="inbox-hint">Sent by email with a link to their private chat. Replies show up here.</small>
               </div>
             </>
-          ) : <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 1, color: C.faint, fontSize: 13 }}>Select a conversation</div>}
-        </div>
+          ) : (
+            <div className="inbox-placeholder">
+              <div style={{ fontSize: 34 }}>💬</div>
+              <strong>Pick a conversation</strong>
+              <span>or start a new message to a client.</span>
+            </div>
+          )}
+        </section>
       </div>
+
       {newModal && (
-        <Modal title="New email" onClose={() => setNewModal(false)} footer={<><button style={T.btn} onClick={() => setNewModal(false)}>Cancel</button><button style={T.btnPrimary} disabled={sending} onClick={sendNew}>{sending ? 'Sending…' : 'Send email'}</button></>}>
-          <div style={T.formGroup}><label style={T.formLabel}>To</label><input style={T.formInput} list="cl4" value={nf.to} onChange={e => setNf({ ...nf, to: e.target.value })} /><datalist id="cl4">{data.clients.map(c => <option key={c.id} value={c.name} />)}</datalist></div>
-          <div style={T.formGroup}><label style={T.formLabel}>Message</label><textarea style={{ ...T.formInput, resize: 'none' }} rows={5} value={nf.body} onChange={e => setNf({ ...nf, body: e.target.value })} /></div>
+        <Modal title="New message" onClose={() => setNewModal(false)} footer={<><button style={T.btn} onClick={() => setNewModal(false)}>Cancel</button><button style={T.btnPrimary} disabled={sending} onClick={sendNew}>{sending ? 'Sending…' : 'Send email'}</button></>}>
+          <div style={T.formGroup}><label style={T.formLabel}>To</label>
+            <select style={T.formInput} value={nf.clientId} onChange={e => setNf({ ...nf, clientId: e.target.value })}>
+              <option value="">Choose a client…</option>
+              {data.clients.filter(c => !c.archived).map(c => <option key={c.id} value={c.id}>{c.name}{c.email ? ` · ${c.email}` : ' · no email'}</option>)}
+            </select>
+          </div>
+          <div style={T.formGroup}><label style={T.formLabel}>Message</label><textarea style={{ ...T.formInput, resize: 'vertical' }} rows={6} value={nf.body} onChange={e => setNf({ ...nf, body: e.target.value })} /></div>
+          <div className="inbox-quick" style={{ marginTop: -4 }}>{QUICK_REPLIES.map(text => <button key={text} onClick={() => setNf(v => ({ ...v, body: v.body ? `${v.body} ${text}` : text }))}>{text}</button>)}</div>
         </Modal>
       )}
     </div>

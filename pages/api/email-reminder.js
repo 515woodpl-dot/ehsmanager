@@ -1,4 +1,4 @@
-import { resend, fromFor, emailWrap } from '../../lib/email'
+import { emailWrap, sendStudioEmail, signOffHtml } from '../../lib/email'
 import { requireUser } from '../../lib/api-auth'
 
 const escapeHtml = value => String(value ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;')
@@ -9,8 +9,8 @@ export default async function handler(req, res) {
 
   const auth = await requireUser(req, res)
   if (!auth) return
-  const bizName = auth.profile.business_name || 'My Studio'
-  const ownerName = (auth.profile.full_name || '').split(' ')[0] || bizName
+  const bizName = auth.config.branding.businessName
+  const ownerName = (auth.config.branding.ownerName || '').split(' ')[0] || bizName
 
   const bookingId = req.body?.booking?.id
   if (!bookingId) return res.status(400).json({ error: 'Missing booking ID' })
@@ -24,7 +24,6 @@ export default async function handler(req, res) {
   const booking = row
   const clientEmail = client.email
   const clientName = client.name
-  if (!resend) return res.status(500).json({ error: 'Email service is not configured' })
 
   const fmtDate = iso => iso ? new Date(iso + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }) : 'TBD'
   const fmtTime = t => { if (!t) return ''; const [h, m] = t.split(':'); const hr = parseInt(h); return `${hr % 12 || 12}:${m} ${hr < 12 ? 'AM' : 'PM'}` }
@@ -47,19 +46,14 @@ export default async function handler(req, res) {
     ${booking.notes ? `<p><strong>Session notes:</strong> ${escapeHtml(booking.notes)}</p>` : ''}
 
     <p style="margin-top:24px;">See you soon!<br/><strong>${escapeHtml(ownerName)}</strong></p>
-  `, bizName)
+  `, auth.config)
 
-  try {
-    const { data, error } = await resend.emails.send({
-      from: fromFor(bizName),
-      reply_to: auth.profile.email || undefined,
-      to: clientEmail,
-      subject: `Session reminder — ${fmtDate(booking.date)}`,
-      html,
-    })
-    if (error) return res.status(400).json({ error })
-    return res.status(200).json({ id: data.id })
-  } catch (err) {
-    return res.status(500).json({ error: err.message })
-  }
+  const result = await sendStudioEmail(auth.config, {
+    to: clientEmail,
+    clientId: row.client_id,
+    subject: `Session reminder — ${fmtDate(booking.date)}`,
+    html,
+  })
+  if (result.error) return res.status(400).json({ error: result.error })
+  return res.status(200).json({ id: result.id })
 }

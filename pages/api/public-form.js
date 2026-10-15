@@ -1,5 +1,7 @@
 import { createServiceClient } from '../../lib/pibase'
-import { resend, FROM, emailWrap } from '../../lib/email'
+import { notifyStudio } from '../../lib/push'
+import { emailWrap, sendStudioEmail } from '../../lib/email'
+import { loadStudioConfig } from '../../lib/studioConfig'
 
 const escapeHtml = (value = '') => String(value)
   .replace(/&/g, '&amp;')
@@ -86,8 +88,8 @@ export default async function handler(req, res) {
 
       // 3. Notify the studio owner by email (best-effort)
       try {
-        const { data: profile } = await db.from('profiles').select('email, business_name').eq('id', studioId).single()
-        if (resend && profile?.email) {
+        const config = await loadStudioConfig(db, studioId)
+        if (config.branding.studioEmail) {
           const fmtDate = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })
           const html = emailWrap(`
             <h1>New Inquiry</h1>
@@ -102,17 +104,18 @@ export default async function handler(req, res) {
             ${safeLead.message ? `<div class="box" style="font-family:Arial,sans-serif;font-size:13px;line-height:1.7;color:#444;"><strong>Message:</strong><br/><br/>${escapeHtml(safeLead.message)}</div>` : ''}
             <a href="${escapeHtml(process.env.NEXT_PUBLIC_APP_URL || 'https://manager.elliesheartstrings.com')}" class="btn">Open Studio Manager</a>
             <p style="margin-top:20px;font-size:13px;color:#9B9B98;">This lead has been added to your client list.</p>
-          `, profile.business_name)
-          await resend.emails.send({
-            from: FROM,
-            to: profile.email,
-            reply_to: safeLead.email,
+          `, config)
+          const result = await sendStudioEmail(config, {
+            to: config.branding.studioEmail,
+            replyTo: safeLead.email,
             subject: `New inquiry from ${safeLead.name}`,
             html,
           })
+          if (result.error) console.error('[public-form] email failed', result.error)
         }
       } catch (e) { console.error('[public-form] email failed', e) }
 
+      await notifyStudio(db, studioId, { type: 'bookings', title: `💌 New inquiry from ${safeLead.name}`, body: safeLead.interest || safeLead.message || safeLead.email, url: '/?view=clients', tag: `lead-${safeLead.email}` })
       return res.status(200).json({ ok: true })
     }
 

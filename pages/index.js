@@ -4,6 +4,7 @@ import { T, C } from '../lib/tokens'
 import { seed } from '../lib/data'
 import { pibase } from '../lib/pibase'
 import { loadUserData, syncCollections } from '../lib/db'
+import { assignInvoiceNumbers, hasInvoiceNumber, invoiceLabel } from '../lib/invoices'
 import { Toast } from '../components/UI'
 import Projects, { CardModalExport as CardModal } from '../components/Projects'
 import Clients from '../components/Clients'
@@ -38,7 +39,7 @@ function GlobalSearch({ data, setView }) {
     if (!q.trim()) return []
     const lo = q.toLowerCase(); const r = []
     data.clients.filter(c => !c.archived).forEach(c => { if (c.name.toLowerCase().includes(lo) || (c.email || '').toLowerCase().includes(lo)) r.push({ cat: 'Client', label: c.name, sub: `${c.type} · ${c.email || ''}`, view: 'clients' }) })
-    data.invoices.forEach(i => { if (i.client.toLowerCase().includes(lo) || i.id.toLowerCase().includes(lo)) r.push({ cat: 'Invoice', label: `${i.id} · ${i.client}`, sub: '$' + i.amount.toLocaleString(), view: 'invoices' }) })
+    data.invoices.forEach(i => { if (i.client.toLowerCase().includes(lo) || (i.number || '').toLowerCase().includes(lo)) r.push({ cat: 'Invoice', label: `${invoiceLabel(i)} · ${i.client}`, sub: '$' + i.amount.toLocaleString(), view: 'invoices' }) })
     data.bookings.forEach(b => { if (b.client.toLowerCase().includes(lo)) r.push({ cat: 'Booking', label: b.client, sub: b.date + ' · ' + b.location, view: 'calendar' }) })
     return r.slice(0, 7)
   }, [q, data])
@@ -320,6 +321,58 @@ export default function Home() {
     return () => clearTimeout(timer)
   }, [data, dbReady, user?.id, retryTick])
 
+  // Clients accept quotes, answer questionnaires, sign contracts and reply
+  // to messages from their own links and email. When the studio comes back to the tab, pull those
+  // updates in — but only if nothing local is still waiting to save.
+  useEffect(() => {
+    if (!dbReady || !user) return
+    let lastRefresh = Date.now()
+    let refreshing = false
+    const refresh = async () => {
+      if (document.visibilityState !== 'visible' || refreshing || Date.now() - lastRefresh < 15000) return
+      const idle = () => snapshotRef.current && JSON.stringify(snapshotRef.current) === JSON.stringify(latestDataRef.current)
+      if (!idle()) return
+      refreshing = true; lastRefresh = Date.now()
+      try {
+        const fresh = await loadUserData(user.id)
+        if (!idle() || syncUserRef.current !== user.id) return
+        snapshotRef.current = fresh
+        setData(fresh)
+      } catch (error) {
+        console.error('[db] refresh', error)
+      } finally {
+        refreshing = false
+      }
+    }
+    // Also check every minute so client replies and chat messages appear
+    // while the app is open.
+    const timer = setInterval(refresh, 60000)
+    window.addEventListener('focus', refresh)
+    document.addEventListener('visibilitychange', refresh)
+    return () => { clearInterval(timer); window.removeEventListener('focus', refresh); document.removeEventListener('visibilitychange', refresh) }
+  }, [dbReady, user?.id])
+
+  // Notifications tapped while the app is open switch to their page.
+  useEffect(() => {
+    const go = event => setActiveView(event.detail)
+    window.addEventListener('ehs:navigate', go)
+    return () => window.removeEventListener('ehs:navigate', go)
+  }, [])
+
+  // Unread conversations as a badge on the installed app's icon.
+  const unreadCount = dbReady ? data.messages.filter(m => m.unread).length : 0
+  useEffect(() => {
+    if (typeof navigator === 'undefined' || !('setAppBadge' in navigator)) return
+    ;(unreadCount ? navigator.setAppBadge(unreadCount) : navigator.clearAppBadge()).catch(() => {})
+  }, [unreadCount])
+
+  // Older invoices were stored with only a UUID (or "INV-001"). Give each a
+  // "#1xxx" number once after loading; the sync engine above persists it.
+  useEffect(() => {
+    if (!dbReady || data.invoices.every(hasInvoiceNumber)) return
+    setData(d => ({ ...d, invoices: assignInvoiceNumbers(d.invoices) }))
+  }, [dbReady, data.invoices])
+
   useEffect(() => {
     if (!pibase) return
     const warnOnExit = event => {
@@ -339,7 +392,7 @@ export default function Home() {
   if (!dbReady) {
     return <main style={{ maxWidth: 520, margin: '12vh auto', padding: 24, fontFamily: 'sans-serif' }}>
       <h1>EHS Studio Manager</h1>
-      <p>{loadError || (authChecked ? 'Sign in to access your studio data.' : 'Loading studio data...')}</p>
+      <p>{typeof navigator !== 'undefined' && !navigator.onLine ? 'You\'re offline. Connect to the internet to load your studio.' : loadError || (authChecked ? 'Sign in to access your studio data.' : 'Loading studio data...')}</p>
       {authChecked && <a href="/login">Go to sign in</a>}
     </main>
   }
@@ -363,7 +416,7 @@ export default function Home() {
     discounts: <Discounts {...props} />,
     invoices: <Invoices {...props} />,
     contracts: <Contracts {...props} />,
-    inbox: <Inbox {...props} />,
+    inbox: <Inbox {...props} openClientCard={c => setCalendarCardModal(c)} />,
     contactform: <ContactFormSettings {...props} />,
     settings: <Settings {...props} />,
   }
@@ -372,8 +425,6 @@ export default function Home() {
     <>
       <Head>
         <title>EHS Studio Manager</title>
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>📷</text></svg>" />
       </Head>
 
       <div style={{ display: 'flex', minHeight: '100vh', background: C.bg }}>

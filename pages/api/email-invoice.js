@@ -1,5 +1,6 @@
-import { resend, fromFor, emailWrap } from '../../lib/email'
+import { emailWrap, sendStudioEmail, signOffHtml } from '../../lib/email'
 import { requireUser } from '../../lib/api-auth'
+import { createInvoiceToken } from '../../lib/signingTokens'
 
 const escapeHtml = value => String(value ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;')
   .replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;')
@@ -9,8 +10,8 @@ export default async function handler(req, res) {
 
   const auth = await requireUser(req, res)
   if (!auth) return
-  const bizName = auth.profile.business_name || 'My Studio'
-  const ownerName = (auth.profile.full_name || '').split(' ')[0] || bizName
+  const bizName = auth.config.branding.businessName
+  const ownerName = (auth.config.branding.ownerName || '').split(' ')[0] || bizName
 
   const invoiceId = req.body?.invoice?.id
   if (!invoiceId) return res.status(400).json({ error: 'Missing invoice ID' })
@@ -24,7 +25,6 @@ export default async function handler(req, res) {
   const invoice = { ...row, client: row.client_name, lineItems: Array.isArray(row.line_items) ? row.line_items : row.line_items?.items || [] }
   const clientEmail = client.email
   const clientName = client.name
-  if (!resend) return res.status(500).json({ error: 'Email service is not configured' })
 
   const pct = invoice.amount > 0 ? Math.round((invoice.paid / invoice.amount) * 100) : 0
   const owing = invoice.amount - invoice.paid
@@ -34,40 +34,53 @@ export default async function handler(req, res) {
   const statusLabel = invoice.status === 'paid' ? 'Paid in full' : invoice.status === 'partial' ? `${fmt(invoice.paid)} paid · ${fmt(owing)} remaining` : `${fmt(invoice.amount)} due`
 
   const lineItemsHtml = invoice.lineItems?.length
-    ? invoice.lineItems.map(li => `<div class="box-row"><span class="label">${escapeHtml(li.description || li.name || 'Item')}${li.qty > 1 ? ` ×${Number(li.qty)}` : ''}</span><span class="value">${fmt((li.price || 0) * (li.qty || 1))}</span></div>`).join('')
+    ? invoice.lineItems.map(li => `<div class="box-row"><span class="label">${escapeHtml(li.name || li.description || 'Item')}${li.qty > 1 ? ` ×${Number(li.qty)}` : ''}</span><span class="value">${fmt((li.price || 0) * (li.qty || 1))}</span></div>`).join('')
     : ''
 
+  const label = invoice.number || 'Invoice'
+  let viewUrl = null
+  try {
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://manager.elliesheartstrings.com'
+    viewUrl = new URL(`/invoice/${createInvoiceToken(invoice.id)}`, baseUrl).toString()
+  } catch {
+    viewUrl = null
+  }
+
+  // The studio can write its own message in the send dialog; keep the
+  // default wording for callers that don't send one.
+  const customMessage = typeof req.body?.message === 'string' ? req.body.message.trim().slice(0, 5000) : ''
+  const intro = customMessage
+    ? customMessage.split(/\n{2,}/).map(paragraph => `<p>${escapeHtml(paragraph).replace(/\n/g, '<br/>')}</p>`).join('')
+    : `<p>Hi ${escapeHtml(clientName || 'there')},</p>
+    <p>Please find your invoice details below. ${invoice.status !== 'paid' ? 'Payment is due by ' + fmtDate(invoice.due) + '.' : 'Thank you for your payment!'}</p>`
+  const customSubject = typeof req.body?.subject === 'string' ? req.body.subject.replace(/[\r\n]+/g, ' ').trim().slice(0, 200) : ''
+
   const html = emailWrap(`
-    <h1>Invoice ${escapeHtml(invoice.number || invoice.id)}</h1>
-    <p>Hi ${escapeHtml(clientName || 'there')},</p>
-    <p>Please find your invoice details below. ${invoice.status !== 'paid' ? 'Payment is due by ' + fmtDate(invoice.due) + '.' : 'Thank you for your payment!'}</p>
+    <h1>Invoice ${escapeHtml(label)}</h1>
+    ${intro}
+    ${viewUrl ? `<p><a href="${escapeHtml(viewUrl)}" class="btn" style="color:#ffffff;">View invoice ${escapeHtml(label)}</a></p>` : ''}
 
     <div class="amount">${fmt(invoice.amount)}</div>
 
     <div class="box">
       ${lineItemsHtml}
-      <div class="box-row"><span class="label">Invoice</span><span class="value">${escapeHtml(invoice.number || invoice.id)}</span></div>
+      <div class="box-row"><span class="label">Invoice</span><span class="value">${escapeHtml(label)}</span></div>
       <div class="box-row"><span class="label">Due date</span><span class="value">${fmtDate(invoice.due)}</span></div>
       <div class="box-row"><span class="label">Status</span><span class="value">${statusLabel}</span></div>
       ${invoice.note ? `<div class="box-row"><span class="label">Note</span><span class="value">${escapeHtml(invoice.note)}</span></div>` : ''}
     </div>
 
-    <p>If you have any questions about this invoice, please don't hesitate to reach out.</p>
-    <p>Thank you for choosing ${escapeHtml(bizName)}.</p>
-    <p style="margin-top:24px;">Warmly,<br/><strong>${escapeHtml(ownerName)}</strong></p>
-  `, bizName)
+    ${customMessage ? '' : `<p>If you have any questions about this invoice, please don't hesitate to reach out.</p>
+    <p>Thank you for choosing ${escapeHtml(bizName)}.</p>`}
+    ${signOffHtml(auth.config)}
+  `, auth.config)
 
-  try {
-    const { data, error } = await resend.emails.send({
-      from: fromFor(bizName),
-      reply_to: auth.profile.email || undefined,
-      to: clientEmail,
-      subject: `Invoice ${invoice.number || invoice.id} from ${bizName}`,
-      html,
-    })
-    if (error) return res.status(400).json({ error })
-    return res.status(200).json({ id: data.id })
-  } catch (err) {
-    return res.status(500).json({ error: err.message })
-  }
+  const result = await sendStudioEmail(auth.config, {
+    to: clientEmail,
+    clientId: row.client_id,
+    subject: customSubject || `Invoice ${label} from ${bizName}`,
+    html,
+  })
+  if (result.error) return res.status(400).json({ error: result.error })
+  return res.status(200).json({ id: result.id })
 }

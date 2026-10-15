@@ -1,6 +1,7 @@
-import { resend, fromFor, emailWrap } from '../../lib/email'
+import { emailWrap, sendStudioEmail, signOffHtml } from '../../lib/email'
 import { requireUser } from '../../lib/api-auth'
 import { createContractToken } from '../../lib/signingTokens'
+import { messageHtml, cleanSubject } from '../../lib/documentEmail'
 
 function escapeHtml(value) {
   return String(value || '')
@@ -16,8 +17,8 @@ export default async function handler(req, res) {
 
   const auth = await requireUser(req, res)
   if (!auth) return
-  const bizName = auth.profile.business_name || 'My Studio'
-  const ownerName = (auth.profile.full_name || '').split(' ')[0] || bizName
+  const bizName = auth.config.branding.businessName
+  const ownerName = (auth.config.branding.ownerName || '').split(' ')[0] || bizName
 
   const contractId = req.body?.contract?.id
   if (!contractId) return res.status(400).json({ error: 'Missing contract ID' })
@@ -33,7 +34,6 @@ export default async function handler(req, res) {
   const contract = { id: row.id, type: row.type, body: row.body, sent: row.sent }
   const clientEmail = client.email
   const clientName = client.name
-  if (!resend) return res.status(500).json({ error: 'Email service is not configured' })
   const signUrl = contract.id
     ? `${process.env.NEXT_PUBLIC_APP_URL || 'https://manager.elliesheartstrings.com'}/sign/${createContractToken(contract.id)}`
     : null
@@ -41,8 +41,8 @@ export default async function handler(req, res) {
 
   const html = emailWrap(`
     <h1>${escapeHtml(contract.type || 'Photography Agreement')}</h1>
-    <p>Hi ${escapeHtml(clientName || 'there')},</p>
-    <p>Please review your photography contract below. You can sign it securely using the button in this email.</p>
+    ${messageHtml(req.body?.message) || `<p>Hi ${escapeHtml(clientName || 'there')},</p>
+    <p>Please review your photography contract below. You can sign it securely using the button in this email.</p>`}
 
     <div class="box">
       <div class="box-row"><span class="label">Contract</span><span class="value">${escapeHtml(contract.type || 'Photography Agreement')}</span></div>
@@ -55,20 +55,15 @@ export default async function handler(req, res) {
     ${contract.body ? `<div class="box" style="font-size:13px;line-height:1.8;font-family:Arial,sans-serif;color:#444;white-space:pre-wrap;max-height:400px;overflow:auto;">${preview}${contract.body.length > 2000 ? '...' : ''}</div>` : ''}
 
     <p>If you have any questions about the contract terms, please reach out before signing.</p>
-    <p style="margin-top:24px;">Warmly,<br/><strong>${escapeHtml(ownerName)}</strong></p>
-  `, bizName)
+    ${signOffHtml(auth.config)}
+  `, auth.config)
 
-  try {
-    const { data, error } = await resend.emails.send({
-      from: fromFor(bizName),
-      reply_to: auth.profile.email || undefined,
-      to: clientEmail,
-      subject: `Your ${contract.type || 'Photography Agreement'} — ${bizName}`,
-      html,
-    })
-    if (error) return res.status(400).json({ error })
-    return res.status(200).json({ id: data.id })
-  } catch (err) {
-    return res.status(500).json({ error: err.message })
-  }
+  const result = await sendStudioEmail(auth.config, {
+    to: clientEmail,
+    clientId: row.client_id,
+    subject: cleanSubject(req.body?.subject) || `Your ${contract.type || 'Photography Agreement'} — ${bizName}`,
+    html,
+  })
+  if (result.error) return res.status(400).json({ error: result.error })
+  return res.status(200).json({ id: result.id })
 }

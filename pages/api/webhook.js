@@ -1,5 +1,6 @@
-import stripe from '../../lib/stripe'
 import { createServiceClient } from '../../lib/pibase'
+import { notifyStudio } from '../../lib/push'
+import { defaultStudioId, getStripe, loadStudioConfig } from '../../lib/studioConfig'
 export const config = { api: { bodyParser: false } }
 async function getRawBody(req) {
   return new Promise((resolve, reject) => {
@@ -12,7 +13,13 @@ async function getRawBody(req) {
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
   const sig = req.headers['stripe-signature']
-  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET
+  // Keys come from the studio's Settings (?studio=<id> on the webhook URL,
+  // or STUDIO_OWNER_USER_ID), falling back to the server environment.
+  const serviceDb = createServiceClient()
+  const studioId = defaultStudioId(req)
+  const config = serviceDb && studioId ? await loadStudioConfig(serviceDb, studioId) : null
+  const stripe = config ? getStripe(config) : null
+  const webhookSecret = config?.secrets.stripeWebhookSecret || process.env.STRIPE_WEBHOOK_SECRET
   if (!stripe || !webhookSecret) return res.status(503).json({ error: 'Stripe webhook is not configured' })
   let event
   try {
@@ -40,6 +47,7 @@ export default async function handler(req, res) {
         paid: invoice.amount, status: 'paid', payment_method: 'Stripe', paid_at: new Date().toISOString(),
       }).eq('id', invoiceId).eq('user_id', userId).eq('payment_intent_id', intent.id)
       if (error) return res.status(500).json({ error: 'Unable to update invoice' })
+      await notifyStudio(db, userId, { type: 'payments', title: `💰 Payment received`, body: `$${(intent.amount_received / 100).toLocaleString('en-US', { minimumFractionDigits: 2 })} paid online`, url: '/?view=invoices', tag: `payment-${invoiceId}` })
       break
     }
     case 'payment_intent.payment_failed': {

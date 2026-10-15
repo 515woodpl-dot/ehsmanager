@@ -1,6 +1,6 @@
 -- ================================================================
--- EHS Studio Manager — PIBASE/Supabase-compatible Schema
--- Apply as a project owner migration in PIBASE, or in Supabase SQL Editor.
+-- EHS Studio Manager — PIBASE schema
+-- Apply as a project owner migration in PIBASE.
 -- ================================================================
 
 -- PostgreSQL's built-in gen_random_uuid() avoids extension DDL, which PIBASE
@@ -37,8 +37,29 @@ create table if not exists studio_settings (
     "redirectUrl":"",
     "checkboxOptions":["Family Portraits","Maternity Photography","Newborn Photography","Personal Portraits","Kids Portraits","Engagement / Couples Session","Other"]
   }'::jsonb,
+  branding        jsonb not null default '{}'::jsonb,      -- business details + logo
+  integrations    jsonb not null default '{}'::jsonb,      -- non-secret integration options
   updated_at      timestamptz default now(),
   unique (user_id)
+);
+
+-- ── Push notification devices (server-only, no RLS policies) ──
+create table if not exists push_subscriptions (
+  id          uuid primary key default gen_random_uuid(),
+  user_id     uuid not null references profiles(id) on delete cascade,
+  endpoint    text not null unique,
+  keys        jsonb not null,
+  device      text,
+  created_at  timestamptz not null default now(),
+  last_used_at timestamptz
+);
+create index if not exists push_subscriptions_user on push_subscriptions(user_id);
+
+-- ── Studio secrets (encrypted API keys; server-only, no RLS policies) ──
+create table if not exists studio_secrets (
+  user_id    uuid primary key references profiles(id) on delete cascade,
+  payload    text not null,
+  updated_at timestamptz not null default now()
 );
 
 -- ── Clients ──────────────────────────────────────────────────────
@@ -172,6 +193,8 @@ alter table quotes             enable row level security;
 alter table questionnaires     enable row level security;
 alter table messages           enable row level security;
 alter table leads              enable row level security;
+alter table studio_secrets     enable row level security;  -- no policies: server only
+alter table push_subscriptions enable row level security;  -- no policies: server only
 
 -- Profiles: own row only
 create policy "profiles_own" on profiles
@@ -217,7 +240,7 @@ create trigger on_auth_user_created
   after insert on auth.users
   for each row execute procedure handle_new_user();
 -- EHS booking catalog, public reservations, availability and discounts.
--- Apply once to an existing PIBASE project; a fresh project only needs supabase-schema.sql.
+-- Apply once to an existing PIBASE project; a fresh project only needs pibase-schema.sql.
 
 alter table studio_settings add column if not exists availability jsonb not null default '{"timezone":"America/New_York","noticeDays":1,"horizonDays":90,"bufferMinutes":0,"weekdays":{"0":[],"1":[{"start":"09:00","end":"17:00"}],"2":[{"start":"09:00","end":"17:00"}],"3":[{"start":"09:00","end":"17:00"}],"4":[{"start":"09:00","end":"17:00"}],"5":[{"start":"09:00","end":"17:00"}],"6":[]},"blockedDates":[],"blockedTimes":[]}'::jsonb;
 

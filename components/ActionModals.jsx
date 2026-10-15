@@ -1,189 +1,317 @@
 import { useState } from 'react'
 import { T, C } from '../lib/tokens'
+import { pibase } from '../lib/pibase'
 import { Modal } from './UI'
 import { LineItemBuilder, calcTotal } from './LineItemBuilder'
-import { CONTRACT_TEMPLATE, fillContract, buildContractFields } from '../lib/contractTemplate'
 import ContractBuilder from './ContractBuilder'
+import ContractDocument from './ContractDocument'
+import { Overlay, Header, SendEmailModal } from './InvoiceModals'
+import { nextInvoiceNumber, invoiceLabel } from '../lib/invoices'
+import { buildItemCatalog, nextQuoteNumber, quoteLabel } from '../lib/documents'
 
 const uid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => { const r = Math.random() * 16 | 0; return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16) })
-const fmt$ = n => '$' + Number(n || 0).toFixed(2)
+const fmt$ = n => '$' + Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+const fmtLongDate = iso => { if (!iso) return ''; const d = new Date(iso + 'T00:00:00'); return isNaN(d) ? iso : d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) }
+const firstName = name => (name || '').split(/\s+/)[0] || 'there'
+const wait = ms => new Promise(resolve => setTimeout(resolve, ms))
+const todayShort = () => new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 
-// ── Invoice Modal ─────────────────────────────────────────────────
-export function InvoiceModal({ client, data, setData, toast, onClose }) {
-  const emptyLine = { items: [{ id: uid(), name: '', description: '', qty: 1, price: '' }], discount: '', discountType: '%', tax: '', notes: 'Thank you for your business' }
-  const [lineData, setLineData] = useState(emptyLine)
-  const [due, setDue] = useState('')
-  const [existing, setExisting] = useState(null)
-
-  const clientInvoices = data.invoices.filter(i => i.clientId === client.id)
-  const total = calcTotal(lineData)
-
-  const save = () => {
-    if (calcTotal(lineData) === 0 && lineData.items.every(i => !i.name)) {
-      toast('Add at least one item'); return
-    }
-    const inv = {
-      id: uid(),
-      number: 'INV-' + String(data.invoices.length + 1).padStart(3, '0'),
-      client: client.name, clientId: client.id,
-      amount: total, due, status: 'unpaid', paid: 0,
-      note: lineData.notes || '', paymentIntentId: null,
-      lineData,
-    }
-    setData(d => ({ ...d, invoices: [...d.invoices, inv] }))
-    toast('Invoice created'); onClose()
+// Calls an authenticated API route. A document created a moment ago may
+// still be saving in the background, so a 404 is retried briefly.
+async function callApi(endpoint, body) {
+  const { data: { session } } = await pibase.auth.getSession()
+  for (let attempt = 0; attempt < 6; attempt++) {
+    const r = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token || ''}` }, body: JSON.stringify(body) })
+    const result = await r.json().catch(() => ({}))
+    if (r.ok) return result
+    if (r.status !== 404 || attempt === 5) throw new Error(typeof result.error === 'string' ? result.error : result.error?.message || 'Request failed')
+    await wait(1000)
   }
-
-  return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.22)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20, backdropFilter: 'blur(4px)' }} className="modal-wrap"
-      onClick={e => { if (e.target === e.currentTarget) onClose() }}>
-      <div style={{ background: C.surface, borderRadius: 16, padding: 30, width: '100%', maxWidth: 780, maxHeight: '92vh', overflowY: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,0.14)' }} className="modal-inner">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-          <div style={T.modalTitle}>New Invoice — {client.name}</div>
-          <button onClick={onClose} style={{ ...T.btnGhost, fontSize: 20, color: C.muted }}>×</button>
-        </div>
-
-        {/* Existing invoices for this client */}
-        {clientInvoices.length > 0 && (
-          <div style={{ marginBottom: 20, padding: '12px 16px', background: C.surface2, borderRadius: 10, border: `1px solid ${C.border}` }}>
-            <div style={{ fontSize: 12, fontWeight: 600, color: C.muted, marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Previous invoices</div>
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              {clientInvoices.map(i => (
-                <div key={i.id} style={{ padding: '4px 12px', borderRadius: 20, border: `1px solid ${C.border2}`, fontSize: 12, fontWeight: 500, color: C.muted, background: C.surface }}>
-                  {i.id} · {fmt$(i.amount)} · <span style={{ color: i.status === 'paid' ? C.green : i.status === 'partial' ? C.amber : C.red }}>{i.status}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Due date */}
-        <div style={{ display: 'flex', gap: 12, marginBottom: 20, alignItems: 'flex-end' }}>
-          <div style={{ ...T.formGroup, marginBottom: 0, flex: 1 }}>
-            <label style={T.formLabel}>Due date</label>
-            <input style={T.formInput} type="date" value={due} onChange={e => setDue(e.target.value)} />
-          </div>
-          <div style={{ fontSize: 13, color: C.muted, paddingBottom: 10 }}>For: <strong>{client.name}</strong></div>
-        </div>
-
-        <LineItemBuilder value={lineData} onChange={setLineData} />
-
-        <div style={T.modalFooter}>
-          <button style={T.btn} onClick={onClose}>Cancel</button>
-          <button style={T.btnPrimary} onClick={save}>Create invoice · {fmt$(total)}</button>
-        </div>
-      </div>
-    </div>
-  )
 }
 
-// ── Quote Modal ───────────────────────────────────────────────────
-export function QuoteModal({ client, data, setData, toast, onClose }) {
-  const emptyLine = { items: [{ id: uid(), name: '', description: '', qty: 1, price: '' }], discount: '', discountType: '%', tax: '', notes: '' }
-  const [lineData, setLineData] = useState(emptyLine)
-  const [validUntil, setValidUntil] = useState('')
-  const total = calcTotal(lineData)
+async function copyText(value) {
+  try { await navigator.clipboard.writeText(value); return true } catch {}
+  const input = document.createElement('textarea')
+  input.value = value; input.style.position = 'fixed'; input.style.opacity = '0'; document.body.appendChild(input); input.select()
+  const copied = document.execCommand('copy'); input.remove(); return copied
+}
 
-  const save = () => {
-    const q = {
-      id: uid(),
-      client: client.name, clientId: client.id,
-      amount: total, validUntil, status: 'pending',
-      lineData, createdAt: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+// Gets the client's private chat link and copies it.
+export async function copyChatLink(clientId, toast) {
+  try {
+    const { url } = await callApi('/api/chat-link', { clientId })
+    toast(await copyText(url) ? 'Chat link copied — share it with your client' : url)
+  } catch (error) { toast(error.message || 'Could not create chat link') }
+}
+
+const clientFor = (data, doc, fallback) => data.clients.find(c => c.id === doc?.clientId) || fallback || data.clients.find(c => c.name === doc?.client) || null
+
+function Banner({ tone = 'open', children }) {
+  const colors = tone === 'done' ? [C.greenBg, C.green] : ['#FFF1DC', '#8A5300']
+  return <div style={{ margin: '0 0 18px', padding: '10px 14px', background: colors[0], color: colors[1], borderRadius: 8, fontSize: 13 }}>{children}</div>
+}
+
+// ── Quote ─────────────────────────────────────────────────────────
+const emptyQuoteLines = () => ({ items: [{ id: uid(), name: '', description: '', qty: 1, price: '' }], discount: '', discountType: '%', tax: '', notes: '' })
+
+export function QuoteModal({ client: clientProp, quote, data, setData, toast, onClose, onSaved }) {
+  const isEdit = !!quote
+  const client = clientFor(data, quote, clientProp)
+  const clientName = client?.name || quote?.client || ''
+  const [lineData, setLineData] = useState(() => quote?.lineData?.items?.length ? quote.lineData : emptyQuoteLines())
+  const [validUntil, setValidUntil] = useState(quote?.validUntil || '')
+  const [sendFor, setSendFor] = useState(null)
+  const total = calcTotal(lineData)
+  const accepted = quote?.status === 'accepted'
+  const linkedInvoice = quote?.invoiceId ? data.invoices.find(i => i.id === quote.invoiceId) : null
+
+  const build = () => ({ ...(quote || {}), client: clientName, clientId: client?.id || quote?.clientId || null, amount: total, validUntil, lineData })
+
+  const save = ({ thenSend = false } = {}) => {
+    if (lineData.items.every(i => !i.name?.trim()) && total === 0) { toast('Add at least one item'); return }
+    let saved
+    if (isEdit) {
+      saved = build()
+      setData(d => ({ ...d, quotes: d.quotes.map(q => q.id === quote.id ? saved : q) }))
+      toast(`Quote ${quoteLabel(saved)} updated`)
+    } else {
+      saved = { ...build(), id: uid(), number: nextQuoteNumber(data.quotes || []), status: 'pending', createdAt: new Date().toISOString() }
+      setData(d => ({ ...d, quotes: [...(d.quotes || []), saved] }))
+      toast(`Quote ${saved.number} created`)
     }
-    setData(d => ({ ...d, quotes: [...(d.quotes || []), q] }))
-    toast('Quote sent'); onClose()
+    onSaved?.()
+    if (!isEdit || thenSend) setSendFor(saved)
+    else onClose()
   }
 
-  const clientQuotes = (data.quotes || []).filter(q => q.clientId === client.id)
+  // Accepting a quote turns it into an unpaid invoice with the same items.
+  const accept = () => {
+    if (!confirm(`Mark quote ${quoteLabel(quote)} as accepted and create an invoice for ${fmt$(total)}?`)) return
+    const number = nextInvoiceNumber(data.invoices)
+    const invoice = { id: uid(), number, client: clientName, clientId: client?.id || quote.clientId || null, amount: total, due: '', status: 'unpaid', paid: 0, note: lineData.notes || `From accepted quote ${quoteLabel(quote)}`, paymentIntentId: null, lineData, createdAt: new Date().toISOString() }
+    setData(d => ({
+      ...d,
+      invoices: [...d.invoices, invoice],
+      quotes: d.quotes.map(q => q.id === quote.id ? { ...build(), status: 'accepted', invoiceId: invoice.id, acceptedAt: new Date().toISOString() } : q),
+    }))
+    toast(`Quote accepted · invoice ${number} created`); onSaved?.(); onClose()
+  }
+
+  const remove = () => {
+    if (!confirm(`Delete quote ${quoteLabel(quote)}? This cannot be undone.`)) return
+    setData(d => ({ ...d, quotes: d.quotes.filter(q => q.id !== quote.id) }))
+    toast(`Quote ${quoteLabel(quote)} deleted`); onClose()
+  }
+
+  if (sendFor) {
+    const valid = sendFor.validUntil ? ` It's valid until ${fmtLongDate(sendFor.validUntil)}.` : ''
+    return <SendEmailModal endpoint="/api/email-quote" payload={{ quote: { id: sendFor.id } }} client={client} clientName={clientName} toast={toast} onClose={() => onClose()} justCreated={!isEdit}
+      title={!isEdit ? `Quote ${sendFor.number} created — email it to ${clientName}?` : `Email quote ${quoteLabel(sendFor)}`} sentToast={`Quote ${quoteLabel(sendFor)} emailed`}
+      initialSubject={`Your quote ${quoteLabel(sendFor)} is ready`}
+      initialMessage={`Hi ${firstName(clientName)},\n\nThank you for your interest! Here is your quote ${quoteLabel(sendFor)} for ${fmt$(sendFor.amount)}.${valid}\n\nClick the button below to review it. If everything looks good, you can accept it right there and your invoice will be created automatically.`}
+      buttonLabel="View & accept quote" />
+  }
 
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.22)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20, backdropFilter: 'blur(4px)' }} className="modal-wrap"
-      onClick={e => { if (e.target === e.currentTarget) onClose() }}>
-      <div style={{ background: C.surface, borderRadius: 16, padding: 30, width: '100%', maxWidth: 780, maxHeight: '92vh', overflowY: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,0.14)' }} className="modal-inner">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-          <div style={T.modalTitle}>New Quote — {client.name}</div>
-          <button onClick={onClose} style={{ ...T.btnGhost, fontSize: 20, color: C.muted }}>×</button>
+    <Overlay onClose={onClose}>
+      <Header title={isEdit ? `Quote ${quoteLabel(quote)} — ${clientName}` : `New quote — ${clientName}`} onClose={onClose} />
+      {accepted && <Banner tone="done">Accepted{quote.acceptedAt ? ` on ${new Date(quote.acceptedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}` : ''}.{linkedInvoice ? ` Invoice ${invoiceLabel(linkedInvoice)} was created from it.` : ''}</Banner>}
+      {isEdit && !accepted && <Banner>Waiting for {clientName} to accept.</Banner>}
+
+      <div className="invoice-editor-meta">
+        <div style={{ ...T.formGroup, marginBottom: 0 }}>
+          <label style={T.formLabel}>Prepared for</label>
+          <div style={{ padding: '9px 0', fontSize: 14, fontWeight: 500 }}>{clientName}{client?.email ? <span style={{ color: C.muted, fontWeight: 400 }}> · {client.email}</span> : ''}</div>
         </div>
-
-        {clientQuotes.length > 0 && (
-          <div style={{ marginBottom: 20, padding: '12px 16px', background: C.surface2, borderRadius: 10, border: `1px solid ${C.border}` }}>
-            <div style={{ fontSize: 12, fontWeight: 600, color: C.muted, marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Previous quotes</div>
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              {clientQuotes.map(q => (
-                <div key={q.id} style={{ padding: '4px 12px', borderRadius: 20, border: `1px solid ${C.border2}`, fontSize: 12, fontWeight: 500, color: C.muted, background: C.surface, cursor: 'pointer' }}
-                  onClick={() => setLineData(q.lineData || emptyLine)} title="Click to load this quote">
-                  {q.id} · {fmt$(q.amount)} · {q.status} ↩
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        <div style={{ ...T.formGroup, marginBottom: 20 }}>
+        <div style={{ ...T.formGroup, marginBottom: 0 }}>
+          <label style={T.formLabel}>Quote number</label>
+          <div style={{ padding: '9px 0', fontSize: 14, fontWeight: 500 }}>{isEdit ? quoteLabel(quote) : nextQuoteNumber(data.quotes || [])}</div>
+        </div>
+        <div style={{ ...T.formGroup, marginBottom: 0 }}>
           <label style={T.formLabel}>Valid until</label>
-          <input style={{ ...T.formInput, maxWidth: 220 }} type="date" value={validUntil} onChange={e => setValidUntil(e.target.value)} />
-        </div>
-
-        <LineItemBuilder value={lineData} onChange={setLineData} />
-
-        <div style={T.modalFooter}>
-          <button style={T.btn} onClick={onClose}>Cancel</button>
-          <button style={T.btnPrimary} onClick={save}>Send quote · {fmt$(total)}</button>
+          <input style={T.formInput} type="date" value={validUntil} onChange={e => setValidUntil(e.target.value)} />
         </div>
       </div>
-    </div>
+
+      <LineItemBuilder value={lineData} onChange={setLineData} catalog={buildItemCatalog(data)} />
+
+      <div style={{ ...T.modalFooter, flexWrap: 'wrap' }} className="modal-footer-wrap">
+        {isEdit && <button style={{ ...T.btn, color: C.red, borderColor: C.red }} onClick={remove}>Delete</button>}
+        <div style={{ flex: 1 }} />
+        <button style={T.btn} onClick={onClose}>Cancel</button>
+        {isEdit && !accepted && <button style={{ ...T.btn, color: C.green, borderColor: C.green }} onClick={accept}>Accepted → create invoice</button>}
+        {isEdit && !accepted && <button style={T.btn} onClick={() => save({ thenSend: true })}>Save &amp; email client</button>}
+        <button style={T.btnPrimary} onClick={() => save()}>{isEdit ? 'Save changes' : 'Create quote'} · {fmt$(total)}</button>
+      </div>
+    </Overlay>
   )
 }
 
-// ── Contract Modal (1.8 — dynamic builder) ───────────────────────
-export function ContractModal({ client, data, setData, toast, onClose }) {
-  const handleSave = (k) => {
-    setData(d => ({ ...d, contracts: [...d.contracts, k] }))
-    toast('Contract created'); onClose()
+// ── Contract ──────────────────────────────────────────────────────
+// Without `contract`: build a new one, then offer to email it.
+// With `contract`: view it, email it, copy the signing link, edit or delete.
+export function ContractModal({ client: clientProp, contract, startMode = 'view', data, setData, toast, onClose, onSaved }) {
+  const [mode, setMode] = useState(contract ? startMode : 'build') // build | view | send
+  const [current, setCurrent] = useState(contract || null)
+  const [link, setLink] = useState('')
+  const [busy, setBusy] = useState(false)
+  const live = current ? data.contracts.find(k => k.id === current.id) || current : null
+  const client = clientFor(data, live, clientProp)
+  const clientName = client?.name || live?.client || ''
+
+  const handleSave = k => {
+    const exists = data.contracts.some(item => item.id === k.id)
+    setData(d => ({ ...d, contracts: exists ? d.contracts.map(item => item.id === k.id ? k : item) : [...d.contracts, k] }))
+    toast(exists ? 'Contract updated' : 'Contract saved'); onSaved?.()
+    setCurrent(k); setMode(exists ? 'view' : 'send')
   }
+
+  const copyLink = async () => {
+    setBusy(true)
+    try {
+      const result = await callApi('/api/contract-link', { contractId: live.id })
+      setLink(result.url)
+      toast(await copyText(result.url) ? 'Signing link copied' : 'Signing link ready')
+    } catch (error) { toast(error.message || 'Could not create signing link') }
+    setBusy(false)
+  }
+
+  const remove = () => {
+    if (!confirm('Delete this contract? This cannot be undone.')) return
+    setData(d => ({ ...d, contracts: d.contracts.filter(k => k.id !== live.id) }))
+    toast('Contract deleted'); onClose()
+  }
+
+  if (mode === 'build') {
+    return (
+      <Overlay onClose={onClose} maxWidth={760}>
+        <ContractBuilder client={client} contract={live} data={data} onSave={handleSave} onClose={live ? () => setMode('view') : onClose} />
+      </Overlay>
+    )
+  }
+
+  if (mode === 'send') {
+    return <SendEmailModal endpoint="/api/email-contract" payload={{ contract: { id: live.id } }} client={client} clientName={clientName} toast={toast}
+      onClose={result => (result?.sent || !contract || startMode === 'send' ? onClose() : setMode('view'))} justCreated={!contract}
+      title={!contract ? `Contract saved — email it to ${clientName} to sign?` : `Email contract to ${clientName}`} sentToast="Contract emailed"
+      initialSubject={`Your ${live.type || 'photography agreement'} is ready to sign`}
+      initialMessage={`Hi ${firstName(clientName)},\n\nYour ${live.type || 'photography agreement'} is ready. Please review it and sign securely using the button below.\n\nIf you have any questions about the terms, just reply to this email before signing.`}
+      buttonLabel="Review and sign contract"
+      extraActions={<button style={T.btn} disabled={busy} onClick={copyLink}>{busy ? 'Preparing…' : 'Copy signing link'}</button>} />
+  }
+
+  const signed = live.status === 'signed'
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.22)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20, backdropFilter: 'blur(4px)' }} className="modal-wrap"
-      onClick={e => { if (e.target === e.currentTarget) onClose() }}>
-      <div style={{ background: C.surface, borderRadius: 16, padding: 30, width: '100%', maxWidth: 740, maxHeight: '92vh', overflowY: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,0.14)' }} className="modal-inner">
-        <ContractBuilder client={client} data={data} onSave={handleSave} onClose={onClose} />
+    <Overlay onClose={onClose} maxWidth={820}>
+      <Header title={`${live.type || 'Contract'} — ${clientName}`} onClose={onClose} />
+      {signed
+        ? <Banner tone="done">Signed by {live.signedBy || clientName}{live.signedAt ? ` · ${live.signedAt}` : ''}</Banner>
+        : <Banner>Waiting for {clientName} to sign · created {live.sent || 'recently'}</Banner>}
+      {link && (
+        <div style={T.formGroup}>
+          <label style={T.formLabel}>Signing link</label>
+          <input aria-label="Signing link" style={T.formInput} readOnly value={link} onFocus={event => event.currentTarget.select()} />
+        </div>
+      )}
+      <div style={{ background: C.surface2, borderRadius: 10, padding: 12, border: `1px solid ${C.border}`, maxHeight: '55vh', overflowY: 'auto' }}>
+        <ContractDocument body={live.body} signedBy={live.signedBy} signedAt={live.signedAt} signatureData={live.fields?.signatureData} headerImageUrl={live.fields?.headerImageUrl} />
       </div>
-    </div>
+      <div style={{ ...T.modalFooter, flexWrap: 'wrap' }} className="modal-footer-wrap">
+        <button style={{ ...T.btn, color: C.red, borderColor: C.red }} onClick={remove}>Delete</button>
+        <div style={{ flex: 1 }} />
+        {!signed && <button style={T.btn} onClick={() => setMode('build')}>Edit</button>}
+        {!signed && <button style={T.btn} disabled={busy} onClick={copyLink}>{busy ? 'Preparing…' : 'Copy signing link'}</button>}
+        {!signed && <button style={T.btnPrimary} onClick={() => setMode('send')}>Email to client</button>}
+        {signed && <button style={T.btnPrimary} onClick={onClose}>Close</button>}
+      </div>
+    </Overlay>
   )
 }
 
-// ── Questionnaire Modal ───────────────────────────────────────────
-export function QuestionnaireModal({ client, data, setData, toast, onClose }) {
-  const [title, setTitle] = useState(`${client.type || 'Session'} Questionnaire`)
-  const [questions, setQuestions] = useState([
-    { id: uid(), text: 'How did you hear about us?', type: 'text' },
-    { id: uid(), text: 'Do you have any specific shots in mind?', type: 'textarea' },
-    { id: uid(), text: 'Are there any props or outfits you plan to bring?', type: 'text' },
-  ])
+// ── Questionnaire ─────────────────────────────────────────────────
+const defaultQuestions = () => [
+  { id: uid(), text: 'How did you hear about us?', type: 'text' },
+  { id: uid(), text: 'Do you have any specific shots in mind?', type: 'textarea' },
+  { id: uid(), text: 'Are there any props or outfits you plan to bring?', type: 'text' },
+]
+
+export function QuestionnaireModal({ client: clientProp, questionnaire, data, setData, toast, onClose, onSaved }) {
+  const isEdit = !!questionnaire
+  const live = isEdit ? (data.questionnaires || []).find(q => q.id === questionnaire.id) || questionnaire : null
+  const client = clientFor(data, live, clientProp)
+  const clientName = client?.name || live?.client || ''
+  const [title, setTitle] = useState(live?.title || `${client?.type || 'Session'} Questionnaire`)
+  const [questions, setQuestions] = useState(live?.questions?.length ? live.questions : defaultQuestions())
   const [newQ, setNewQ] = useState('')
+  const [sendFor, setSendFor] = useState(null)
 
   const addQ = () => {
     if (!newQ.trim()) return
     setQuestions([...questions, { id: uid(), text: newQ.trim(), type: 'text' }])
     setNewQ('')
   }
-
   const removeQ = id => setQuestions(questions.filter(q => q.id !== id))
   const updateQ = (id, patch) => setQuestions(questions.map(q => q.id === id ? { ...q, ...patch } : q))
 
   const save = () => {
-    const qn = {
-      id: uid(), client: client.name, clientId: client.id, title,
-      questions, status: 'sent',
-      createdAt: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+    const cleaned = questions.filter(q => q.text.trim())
+    if (!cleaned.length) { toast('Add at least one question'); return }
+    let saved
+    if (isEdit) {
+      saved = { ...live, title, questions: cleaned }
+      setData(d => ({ ...d, questionnaires: d.questionnaires.map(q => q.id === live.id ? saved : q) }))
+    } else {
+      saved = { id: uid(), client: clientName, clientId: client?.id || null, title, questions: cleaned, answers: {}, status: 'draft', createdAt: todayShort() }
+      setData(d => ({ ...d, questionnaires: [...(d.questionnaires || []), saved] }))
     }
-    setData(d => ({ ...d, questionnaires: [...(d.questionnaires || []), qn] }))
-    toast('Questionnaire created'); onClose()
+    onSaved?.(); setSendFor(saved)
+  }
+
+  const remove = () => {
+    if (!confirm(`Delete "${live.title}"? This cannot be undone.`)) return
+    setData(d => ({ ...d, questionnaires: d.questionnaires.filter(q => q.id !== live.id) }))
+    toast('Questionnaire deleted'); onClose()
+  }
+
+  if (sendFor) {
+    return <SendEmailModal endpoint="/api/email-questionnaire" payload={{ questionnaire: { id: sendFor.id } }} client={client} clientName={clientName} toast={toast}
+      onClose={result => {
+        if (result?.sent) setData(d => ({ ...d, questionnaires: d.questionnaires.map(q => q.id === sendFor.id && q.status !== 'completed' ? { ...q, status: 'sent' } : q) }))
+        else if (sendFor.status !== 'sent') toast('Saved as a draft — open it from Activity to send it')
+        onClose()
+      }}
+      justCreated title={`Send "${sendFor.title}" to ${clientName}`} sentToast="Questionnaire sent"
+      initialSubject="A few questions before your session"
+      initialMessage={`Hi ${firstName(clientName)},\n\nTo help us plan your session, please take a few minutes to answer a few quick questions.\n\nClick the button below to open the questionnaire. Thank you!`}
+      buttonLabel="Answer questionnaire" />
+  }
+
+  // Answered questionnaires are read-only: show the client's answers.
+  if (live?.status === 'completed') {
+    const submittedAt = live.answers?.submittedAt
+    return (
+      <Modal title={`${live.title} — ${clientName}`} onClose={onClose} wide
+        footer={<><button style={{ ...T.btn, color: C.red, borderColor: C.red }} onClick={remove}>Delete</button><div style={{ flex: 1 }} /><button style={T.btnPrimary} onClick={onClose}>Close</button></>}>
+        <Banner tone="done">Answered{submittedAt ? ` on ${new Date(submittedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}` : ''}</Banner>
+        {live.questions.map((q, i) => (
+          <div key={q.id} style={{ padding: '12px 0', borderBottom: `1px solid ${C.border}` }}>
+            <div style={{ fontSize: 12, color: C.muted, fontWeight: 600, marginBottom: 4 }}>{i + 1}. {q.text}</div>
+            <div style={{ fontSize: 14, whiteSpace: 'pre-wrap' }}>{live.answers?.[q.id] || <span style={{ color: C.faint }}>No answer</span>}</div>
+          </div>
+        ))}
+      </Modal>
+    )
   }
 
   return (
-    <Modal title={`Questionnaire — ${client.name}`} onClose={onClose} wide
-      footer={<><button style={T.btn} onClick={onClose}>Cancel</button><button style={T.btnPrimary} onClick={save}>Send questionnaire</button></>}>
+    <Modal title={isEdit ? `${live.title} — ${clientName}` : `Questionnaire — ${clientName}`} onClose={onClose} wide
+      footer={<>
+        {isEdit && <button style={{ ...T.btn, color: C.red, borderColor: C.red }} onClick={remove}>Delete</button>}
+        <div style={{ flex: 1 }} />
+        <button style={T.btn} onClick={onClose}>Cancel</button>
+        <button style={T.btnPrimary} onClick={save}>{live?.status === 'sent' ? 'Save & resend' : 'Next: send to client'}</button>
+      </>}>
+      {live && <Banner>{live.status === 'sent' ? `Sent to ${clientName} — waiting for answers.` : 'Draft — not sent yet.'}</Banner>}
       <div style={T.formGroup}>
         <label style={T.formLabel}>Questionnaire title</label>
         <input style={T.formInput} value={title} onChange={e => setTitle(e.target.value)} />
@@ -192,15 +320,15 @@ export function QuestionnaireModal({ client, data, setData, toast, onClose }) {
       <div style={{ marginBottom: 16 }}>
         <label style={T.formLabel}>Questions</label>
         {questions.map((q, i) => (
-          <div key={q.id} style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
+          <div key={q.id} className="questionnaire-row">
             <div style={{ width: 24, height: 24, borderRadius: '50%', background: C.surface3, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 600, color: C.muted, flexShrink: 0 }}>{i + 1}</div>
-            <input style={{ ...T.formInput, flex: 1 }} value={q.text} onChange={e => updateQ(q.id, { text: e.target.value })} placeholder="Question text" />
-            <select style={{ ...T.formInput, width: 110 }} value={q.type} onChange={e => updateQ(q.id, { type: e.target.value })}>
+            <input style={{ ...T.formInput, flex: 1, minWidth: 0 }} value={q.text} onChange={e => updateQ(q.id, { text: e.target.value })} placeholder="Question text" />
+            <select style={{ ...T.formInput, width: 120 }} value={q.type} onChange={e => updateQ(q.id, { type: e.target.value })}>
               <option value="text">Short text</option>
               <option value="textarea">Long text</option>
               <option value="yesno">Yes / No</option>
             </select>
-            <button style={{ ...T.btnGhost, color: C.red, fontSize: 16, flexShrink: 0 }} onClick={() => removeQ(q.id)}>×</button>
+            <button aria-label="Remove question" style={{ ...T.btnGhost, color: C.red, fontSize: 16, flexShrink: 0 }} onClick={() => removeQ(q.id)}>×</button>
           </div>
         ))}
       </div>
@@ -213,31 +341,54 @@ export function QuestionnaireModal({ client, data, setData, toast, onClose }) {
   )
 }
 
-// ── Session Modal ─────────────────────────────────────────────────
-export function SessionModal({ client, data, setData, toast, onClose }) {
+// ── Session ───────────────────────────────────────────────────────
+export function SessionModal({ client: clientProp, session, data, setData, toast, onClose, onSaved }) {
+  const isEdit = !!session
+  const client = clientFor(data, session, clientProp)
+  const clientName = client?.name || session?.client || ''
   const [form, setForm] = useState({
-    type: client.type || data.sessionTypes?.[0] || 'Family',
-    date: client.date || '',
-    time: '',
-    location: '',
-    notes: '',
+    type: session?.type || client?.type || data.sessionTypes?.[0] || 'Family',
+    date: session?.date || client?.date || '',
+    time: session?.time || '',
+    location: session?.location || '',
+    notes: session?.notes || '',
+    status: session?.status || 'pending',
   })
   const types = data.sessionTypes || ['Family', 'Maternity', 'Newborn', 'Portrait']
+  const when = form.date ? new Date(form.date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }) : ''
 
   const save = () => {
     if (!form.date) { toast('Please set a session date'); return }
-    const b = { id: uid(), client: client.name, clientId: client.id, ...form, status: 'pending' }
-    setData(d => ({ ...d, bookings: [...d.bookings, b] }))
-    toast('Session scheduled'); onClose()
+    if (isEdit) {
+      setData(d => ({ ...d, bookings: d.bookings.map(b => b.id === session.id ? { ...b, ...form } : b) }))
+      toast('Session updated')
+    } else {
+      const b = { id: uid(), client: clientName, clientId: client?.id || null, ...form }
+      setData(d => ({ ...d, bookings: [...d.bookings, b] }))
+      toast(`Session scheduled · ${when}${form.time ? ` at ${form.time}` : ''}`)
+    }
+    onSaved?.(); onClose()
+  }
+
+  const remove = () => {
+    if (!confirm('Delete this session? This cannot be undone.')) return
+    setData(d => ({ ...d, bookings: d.bookings.filter(b => b.id !== session.id) }))
+    toast('Session deleted'); onClose()
   }
 
   return (
-    <Modal title={`Schedule Session — ${client.name}`} onClose={onClose}
-      footer={<><button style={T.btn} onClick={onClose}>Cancel</button><button style={T.btnPrimary} onClick={save}>Schedule session</button></>}>
+    <Modal title={`${isEdit ? 'Session' : 'Schedule session'} — ${clientName}`} onClose={onClose}
+      footer={<>
+        {isEdit && <button style={{ ...T.btn, color: C.red, borderColor: C.red }} onClick={remove}>Delete</button>}
+        <div style={{ flex: 1 }} />
+        <button style={T.btn} onClick={onClose}>Cancel</button>
+        <button style={T.btnPrimary} onClick={save}>{isEdit ? 'Save changes' : 'Schedule session'}</button>
+      </>}>
       <div style={T.formRow} className="form-row-2">
         <div style={T.formGroup}>
           <label style={T.formLabel}>Session type</label>
           <select style={T.formInput} value={form.type} onChange={e => setForm({ ...form, type: e.target.value })}>
+            {!types.includes(form.type) && form.type && <option>{form.type}</option>}
             {types.map(t => <option key={t}>{t}</option>)}
           </select>
         </div>
@@ -256,110 +407,85 @@ export function SessionModal({ client, data, setData, toast, onClose }) {
           <input style={T.formInput} placeholder="Studio, park, etc." value={form.location} onChange={e => setForm({ ...form, location: e.target.value })} />
         </div>
       </div>
+      {isEdit && (
+        <div style={T.formGroup}>
+          <label style={T.formLabel}>Status</label>
+          <select style={T.formInput} value={form.status} onChange={e => setForm({ ...form, status: e.target.value })}>
+            <option value="pending">Pending</option>
+            <option value="confirmed">Confirmed</option>
+            <option value="canceled">Canceled</option>
+          </select>
+        </div>
+      )}
       <div style={T.formGroup}>
         <label style={T.formLabel}>Notes for client</label>
         <textarea style={{ ...T.formInput, resize: 'none' }} rows={3} placeholder="Outfit suggestions, what to bring, parking info..." value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} />
       </div>
 
-      {/* Preview */}
       {form.date && (
         <div style={{ background: C.surface2, borderRadius: 8, padding: '12px 14px', marginTop: 4, fontSize: 13, color: C.muted }}>
-          📅 <strong style={{ color: C.text }}>{client.name}</strong> · {form.type} · {new Date(form.date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}{form.time ? ` at ${form.time}` : ''}{form.location ? ` · ${form.location}` : ''}
+          📅 <strong style={{ color: C.text }}>{clientName}</strong> · {form.type} · {when}{form.time ? ` at ${form.time}` : ''}{form.location ? ` · ${form.location}` : ''}
         </div>
       )}
     </Modal>
   )
 }
 
-// ── Message Modal ─────────────────────────────────────────────────
-export function MessageModal({ client, data, setData, toast, onClose }) {
+// ── Message ───────────────────────────────────────────────────────
+// Emails the client through /api/email-message (Resend) and records the
+// message in their Inbox conversation.
+export function MessageModal({ client, data, setData, toast, onClose, onSaved }) {
   const [body, setBody] = useState('')
+  const [sending, setSending] = useState(false)
+  const [error, setError] = useState('')
   const existing = data.messages.find(m => m.clientId === client.id)
 
-  const send = () => {
+  const send = async () => {
     if (!body.trim()) { toast('Write a message first'); return }
-    const msg = { id: uid(), from: 'You', text: body.trim(), time: 'Just now', out: true }
-    if (existing) {
-      setData(d => ({ ...d, messages: d.messages.map(m => m.id === existing.id ? { ...m, thread: [...m.thread, msg] } : m) }))
-    } else {
-      setData(d => ({ ...d, messages: [{ id: uid(), from: client.name, clientId: client.id, thread: [msg], unread: false }, ...d.messages] }))
+    if (!client.email) { setError(`${client.name} has no email address. Add one in the client details first.`); return }
+    setSending(true); setError('')
+    try {
+      await callApi('/api/email-message', { clientId: client.id, clientName: client.name, message: body.trim() })
+      const msg = { id: uid(), from: 'You', text: body.trim(), time: todayShort(), at: new Date().toISOString(), out: true, via: 'email' }
+      if (existing) {
+        setData(d => ({ ...d, messages: d.messages.map(m => m.id === existing.id ? { ...m, thread: [...m.thread, msg] } : m) }))
+      } else {
+        setData(d => ({ ...d, messages: [{ id: uid(), from: client.name, clientId: client.id, thread: [msg], unread: false }, ...d.messages] }))
+      }
+      toast(`Email sent to ${client.email}`); onSaved?.(); onClose()
+    } catch (err) {
+      setError(err.message || 'Message could not be sent')
+    } finally {
+      setSending(false)
     }
-    toast('Message sent'); onClose()
   }
 
   return (
     <Modal title={`Message — ${client.name}`} onClose={onClose}
-      footer={<><button style={T.btn} onClick={onClose}>Cancel</button><button style={T.btnPrimary} onClick={send}>Send message</button></>}>
+      footer={<><button style={T.btn} onClick={onClose}>Cancel</button><button style={{ ...T.btnPrimary, opacity: sending ? 0.6 : 1 }} disabled={sending} onClick={send}>{sending ? 'Sending…' : 'Send email'}</button></>}>
       <div style={{ marginBottom: 12, fontSize: 13, color: C.muted }}>
-        To: <strong style={{ color: C.text }}>{client.name}</strong>{client.email ? ` · ${client.email}` : ''}
+        To: <strong style={{ color: C.text }}>{client.name}</strong>{client.email ? ` · ${client.email}` : ' · no email address'}
       </div>
       {existing?.thread?.length > 0 && (
-        <div style={{ background: C.surface2, borderRadius: 8, padding: '10px 14px', marginBottom: 14, maxHeight: 160, overflowY: 'auto' }}>
-          {existing.thread.slice(-3).map(m => (
+        <div style={{ background: C.surface2, borderRadius: 8, padding: '10px 14px', marginBottom: 14, maxHeight: 200, overflowY: 'auto' }}>
+          {existing.thread.slice(-5).map(m => (
             <div key={m.id} style={{ marginBottom: 8, fontSize: 13 }}>
-              <span style={{ fontWeight: 600, color: m.out ? C.text : C.blue }}>{m.out ? 'You' : client.name}:</span>{' '}
-              <span style={{ color: C.muted }}>{m.text}</span>
+              <span style={{ fontWeight: 600, color: m.out ? C.text : C.blue }}>{m.out ? 'You' : client.name}{m.via ? ` (${m.via})` : ''}:</span>{' '}
+              <span style={{ color: C.muted, whiteSpace: 'pre-wrap' }}>{m.text}</span>
+              {m.time && <span style={{ color: C.faint, fontSize: 11 }}> · {m.time}</span>}
             </div>
           ))}
         </div>
       )}
       <div style={T.formGroup}>
         <label style={T.formLabel}>Message</label>
-        <textarea style={{ ...T.formInput, resize: 'none' }} rows={5} placeholder={`Write a message to ${client.name}...`} value={body} onChange={e => setBody(e.target.value)} autoFocus />
+        <textarea style={{ ...T.formInput, resize: 'vertical' }} rows={6} placeholder={`Write a message to ${client.name}...`} value={body} onChange={e => setBody(e.target.value)} autoFocus />
       </div>
-    </Modal>
-  )
-}
-
-// ── Gallery Modal ─────────────────────────────────────────────────
-export function GalleryModal({ client, data, setData, toast, onClose }) {
-  const existing = data.clients.find(c => c.id === client.id)?.gallery || []
-  const [url, setUrl] = useState('')
-  const [label, setLabel] = useState('')
-  const [galleries, setGalleries] = useState(existing)
-
-  const add = () => {
-    if (!url.trim()) { toast('Enter a gallery URL'); return }
-    const entry = { id: uid(), url: url.trim(), label: label.trim() || 'Gallery', addedAt: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) }
-    const updated = [...galleries, entry]
-    setGalleries(updated)
-    setUrl(''); setLabel('')
-  }
-
-  const remove = id => setGalleries(galleries.filter(g => g.id !== id))
-
-  const save = () => {
-    setData(d => ({ ...d, clients: d.clients.map(c => c.id === client.id ? { ...c, gallery: galleries } : c) }))
-    toast('Gallery links saved'); onClose()
-  }
-
-  return (
-    <Modal title={`Gallery — ${client.name}`} onClose={onClose}
-      footer={<><button style={T.btn} onClick={onClose}>Cancel</button><button style={T.btnPrimary} onClick={save}>Save</button></>}>
-      <div style={{ marginBottom: 16 }}>
-        <label style={T.formLabel}>Add gallery link</label>
-        <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
-          <input style={{ ...T.formInput, flex: 1 }} placeholder="https://..." value={url} onChange={e => setUrl(e.target.value)} onKeyDown={e => e.key === 'Enter' && add()} />
-          <input style={{ ...T.formInput, width: 140 }} placeholder="Label (optional)" value={label} onChange={e => setLabel(e.target.value)} />
-          <button style={T.btnSm} onClick={add}>Add</button>
-        </div>
+      <div style={{ fontSize: 12, color: C.faint, display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
+        <span>Sent by email with a link to your private chat. Replies show up here.</span>
+        <button type="button" style={{ ...T.btnGhost, color: C.blue, padding: 0 }} onClick={() => copyChatLink(client.id, toast)}>Copy chat link</button>
       </div>
-
-      {galleries.length === 0 && (
-        <div style={{ textAlign: 'center', padding: '24px 0', color: C.faint, fontSize: 13 }}>No gallery links yet. Paste a URL above.</div>
-      )}
-
-      {galleries.map(g => (
-        <div key={g.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0', borderBottom: `1px solid ${C.border}` }}>
-          <div style={{ width: 32, height: 32, borderRadius: 8, background: C.surface2, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, flexShrink: 0 }}>🖼</div>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontWeight: 500, fontSize: 13.5 }}>{g.label}</div>
-            <a href={g.url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, color: C.blue, textDecoration: 'none', wordBreak: 'break-all' }}>{g.url}</a>
-          </div>
-          <div style={{ fontSize: 11, color: C.faint, whiteSpace: 'nowrap' }}>{g.addedAt}</div>
-          <button style={{ ...T.btnGhost, color: C.red, fontSize: 16 }} onClick={() => remove(g.id)}>×</button>
-        </div>
-      ))}
+      {error && <div style={{ marginTop: 12, padding: '10px 14px', background: C.redBg, color: C.red, borderRadius: 8, fontSize: 13 }}>{error}</div>}
     </Modal>
   )
 }

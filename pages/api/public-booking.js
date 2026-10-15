@@ -1,4 +1,5 @@
 import { createServiceClient } from '../../lib/pibase'
+import { notifyStudio } from '../../lib/push'
 import { availableSlots, discountAmount, safeImageUrl, validDate } from '../../lib/booking'
 
 const publicType = row => ({
@@ -74,6 +75,7 @@ export default async function handler(req, res) {
       if (/discount|gift card/i.test(bookingError.message || '')) return res.status(409).json({ error: 'That discount is no longer available. Review your total and try again.' })
       return res.status(500).json({ error: 'Unable to reserve this session right now' })
     }
+    await notifyStudio(db, ownerId, { type: 'bookings', title: `📅 New booking request from ${safeName}`, body: `${type.name} · ${safeDate} at ${safeTime}`, url: '/?view=sessions', tag: `booking-${bookingId}` })
     return res.status(201).json({ ok: true, bookingId })
   } catch (error) {
     console.error('[public-booking]', error)

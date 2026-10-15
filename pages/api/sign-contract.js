@@ -1,4 +1,5 @@
 import { createServiceClient } from '../../lib/pibase'
+import { notifyStudio } from '../../lib/push'
 import { verifyContractToken } from '../../lib/signingTokens'
 
 export default async function handler(req, res) {
@@ -15,7 +16,7 @@ export default async function handler(req, res) {
 
   const { data: current, error: lookupError } = await db
     .from('contracts')
-    .select('fields, status')
+    .select('fields, status, user_id, client_name, type')
     .eq('id', parsed.contractId)
     .single()
   if (lookupError || !current) return res.status(404).json({ error: 'Contract not found' })
@@ -36,5 +37,6 @@ export default async function handler(req, res) {
 
   if (error) return res.status(500).json({ error: 'Unable to sign contract' })
   if (!signed?.length) return res.status(409).json({ error: 'Contract has already been signed' })
+  await notifyStudio(db, current.user_id, { type: 'documents', title: `✍️ ${current.client_name || String(signerName).trim()} signed`, body: current.type || 'Photography agreement', url: '/?view=contracts', tag: `contract-${parsed.contractId}` })
   return res.status(200).json({ ok: true, signedAt })
 }

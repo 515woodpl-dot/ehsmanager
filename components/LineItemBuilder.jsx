@@ -1,10 +1,10 @@
-import { useState } from 'react'
+import { useId } from 'react'
 import { T, C } from '../lib/tokens'
 
 const uid = () => Math.random().toString(36).slice(2, 8)
 const fmt$ = n => '$' + Number(n || 0).toFixed(2)
 
-export function LineItemBuilder({ value, onChange }) {
+export function LineItemBuilder({ value, onChange, catalog = [] }) {
   const { items = [], discount = '', discountType = '%', tax = '', notes = '' } = value
 
   const update = (patch) => onChange({ ...value, ...patch })
@@ -12,51 +12,86 @@ export function LineItemBuilder({ value, onChange }) {
   const addItem = () => update({ items: [...items, { id: uid(), name: '', description: '', qty: 1, price: '' }] })
   const removeItem = (id) => update({ items: items.filter(i => i.id !== id) })
   const updateItem = (id, patch) => update({ items: items.map(i => i.id === id ? { ...i, ...patch } : i) })
+  const listId = useId()
+
+  // Typing (or picking) the name of a saved item fills in its details,
+  // without overwriting anything already entered.
+  const changeName = (item, name) => {
+    const saved = catalog.find(c => c.name.toLowerCase() === name.trim().toLowerCase())
+    const patch = { name }
+    if (saved) {
+      if (!item.description) patch.description = saved.description
+      if (item.price === '' || item.price == null || Number(item.price) === 0) patch.price = saved.price
+    }
+    updateItem(item.id, patch)
+  }
+
+  const addSaved = name => {
+    const saved = catalog.find(c => c.name === name)
+    if (!saved) return
+    const blank = items.find(i => !i.name && !i.description && !Number(i.price))
+    const filled = { name: saved.name, description: saved.description, price: saved.price, qty: 1 }
+    update({ items: blank ? items.map(i => i.id === blank.id ? { ...i, ...filled } : i) : [...items, { id: uid(), ...filled }] })
+  }
 
   const subtotal = items.reduce((s, i) => s + (parseFloat(i.qty) || 0) * (parseFloat(i.price) || 0), 0)
   const discountAmt = discount ? (discountType === '%' ? subtotal * parseFloat(discount) / 100 : parseFloat(discount)) : 0
   const taxAmt = tax ? (subtotal - discountAmt) * parseFloat(tax) / 100 : 0
-  const total = subtotal - discountAmt + taxAmt
-
-  const colHead = (label, w) => (
-    <div style={{ width: w, fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: C.muted }}>{label}</div>
-  )
+  const total = calcTotal(value)
 
   return (
     <div>
-      {/* Column headers */}
-      <div style={{ display: 'flex', gap: 8, marginBottom: 10, padding: '0 4px' }}>
-        {colHead('Items', '100%')}
-        {colHead('Qty', 64)}
-        {colHead('Price', 100)}
-        {colHead('Amount', 90)}
-        <div style={{ width: 28 }} />
-      </div>
+      <div style={{ ...T.formLabel, marginBottom: 10 }}>Items</div>
 
-      {/* Line items */}
-      {items.map((item) => {
+      {/* Line items — one card per item so name and description get full width */}
+      {items.map((item, index) => {
         const amount = (parseFloat(item.qty) || 0) * (parseFloat(item.price) || 0)
         return (
-          <div key={item.id} style={{ display: 'flex', gap: 8, marginBottom: 8, background: C.surface2, borderRadius: 8, padding: '10px 10px 10px 12px', alignItems: 'flex-start' }}>
-            <div style={{ flex: 1 }}>
-              <input style={{ ...T.formInput, marginBottom: 6, background: C.surface, fontSize: 13.5 }} placeholder="Item name" value={item.name} onChange={e => updateItem(item.id, { name: e.target.value })} />
-              <input style={{ ...T.formInput, background: C.surface, fontSize: 12, color: C.muted }} placeholder="Item description (optional)" value={item.description} onChange={e => updateItem(item.id, { description: e.target.value })} />
+          <div key={item.id} className="line-item-card">
+            <div className="line-item-grid">
+              <label className="line-item-field line-item-name">
+                <span>Item {index + 1}</span>
+                <input style={{ ...T.formInput, fontSize: 14, fontWeight: 500 }} list={catalog.length ? listId : undefined} placeholder={catalog.length ? 'Type or pick a saved item' : 'e.g. Maternity Signature session'} value={item.name} onChange={e => changeName(item, e.target.value)} />
+              </label>
+              <label className="line-item-field">
+                <span>Qty</span>
+                <input style={{ ...T.formInput, textAlign: 'center' }} type="number" min="1" value={item.qty} onChange={e => updateItem(item.id, { qty: e.target.value })} />
+              </label>
+              <label className="line-item-field">
+                <span>Price</span>
+                <div style={{ position: 'relative' }}>
+                  <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: C.muted, fontSize: 13, pointerEvents: 'none' }}>$</span>
+                  <input style={{ ...T.formInput, paddingLeft: 22 }} type="number" min="0" step="0.01" placeholder="0.00" value={item.price} onChange={e => updateItem(item.id, { price: e.target.value })} />
+                </div>
+              </label>
+              <div className="line-item-field">
+                <span>Amount</span>
+                <div style={{ padding: '9px 0', fontSize: 14, fontWeight: 600, textAlign: 'right', color: C.text }}>{fmt$(amount)}</div>
+              </div>
+              <button onClick={() => removeItem(item.id)} title="Remove item" aria-label={`Remove item ${index + 1}`} className="line-item-remove" style={{ ...T.btnGhost, color: C.faint, fontSize: 18 }}>×</button>
             </div>
-            <input style={{ ...T.formInput, width: 64, background: C.surface, textAlign: 'center' }} type="number" min="1" value={item.qty} onChange={e => updateItem(item.id, { qty: e.target.value })} />
-            <div style={{ position: 'relative', width: 100 }}>
-              <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: C.muted, fontSize: 13, pointerEvents: 'none' }}>$</span>
-              <input style={{ ...T.formInput, paddingLeft: 22, background: C.surface }} type="number" min="0" step="0.01" placeholder="0.00" value={item.price} onChange={e => updateItem(item.id, { price: e.target.value })} />
-            </div>
-            <div style={{ width: 90, padding: '9px 0', fontSize: 14, fontWeight: 500, textAlign: 'right', color: C.text }}>{fmt$(amount)}</div>
-            <button onClick={() => removeItem(item.id)} style={{ ...T.btnGhost, padding: '6px', color: C.faint, fontSize: 16, marginTop: 6 }}>×</button>
+            <label className="line-item-field" style={{ marginTop: 10 }}>
+              <span>Description</span>
+              <textarea style={{ ...T.formInput, resize: 'vertical', fontSize: 13, minHeight: 60 }} rows={2} placeholder="What's included — hours of coverage, edited images, prints, travel…" value={item.description || ''} onChange={e => updateItem(item.id, { description: e.target.value })} />
+            </label>
           </div>
         )
       })}
 
+      {catalog.length > 0 && <datalist id={listId}>{catalog.map(c => <option key={c.name} value={c.name}>{c.price !== '' ? fmt$(c.price) : ''}</option>)}</datalist>}
+
       {/* Add item */}
-      <button onClick={addItem} style={{ ...T.btnGhost, color: C.blue, fontSize: 13, fontWeight: 500, padding: '6px 4px', marginBottom: 20, display: 'flex', alignItems: 'center', gap: 5 }}>
-        <span style={{ fontSize: 17, lineHeight: 1 }}>⊕</span> Add item
-      </button>
+      <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap', marginBottom: 20 }}>
+        <button onClick={addItem} style={{ ...T.btnGhost, color: C.blue, fontSize: 13, fontWeight: 500, padding: '6px 4px', display: 'flex', alignItems: 'center', gap: 5 }}>
+          <span style={{ fontSize: 17, lineHeight: 1 }}>⊕</span> Add item
+        </button>
+        {catalog.length > 0 && (
+          <select aria-label="Add a saved item" style={{ ...T.formInput, width: 'auto', maxWidth: '100%', fontSize: 13, padding: '6px 10px' }} value="" onChange={e => addSaved(e.target.value)}>
+            <option value="">+ Add a saved item…</option>
+            {catalog.map(c => <option key={c.name} value={c.name}>{c.name}{c.price !== '' ? ` · ${fmt$(c.price)}` : ''}</option>)}
+          </select>
+        )}
+      </div>
 
       {/* Totals section */}
       <div style={{ display: 'flex', gap: 20 }} className="line-item-totals">

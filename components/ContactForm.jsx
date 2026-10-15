@@ -35,7 +35,7 @@ export default function ContactFormSettings({ data, setData, toast }) {
 
   return (
     <div>
-      <div style={T.pageHeader}>
+      <div style={T.pageHeader} className="page-header-wrap">
         <div>
           <div style={T.pageTitle}>Contact Form</div>
           <div style={T.pageSub}>Configure your public lead capture form</div>
@@ -53,17 +53,17 @@ export default function ContactFormSettings({ data, setData, toast }) {
       </div>
 
       {/* Shareable link */}
-      <div style={{ ...T.card, marginBottom: 20, display: 'flex', alignItems: 'center', gap: 14 }}>
-        <div style={{ flex: 1 }}>
+      <div style={{ ...T.card, marginBottom: 20, display: 'flex', alignItems: 'center', gap: 14 }} className="contact-share">
+        <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 12, fontWeight: 600, color: C.muted, letterSpacing: '0.04em', textTransform: 'uppercase', marginBottom: 4 }}>Shareable link</div>
-          <div style={{ fontSize: 14, color: C.text, fontFamily: 'monospace' }}>{publicUrl}</div>
+          <div style={{ fontSize: 14, color: C.text, fontFamily: 'monospace', overflowWrap: 'anywhere' }}>{publicUrl}</div>
           <div style={{ fontSize: 12, color: C.faint, marginTop: 3 }}>Share this link with potential clients to capture leads</div>
         </div>
         <button style={T.btnSm} onClick={copyLink}>Copy link</button>
         <a href="/contact" target="_blank" style={{ ...T.btnSm, textDecoration: 'none', color: C.text }}>Open ↗</a>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }} className="contact-form-grid">
         {/* LEFT — Settings */}
         <div style={T.card}>
           <div style={{ fontFamily: "'DM Serif Display', Georgia, serif", fontSize: 17, marginBottom: 22 }}>Settings</div>

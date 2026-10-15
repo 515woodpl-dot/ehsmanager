@@ -4,7 +4,7 @@ Use the existing checkouts in `/workspace`; do not create a worktree for setup.
 
 1. In `/workspace/pibase`, run `./scripts/init-env.sh`, then `docker compose up --build -d`. Check `http://127.0.0.1:18080/healthz`.
 2. Create an isolated project with `./scripts/create-project.sh "EHS local"`. Store the returned project ID and keys outside Git.
-3. Apply `supabase-schema.sql` from this repository with PIBASE's `gateway migration-apply PROJECT_ID 0001_ehsmanager` command. The filename is historical; PIBASE is the only backend.
+3. Apply `pibase-schema.sql` from this repository with PIBASE's `gateway migration-apply PROJECT_ID 0001_ehsmanager` command. PIBASE is the only backend.
 4. Sign up and verify a studio owner, then set `STUDIO_OWNER_USER_ID`. Copy `.env.local.example` to the ignored `.env.local`, enter the project URL and keys, and set `CONTRACT_SIGNING_SECRET` to a random value.
 5. Run `npm ci`, `npm run dev`, and `npm run build`. The manager runs at `http://127.0.0.1:3000`, and the public booking page is `/booking`.
 
