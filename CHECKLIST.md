@@ -5,7 +5,7 @@ every round of changes, and keep the "Open / follow-ups" list current.
 
 ---
 
-## 2026-10-16 (round 9) — Payment plans, studio countersigning, live chat
+## 2026-10-16 (round 9) — Payment plans, studio countersigning, contract highlights, live chat
 
 ### ⚠️ Before using
 - [ ] No database migration needed. Payment plans and payments live with the
@@ -63,6 +63,17 @@ every round of changes, and keep the "Open / follow-ups" list current.
       of a blank line.
 - [x] Signatures made from links can't be undone by an older copy of the
       app that was still open.
+
+### Contracts — filled-in details highlighted
+- [x] Everything filled in from the client, session and invoice shows with
+      a **light pink** highlight: client name and email, effective date,
+      session type, date and time, location, total fee, retainer, remaining
+      amount and its due date. The highlight appears in the preview, in the
+      app's contract view, and on the client's signing page. It's kept when
+      printing or saving as PDF.
+- [x] Contracts saved before this change highlight the client name, email,
+      session type and location. Open and save one again to highlight its
+      dates and amounts too.
 
 ### Chat — new messages appear without refreshing
 - [x] Studio replies are saved on the server the moment they're sent, so the

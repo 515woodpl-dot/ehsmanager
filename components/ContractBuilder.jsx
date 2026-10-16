@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { T, C } from '../lib/tokens'
-import { CONTRACT_TEMPLATE, fillContract } from '../lib/contractTemplate'
+import { CONTRACT_TEMPLATE, fillContract, highlightValues } from '../lib/contractTemplate'
 import ContractDocument from './ContractDocument'
 
 const uid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => { const r = Math.random() * 16 | 0; return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16) })
@@ -163,7 +163,7 @@ export default function ContractBuilder({ client, contract = null, data, onSave,
       sent: contract?.sent || new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
       status: contract?.status || 'pending',
       body: previewText,
-      fields: { ...(contract?.fields || {}), ...fields },
+      fields: { ...(contract?.fields || {}), ...fields, highlights: highlightValues(contractFields) },
     }
     onSave(k)
   }
@@ -295,7 +295,7 @@ export default function ContractBuilder({ client, contract = null, data, onSave,
         </div>
       ) : (
         <div style={{ background: C.surface2, borderRadius: 10, padding: 12, border: `1px solid ${C.border}`, maxHeight: '65vh', overflowY: 'auto' }}>
-          <ContractDocument body={previewText} headerImageUrl={fields.headerImageUrl} />
+          <ContractDocument body={previewText} headerImageUrl={fields.headerImageUrl} highlights={highlightValues(contractFields)} />
         </div>
       )}
 

@@ -5,6 +5,7 @@ import { Modal } from './UI'
 import { LineItemBuilder, calcTotal } from './LineItemBuilder'
 import ContractBuilder from './ContractBuilder'
 import ContractDocument from './ContractDocument'
+import { contractHighlights } from '../lib/contractTemplate'
 import SignaturePad from './SignaturePad'
 import { Overlay, Header, SendEmailModal } from './InvoiceModals'
 import { nextInvoiceNumber, invoiceLabel } from '../lib/invoices'
@@ -280,7 +281,7 @@ export function ContractModal({ client: clientProp, contract, startMode = 'view'
         </div>
       )}
       <div style={{ background: C.surface2, borderRadius: 10, padding: 12, border: `1px solid ${C.border}`, maxHeight: '55vh', overflowY: 'auto' }}>
-        <ContractDocument body={live.body} signedBy={live.signedBy} signedAt={live.signedAt} signatureData={live.fields?.signatureData} headerImageUrl={live.fields?.headerImageUrl} studioSignature={studioSig} />
+        <ContractDocument body={live.body} signedBy={live.signedBy} signedAt={live.signedAt} signatureData={live.fields?.signatureData} headerImageUrl={live.fields?.headerImageUrl} studioSignature={studioSig} highlights={contractHighlights(live.fields)} />
       </div>
       {!studioSig?.name && <ContractSignPanel contract={live} role="studio" setData={setData} toast={toast} />}
       <div style={{ ...T.modalFooter, flexWrap: 'wrap' }} className="modal-footer-wrap">

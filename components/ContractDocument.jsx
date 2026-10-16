@@ -1,5 +1,16 @@
+// Wraps every filled-in detail (client, session date/time, location,
+// amounts) in a light pink mark. Longest values first so "$1,200.00" wins
+// over "$1,200".
+function marked(text, values) {
+  if (!values?.length) return text
+  const escape = v => v.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const pattern = new RegExp(`(${[...new Set(values)].sort((a, b) => b.length - a.length).map(escape).join('|')})`, 'g')
+  const set = new Set(values)
+  return text.split(pattern).map((part, i) => set.has(part) ? <mark className="contract-filled" key={i}>{part}</mark> : part)
+}
+
 /** Formats the stored plain-text agreement without changing its legal wording. */
-export default function ContractDocument({ body, signedBy, signedAt, signatureData, headerImageUrl, studioSignature = null }) {
+export default function ContractDocument({ body, signedBy, signedAt, signatureData, headerImageUrl, studioSignature = null, highlights = [] }) {
   const allLines = String(body || 'No contract body.').replace(/\r\n/g, '\n').split('\n')
   const titleIndex = allLines.findIndex(line => line.trim() === 'Portrait Photography Services Agreement')
   const lines = allLines.slice(titleIndex >= 0 ? titleIndex : 0)
@@ -14,9 +25,9 @@ export default function ContractDocument({ body, signedBy, signedAt, signatureDa
       const text = line.trim()
       if (!text) return null
       if (/^\d+\.\s+\S/.test(text)) return <h2 key={index}>{text}</h2>
-      if (text.startsWith('●')) return <p className="contract-document-bullet" key={index}>{text.slice(1).trim()}</p>
-      if (/^\d+\.\d+\s+\S/.test(text)) return <p className="contract-document-clause" key={index}>{text}</p>
-      return <p className={text.startsWith('THIS AGREEMENT') ? 'contract-document-intro' : ''} key={index}>{text}</p>
+      if (text.startsWith('●')) return <p className="contract-document-bullet" key={index}>{marked(text.slice(1).trim(), highlights)}</p>
+      if (/^\d+\.\d+\s+\S/.test(text)) return <p className="contract-document-clause" key={index}>{marked(text, highlights)}</p>
+      return <p className={text.startsWith('THIS AGREEMENT') ? 'contract-document-intro' : ''} key={index}>{marked(text, highlights)}</p>
     })}</div>
     {!!signatures.length && <section className="contract-document-signatures"><h2>Signatures</h2><div>{[0, 2].map(index => {
       // Slot 0 is the studio, slot 2 the client.

@@ -3,6 +3,7 @@ import Head from 'next/head'
 import { createServiceClient } from '../../lib/pibase'
 import { verifyContractToken } from '../../lib/signingTokens'
 import ContractDocument from '../../components/ContractDocument'
+import { contractHighlights } from '../../lib/contractTemplate'
 import SignaturePad from '../../components/SignaturePad'
 
 export default function SignContractPage({ token, contract }) {
@@ -64,7 +65,7 @@ export default function SignContractPage({ token, contract }) {
         </section>
 
         <section className="sign-card contract-copy">
-          <ContractDocument body={contract.body} signedBy={signedBy} signedAt={signedAt} signatureData={signatureData || contract.signatureData} headerImageUrl={contract.headerImageUrl} studioSignature={contract.studioSignature} />
+          <ContractDocument body={contract.body} signedBy={signedBy} signedAt={signedAt} signatureData={signatureData || contract.signatureData} headerImageUrl={contract.headerImageUrl} studioSignature={contract.studioSignature} highlights={contract.highlights} />
         </section>
 
         <form className="sign-card" onSubmit={submit}>
@@ -161,6 +162,7 @@ export async function getServerSideProps({ params }) {
         signedAt: data.signed_at || '',
         signatureData: data.fields?.signatureData || '',
         headerImageUrl: data.fields?.headerImageUrl || '',
+        highlights: contractHighlights(data.fields),
         studioSignature: data.fields?.studioSignature?.name ? { name: data.fields.studioSignature.name, at: data.fields.studioSignature.at || '', data: data.fields.studioSignature.data || null } : null,
       },
     },
