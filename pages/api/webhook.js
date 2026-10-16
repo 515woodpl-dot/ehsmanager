@@ -1,6 +1,7 @@
 import { createServiceClient } from '../../lib/pibase'
 import { notifyStudio } from '../../lib/push'
 import { defaultStudioId, getStripe, loadStudioConfig } from '../../lib/studioConfig'
+import { applyPayment, invoiceFromRow } from '../../lib/invoices'
 export const config = { api: { bodyParser: false } }
 async function getRawBody(req) {
   return new Promise((resolve, reject) => {
@@ -33,21 +34,30 @@ export default async function handler(req, res) {
       const intent = event.data.object
       const db = createServiceClient()
       if (!db) return res.status(503).json({ error: 'Database not configured' })
-      const { invoiceId, userId } = intent.metadata || {}
+      const { invoiceId, userId, label } = intent.metadata || {}
       if (!invoiceId || !userId) break
-      const { data: invoice, error: lookupError } = await db.from('invoices')
-        .select('id, amount, paid, status').eq('id', invoiceId).eq('user_id', userId)
-        .eq('payment_intent_id', intent.id).single()
-      if (lookupError || !invoice) return res.status(500).json({ error: 'Linked invoice not found' })
-      if (invoice.status === 'paid') break
-      if (Math.round((Number(invoice.amount) - Number(invoice.paid)) * 100) !== intent.amount_received) {
-        return res.status(500).json({ error: 'Payment amount does not match invoice balance' })
+      // Payments can be one installment or the whole balance. Each Stripe
+      // payment is logged once (by its id), so a retried webhook is a no-op.
+      // The update only applies if nobody changed `paid` in between.
+      let credited = false
+      for (let attempt = 0; attempt < 3 && !credited; attempt++) {
+        const { data: row, error: lookupError } = await db.from('invoices')
+          .select('id, amount, paid, status, due, line_items').eq('id', invoiceId).eq('user_id', userId).single()
+        if (lookupError || !row) return res.status(500).json({ error: 'Linked invoice not found' })
+        const invoice = invoiceFromRow(row)
+        if ((invoice.lineData.payments || []).some(p => p.intentId === intent.id)) { credited = true; break }
+        const updated = applyPayment(invoice, { id: `stripe-${intent.id}`, amount: intent.amount_received / 100, method: 'Stripe', intentId: intent.id })
+        const { data: saved, error } = await db.from('invoices').update({
+          paid: updated.paid, status: updated.status, payment_method: 'Stripe', paid_at: updated.paidAt,
+          line_items: updated.lineData, updated_at: new Date().toISOString(),
+        }).eq('id', invoiceId).eq('user_id', userId).eq('paid', row.paid).select('id')
+        if (error) return res.status(500).json({ error: 'Unable to update invoice' })
+        if (saved?.length) {
+          credited = true
+          await notifyStudio(db, userId, { type: 'payments', title: `💰 Payment received`, body: `$${(intent.amount_received / 100).toLocaleString('en-US', { minimumFractionDigits: 2 })} paid online${label ? ` · ${label}` : ''}${updated.status === 'paid' ? ' · invoice paid in full' : ''}`, url: '/?view=invoices', tag: `payment-${intent.id}` })
+        }
       }
-      const { error } = await db.from('invoices').update({
-        paid: invoice.amount, status: 'paid', payment_method: 'Stripe', paid_at: new Date().toISOString(),
-      }).eq('id', invoiceId).eq('user_id', userId).eq('payment_intent_id', intent.id)
-      if (error) return res.status(500).json({ error: 'Unable to update invoice' })
-      await notifyStudio(db, userId, { type: 'payments', title: `💰 Payment received`, body: `$${(intent.amount_received / 100).toLocaleString('en-US', { minimumFractionDigits: 2 })} paid online`, url: '/?view=invoices', tag: `payment-${invoiceId}` })
+      if (!credited) return res.status(500).json({ error: 'Invoice changed while recording payment, retry' })
       break
     }
     case 'payment_intent.payment_failed': {

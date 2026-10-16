@@ -199,6 +199,8 @@ function Sidebar({ active, setActive, unread, open, onClose, user, onSignOut }) 
 // ── Root ──────────────────────────────────────────────────────────
 export default function Home() {
   const [view, setView] = useState('dashboard')
+  const viewRef = useRef(view)
+  viewRef.current = view
   const [data, setData] = useState(seed)
   const [localReady, setLocalReady] = useState(false)
   const [toastMsg, setToastMsg] = useState(null)
@@ -328,8 +330,8 @@ export default function Home() {
     if (!dbReady || !user) return
     let lastRefresh = Date.now()
     let refreshing = false
-    const refresh = async () => {
-      if (document.visibilityState !== 'visible' || refreshing || Date.now() - lastRefresh < 15000) return
+    const refresh = async ({ minGap = 15000 } = {}) => {
+      if (document.visibilityState !== 'visible' || refreshing || Date.now() - lastRefresh < minGap) return
       const idle = () => snapshotRef.current && JSON.stringify(snapshotRef.current) === JSON.stringify(latestDataRef.current)
       if (!idle()) return
       refreshing = true; lastRefresh = Date.now()
@@ -345,11 +347,12 @@ export default function Home() {
       }
     }
     // Also check every minute so client replies and chat messages appear
-    // while the app is open.
-    const timer = setInterval(refresh, 60000)
-    window.addEventListener('focus', refresh)
-    document.addEventListener('visibilitychange', refresh)
-    return () => { clearInterval(timer); window.removeEventListener('focus', refresh); document.removeEventListener('visibilitychange', refresh) }
+    // while the app is open — every 10 seconds while the Inbox is open.
+    const timer = setInterval(() => refresh({ minGap: viewRef.current === 'inbox' ? 9000 : 59000 }), 10000)
+    const onWake = () => refresh()
+    window.addEventListener('focus', onWake)
+    document.addEventListener('visibilitychange', onWake)
+    return () => { clearInterval(timer); window.removeEventListener('focus', onWake); document.removeEventListener('visibilitychange', onWake) }
   }, [dbReady, user?.id])
 
   // Notifications tapped while the app is open switch to their page.

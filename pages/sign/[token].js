@@ -15,6 +15,7 @@ export default function SignContractPage({ token, contract }) {
   const [signatureMethod, setSignatureMethod] = useState('draw')
   const [signatureData, setSignatureData] = useState(contract.signatureData || '')
   const [error, setError] = useState('')
+  const [copySent, setCopySent] = useState(false)
 
   const submit = async (event) => {
     event.preventDefault()
@@ -42,6 +43,7 @@ export default function SignContractPage({ token, contract }) {
     setStatus('signed')
     setSignedBy(signerName.trim())
     setSignedAt(data.signedAt || '')
+    setCopySent(!!data.copySent)
   }
 
   return (
@@ -57,17 +59,21 @@ export default function SignContractPage({ token, contract }) {
           <div className="sign-meta">
             <span>{contract.client}</span>
             <span>{contract.sent ? `Sent ${contract.sent}` : 'Ready for review'}</span>
-            <span>{status === 'signed' ? 'Signed' : 'Awaiting signature'}</span>
+            <span>{status === 'signed' ? (contract.studioSignature ? 'Signed by both' : 'Signed') : 'Awaiting signature'}</span>
           </div>
         </section>
 
         <section className="sign-card contract-copy">
-          <ContractDocument body={contract.body} signedBy={signedBy} signedAt={signedAt} signatureData={signatureData || contract.signatureData} headerImageUrl={contract.headerImageUrl} />
+          <ContractDocument body={contract.body} signedBy={signedBy} signedAt={signedAt} signatureData={signatureData || contract.signatureData} headerImageUrl={contract.headerImageUrl} studioSignature={contract.studioSignature} />
         </section>
 
         <form className="sign-card" onSubmit={submit}>
           {status === 'signed' ? (
-            <div className="sign-success">Contract signed. Thank you.</div>
+            <div className="sign-success">
+              {contract.studioSignature ? 'Signed by both parties.' : 'Contract signed. Thank you.'}
+              {copySent ? ' A signed copy has been emailed to you.' : contract.studioSignature ? ' Keep this page — you can print it or save it as a PDF.' : ' You will get a signed copy by email once we add our signature.'}
+              <button type="button" className="sign-print" onClick={() => window.print()}>Print or save as PDF</button>
+            </div>
           ) : (
             <>
               <label>
@@ -118,6 +124,7 @@ export default function SignContractPage({ token, contract }) {
         .sign-card button { width: 100%; border: 1px solid #111110; border-radius: 10px; background: #111110; color: #fff; cursor: pointer; font: inherit; font-weight: 600; min-height: 48px; padding: 12px 16px; }
         .sign-card button:disabled { opacity: .65; }
         .sign-error { color: #991F1F; font-size: 13px; margin: 0 0 12px; }
+        .sign-success .sign-print { margin-top: 12px; background: #fff; color: #111110; border-color: #b7d9c5; }
         .sign-success { background: #EAF4EE; border: 1px solid #b7d9c5; border-radius: 10px; color: #1A6B3C; padding: 16px; }
         @media (max-width: 600px) { .sign-page { padding: 20px 12px 44px; } .sign-card { border-radius: 12px; padding: 20px 16px; } }
       `}</style>
@@ -154,6 +161,7 @@ export async function getServerSideProps({ params }) {
         signedAt: data.signed_at || '',
         signatureData: data.fields?.signatureData || '',
         headerImageUrl: data.fields?.headerImageUrl || '',
+        studioSignature: data.fields?.studioSignature?.name ? { name: data.fields.studioSignature.name, at: data.fields.studioSignature.at || '', data: data.fields.studioSignature.data || null } : null,
       },
     },
   }

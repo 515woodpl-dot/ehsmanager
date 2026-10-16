@@ -5,6 +5,7 @@ import { Modal } from './UI'
 import { LineItemBuilder, calcTotal } from './LineItemBuilder'
 import ContractBuilder from './ContractBuilder'
 import ContractDocument from './ContractDocument'
+import SignaturePad from './SignaturePad'
 import { Overlay, Header, SendEmailModal } from './InvoiceModals'
 import { nextInvoiceNumber, invoiceLabel } from '../lib/invoices'
 import { buildItemCatalog, nextQuoteNumber, quoteLabel } from '../lib/documents'
@@ -147,6 +148,58 @@ export function QuoteModal({ client: clientProp, quote, data, setData, toast, on
   )
 }
 
+// ── Signing a contract from the studio ────────────────────────────
+// role "studio": the studio's own signature. role "client": the client
+// signs in person on the studio's device. Saved on the server, which also
+// emails the client their signed copy once both have signed.
+const SIGNER_KEY = 'ehs-studio-signer-name'
+const rememberedSigner = () => { try { return localStorage.getItem(SIGNER_KEY) || '' } catch { return '' } }
+
+export function ContractSignPanel({ contract, role = 'studio', clientName = '', setData, toast, onDone, onCancel }) {
+  const [name, setName] = useState(role === 'studio' ? rememberedSigner() : clientName)
+  const [method, setMethod] = useState('draw')
+  const [drawing, setDrawing] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+
+  const sign = async () => {
+    if (!name.trim()) { setError('Type the full name to sign'); return }
+    if (method === 'draw' && !drawing) { setError('Draw the signature first, or use the typed name'); return }
+    setBusy(true); setError('')
+    try {
+      const result = await callApi('/api/countersign-contract', { contractId: contract.id, role, name: name.trim(), method, signatureData: method === 'draw' ? drawing : null })
+      if (role === 'studio') { try { localStorage.setItem(SIGNER_KEY, name.trim()) } catch {} }
+      setData(d => ({ ...d, contracts: d.contracts.map(k => k.id === contract.id ? { ...k, ...result.contract } : k) }))
+      toast(result.copy?.sent ? `Signed — copy emailed to ${result.copy.to}` : result.copy?.error ? `Signed. The copy could not be emailed: ${result.copy.error}` : role === 'studio' ? 'Signed — the client gets a copy once they sign' : 'Signed in person')
+      onDone?.(result)
+    } catch (err) { setError(err.message || 'Could not save the signature') }
+    setBusy(false)
+  }
+
+  return (
+    <div style={{ marginTop: 16, padding: 16, border: `1px solid ${C.border}`, borderRadius: 12, background: C.surface }}>
+      <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 10 }}>{role === 'studio' ? 'Your signature' : `${clientName || 'Client'} signs in person`}</div>
+      <div style={T.formGroup}>
+        <label style={T.formLabel}>Full legal name</label>
+        <input style={{ ...T.formInput, fontSize: 16 }} value={name} onChange={e => setName(e.target.value)} placeholder="Full name" />
+      </div>
+      <div className="chip-tabs" role="group" aria-label="Signature method" style={{ marginBottom: 10 }}>
+        <button type="button" className={method === 'draw' ? 'active' : ''} onClick={() => setMethod('draw')}>Draw signature</button>
+        <button type="button" className={method === 'type' ? 'active' : ''} onClick={() => setMethod('type')}>Use typed name</button>
+      </div>
+      {method === 'draw'
+        ? <SignaturePad onChange={setDrawing} />
+        : <div className="contract-signature-typed" style={{ marginBottom: 14 }}>{name || ' '}</div>}
+      <div style={{ fontSize: 12, color: C.muted, marginBottom: 12 }}>{role === 'studio' ? 'Your name and signature act as your electronic signature on this agreement.' : 'By signing, the client agrees to this contract. Their name and signature act as their electronic signature.'}</div>
+      {error && <div style={{ marginBottom: 12, padding: '10px 14px', background: C.redBg, color: C.red, borderRadius: 8, fontSize: 13 }}>{error}</div>}
+      <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+        {onCancel && <button style={T.btn} onClick={onCancel}>Cancel</button>}
+        <button style={T.btnPrimary} disabled={busy} onClick={sign}>{busy ? 'Signing…' : 'Sign contract'}</button>
+      </div>
+    </div>
+  )
+}
+
 // ── Contract ──────────────────────────────────────────────────────
 // Without `contract`: build a new one, then offer to email it.
 // With `contract`: view it, email it, copy the signing link, edit or delete.
@@ -201,12 +254,25 @@ export function ContractModal({ client: clientProp, contract, startMode = 'view'
   }
 
   const signed = live.status === 'signed'
+  const studioSig = live.fields?.studioSignature
+  const complete = signed && !!studioSig?.name
+  const resendCopy = async () => {
+    setBusy(true)
+    try {
+      const result = await callApi('/api/countersign-contract', { contractId: live.id, resend: true })
+      setData(d => ({ ...d, contracts: d.contracts.map(k => k.id === live.id ? { ...k, ...result.contract } : k) }))
+      toast(result.copy?.sent ? `Signed copy emailed to ${result.copy.to}` : result.copy?.error || 'Could not send the copy')
+    } catch (error) { toast(error.message) }
+    setBusy(false)
+  }
   return (
     <Overlay onClose={onClose} maxWidth={820}>
       <Header title={`${live.type || 'Contract'} — ${clientName}`} onClose={onClose} />
-      {signed
-        ? <Banner tone="done">Signed by {live.signedBy || clientName}{live.signedAt ? ` · ${live.signedAt}` : ''}</Banner>
-        : <Banner>Waiting for {clientName} to sign · created {live.sent || 'recently'}</Banner>}
+      {complete
+        ? <Banner tone="done">Signed by both · {live.signedBy || clientName}{live.signedAt ? ` (${live.signedAt})` : ''} and {studioSig.name}{studioSig.at ? ` (${studioSig.at})` : ''}{live.fields?.copySentAt ? ` · copy emailed to ${live.fields.copySentTo || 'the client'}` : ''}</Banner>
+        : signed
+          ? <Banner>{live.signedBy || clientName} signed{live.signedAt ? ` on ${live.signedAt}` : ''}. Add your signature to complete it — {clientName} is then emailed a signed copy.</Banner>
+          : <Banner>Waiting for {clientName} to sign · created {live.sent || 'recently'}{studioSig?.name ? ' · you have signed' : ''}</Banner>}
       {link && (
         <div style={T.formGroup}>
           <label style={T.formLabel}>Signing link</label>
@@ -214,14 +280,16 @@ export function ContractModal({ client: clientProp, contract, startMode = 'view'
         </div>
       )}
       <div style={{ background: C.surface2, borderRadius: 10, padding: 12, border: `1px solid ${C.border}`, maxHeight: '55vh', overflowY: 'auto' }}>
-        <ContractDocument body={live.body} signedBy={live.signedBy} signedAt={live.signedAt} signatureData={live.fields?.signatureData} headerImageUrl={live.fields?.headerImageUrl} />
+        <ContractDocument body={live.body} signedBy={live.signedBy} signedAt={live.signedAt} signatureData={live.fields?.signatureData} headerImageUrl={live.fields?.headerImageUrl} studioSignature={studioSig} />
       </div>
+      {!studioSig?.name && <ContractSignPanel contract={live} role="studio" setData={setData} toast={toast} />}
       <div style={{ ...T.modalFooter, flexWrap: 'wrap' }} className="modal-footer-wrap">
         <button style={{ ...T.btn, color: C.red, borderColor: C.red }} onClick={remove}>Delete</button>
         <div style={{ flex: 1 }} />
         {!signed && <button style={T.btn} onClick={() => setMode('build')}>Edit</button>}
         {!signed && <button style={T.btn} disabled={busy} onClick={copyLink}>{busy ? 'Preparing…' : 'Copy signing link'}</button>}
         {!signed && <button style={T.btnPrimary} onClick={() => setMode('send')}>Email to client</button>}
+        {complete && <button style={T.btn} disabled={busy} onClick={resendCopy}>{busy ? 'Sending…' : live.fields?.copySentAt ? 'Email copy again' : 'Email signed copy'}</button>}
         {signed && <button style={T.btnPrimary} onClick={onClose}>Close</button>}
       </div>
     </Overlay>
@@ -445,12 +513,12 @@ export function MessageModal({ client, data, setData, toast, onClose, onSaved })
     if (!client.email) { setError(`${client.name} has no email address. Add one in the client details first.`); return }
     setSending(true); setError('')
     try {
-      await callApi('/api/email-message', { clientId: client.id, clientName: client.name, message: body.trim() })
       const msg = { id: uid(), from: 'You', text: body.trim(), time: todayShort(), at: new Date().toISOString(), out: true, via: 'email' }
+      const sent = await callApi('/api/email-message', { clientId: client.id, clientName: client.name, message: body.trim(), entryId: msg.id })
       if (existing) {
         setData(d => ({ ...d, messages: d.messages.map(m => m.id === existing.id ? { ...m, thread: [...m.thread, msg] } : m) }))
       } else {
-        setData(d => ({ ...d, messages: [{ id: uid(), from: client.name, clientId: client.id, thread: [msg], unread: false }, ...d.messages] }))
+        setData(d => ({ ...d, messages: [{ id: sent.conversationId || uid(), from: client.name, clientId: client.id, thread: [msg], unread: false }, ...d.messages] }))
       }
       toast(`Email sent to ${client.email}`); onSaved?.(); onClose()
     } catch (err) {

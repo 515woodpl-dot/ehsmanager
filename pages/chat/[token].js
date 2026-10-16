@@ -10,19 +10,34 @@ export default function ChatPage({ token }) {
   const [sending, setSending] = useState(false)
   const endRef = useRef(null)
 
+  // New messages from the studio show up on their own: checked every few
+  // seconds while the page is open, and straight away when the client
+  // comes back to the tab or the phone reconnects.
+  const lastSeen = useRef(null)
   const load = async () => {
     try {
-      const r = await fetch(`/api/chat?token=${encodeURIComponent(token)}`)
+      const r = await fetch(`/api/chat?token=${encodeURIComponent(token)}`, { cache: 'no-store' })
       const body = await r.json()
       if (!r.ok) throw new Error(body.error || 'Chat could not be loaded')
-      setChat(body); setError('')
-    } catch (err) { setError(err.message) }
+      const signature = body.messages.map(m => m.id).join(',')
+      if (signature !== lastSeen.current) { lastSeen.current = signature; setChat(body) }
+      setError('')
+    } catch (err) { if (lastSeen.current === null) setError(err.message) }
   }
 
   useEffect(() => {
     load()
-    const timer = setInterval(() => { if (document.visibilityState === 'visible') load() }, 8000)
-    return () => clearInterval(timer)
+    const timer = setInterval(() => { if (document.visibilityState === 'visible') load() }, 4000)
+    const wake = () => { if (document.visibilityState === 'visible') load() }
+    document.addEventListener('visibilitychange', wake)
+    window.addEventListener('focus', wake)
+    window.addEventListener('online', wake)
+    return () => {
+      clearInterval(timer)
+      document.removeEventListener('visibilitychange', wake)
+      window.removeEventListener('focus', wake)
+      window.removeEventListener('online', wake)
+    }
   }, [token])
 
   useEffect(() => { endRef.current?.scrollIntoView({ block: 'end' }) }, [chat?.messages?.length])
@@ -35,7 +50,11 @@ export default function ChatPage({ token }) {
       const r = await fetch('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token, text: draft }) })
       const body = await r.json().catch(() => ({}))
       if (!r.ok) throw new Error(body.error || 'Message could not be sent')
-      setChat(c => ({ ...c, messages: [...(c?.messages || []), body.message] }))
+      setChat(c => {
+        const messages = [...(c?.messages || []).filter(m => m.id !== body.message.id), body.message]
+        lastSeen.current = messages.map(m => m.id).join(',')
+        return { ...c, messages }
+      })
       setDraft(''); setError('')
     } catch (err) { setError(err.message) }
     setSending(false)

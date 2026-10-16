@@ -1,6 +1,6 @@
 import { requireUser } from '../../lib/api-auth'
 import { emailWrap, sendStudioEmail, signOffHtml } from '../../lib/email'
-import { chatUrl } from '../../lib/conversations'
+import { appendToConversation, chatUrl, messageTime } from '../../lib/conversations'
 
 const escapeHtml = value => String(value ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;')
   .replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;')
@@ -37,5 +37,18 @@ export default async function handler(req, res) {
     html,
   })
   if (result.error) return res.status(400).json({ error: result.error })
-  return res.status(200).json({ id: result.id, client: { id: client.id, name: client.name, email: client.email } })
+
+  // Save the reply on the server straight away so it shows in the client's
+  // chat within seconds. The app adds the same entry (same id) locally,
+  // and the sync merges by id, so it never appears twice.
+  const now = new Date()
+  const entryId = /^[\w-]{8,64}$/.test(req.body?.entryId || '') ? req.body.entryId : `out-${result.id || now.getTime()}`
+  const entry = { id: entryId, from: 'You', text: message, time: messageTime(now, auth.config.timezone), at: now.toISOString(), out: true, via: 'email' }
+  let conversationId = null
+  try {
+    conversationId = (await appendToConversation(auth.db, { userId: auth.user.id, client, entry, unread: false })).id
+  } catch (error) {
+    console.error('[email-message] could not save to conversation', error.message)
+  }
+  return res.status(200).json({ id: result.id, conversationId, entry, client: { id: client.id, name: client.name, email: client.email } })
 }

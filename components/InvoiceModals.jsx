@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { T, C } from '../lib/tokens'
 import { pibase } from '../lib/pibase'
 import { LineItemBuilder, calcTotal } from './LineItemBuilder'
-import { invoiceLabel, invoiceStatus, nextInvoiceNumber } from '../lib/invoices'
+import { applyPayment, invoiceLabel, invoiceStatus, nextInstallment, nextInvoiceNumber, normaliseSchedule, paymentSchedule } from '../lib/invoices'
 import { buildItemCatalog } from '../lib/documents'
 
 const uid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => { const r = Math.random() * 16 | 0; return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16) })
@@ -57,7 +57,9 @@ export function InvoiceModal({ client: clientProp, invoice, data, setData, toast
   const save = ({ thenSend = false } = {}) => {
     if (!clientName) { toast('Choose a client'); return }
     if (lineData.items.every(i => !i.name?.trim()) && total === 0) { toast('Add at least one item'); return }
-    const fields = { client: clientName, clientId: client?.id || invoice?.clientId || null, amount: total, due, note: lineData.notes || '', lineData }
+    const schedule = normaliseSchedule(lineData.schedule, total)
+    if (schedule.length && schedule.some(row => row.amount <= 0)) { toast('Every payment in the plan needs an amount'); return }
+    const fields = { client: clientName, clientId: client?.id || invoice?.clientId || null, amount: total, due, note: lineData.notes || '', lineData: { ...lineData, schedule } }
     let saved
     if (isEdit) {
       const paid = invoice.paid || 0
@@ -134,6 +136,10 @@ export function InvoiceModal({ client: clientProp, invoice, data, setData, toast
 
       <LineItemBuilder value={lineData} onChange={setLineData} catalog={buildItemCatalog(data)} />
 
+      <PaymentPlanEditor schedule={lineData.schedule || []} total={total} due={due} paid={invoice?.paid || 0}
+        onChange={schedule => setLineData(current => ({ ...current, schedule }))}
+        allowPayInFull={lineData.allowPayInFull !== false} onAllowPayInFull={allowPayInFull => setLineData(current => ({ ...current, allowPayInFull }))} />
+
       <div style={{ ...T.modalFooter, flexWrap: 'wrap' }} className="modal-footer-wrap">
         {isEdit && <button style={{ ...T.btn, color: C.red, borderColor: C.red }} onClick={remove}>Delete invoice</button>}
         <div style={{ flex: 1 }} />
@@ -145,15 +151,186 @@ export function InvoiceModal({ client: clientProp, invoice, data, setData, toast
   )
 }
 
+// ── Payment plan ──────────────────────────────────────────────────
+const todayIso = () => new Date().toLocaleDateString('en-CA')
+const round2 = n => Math.round(n * 100) / 100
+const PLAN_PRESETS = [
+  { key: 'full', label: 'Pay in full' },
+  { key: 'deposit', label: 'Deposit + balance' },
+  { key: 'three', label: '3 payments' },
+]
+
+function presetSchedule(key, total, due) {
+  if (key === 'deposit') return [
+    { id: uid(), label: 'Deposit', amount: round2(total / 2), due: todayIso() },
+    { id: uid(), label: 'Balance', amount: 0, due: due || '' },
+  ]
+  if (key === 'three') return [
+    { id: uid(), label: 'Deposit', amount: round2(total / 3), due: todayIso() },
+    { id: uid(), label: 'Second payment', amount: round2(total / 3), due: '' },
+    { id: uid(), label: 'Final payment', amount: 0, due: due || '' },
+  ]
+  return []
+}
+
+// Splits the invoice into installments. The last one always takes what's
+// left so the plan adds up to the total.
+export function PaymentPlanEditor({ schedule, total, due, paid = 0, onChange, allowPayInFull = true, onAllowPayInFull }) {
+  const rows = normaliseSchedule(schedule, total)
+  const active = rows.length > 1
+  const progress = paymentSchedule({ amount: total, paid, due, lineData: { schedule: rows } })
+  // Edits keep what was typed (e.g. "12.") — totals use the normalised rows.
+  const base = active ? schedule.filter(Boolean) : rows
+  const update = (id, patch) => onChange(base.map(row => row.id === id ? { ...row, ...patch } : row))
+  const remove = id => onChange(base.length <= 2 ? [] : base.filter(row => row.id !== id))
+  const add = () => onChange([...base.slice(0, -1), { id: uid(), label: `Payment ${base.length}`, amount: '', due: '' }, base[base.length - 1]])
+  const presetKey = !active ? 'full' : null
+
+  return (
+    <div className="payment-plan">
+      <div className="payment-plan-head">
+        <div>
+          <div style={{ fontSize: 14, fontWeight: 600 }}>Payment plan</div>
+          <div style={{ fontSize: 12, color: C.muted }}>{active ? 'The client pays one installment at a time.' : 'The client pays the whole invoice at once.'}</div>
+        </div>
+        <div className="chip-tabs" role="group" aria-label="Payment plan">
+          {PLAN_PRESETS.map(preset => (
+            <button key={preset.key} type="button" className={presetKey === preset.key ? 'active' : ''}
+              onClick={() => onChange(presetSchedule(preset.key, total, due))}>{preset.label}</button>
+          ))}
+        </div>
+      </div>
+      {active && (
+        <>
+          {rows.map((row, index) => {
+            const last = index === rows.length - 1
+            const state = progress[index]
+            return (
+              <div key={row.id} className="payment-plan-row">
+                <input aria-label="Payment name" style={T.formInput} value={row.label} onChange={e => update(row.id, { label: e.target.value })} />
+                <div className="payment-plan-amount">
+                  <span>$</span>
+                  <input aria-label="Amount" style={{ ...T.formInput, paddingLeft: 22 }} type="number" min="0" step="0.01" inputMode="decimal" readOnly={last}
+                    value={last ? row.amount : (base[index]?.amount ?? row.amount)}
+                    onChange={e => update(row.id, { amount: e.target.value })}
+                    title={last ? 'The last payment is whatever is left' : undefined} />
+                </div>
+                <input aria-label="Due date" style={T.formInput} type="date" value={row.due} onChange={e => update(row.id, { due: e.target.value })} />
+                <div className="payment-plan-status">
+                  {state?.status === 'paid' ? <span style={{ color: C.green }}>Paid</span> : state?.status === 'partial' ? <span style={{ color: C.amber }}>{fmt$(state.paid)} paid</span> : last ? <span style={{ color: C.faint }}>Rest</span> : null}
+                  <button type="button" aria-label="Remove payment" style={{ ...T.btnGhost, color: C.muted, fontSize: 18 }} onClick={() => remove(row.id)}>×</button>
+                </div>
+              </div>
+            )
+          })}
+          <button type="button" style={{ ...T.btnSm, marginTop: 4 }} onClick={add}>+ Add payment</button>
+          {onAllowPayInFull && (
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 12, fontSize: 13, color: C.muted, cursor: 'pointer' }}>
+              <input type="checkbox" checked={allowPayInFull} onChange={e => onAllowPayInFull(e.target.checked)} />
+              Let the client pay the whole balance at once if they'd like
+            </label>
+          )}
+        </>
+      )}
+    </div>
+  )
+}
+
+// ── Record a payment received outside the app ─────────────────────
+const PAY_METHODS = [
+  { value: 'Cash', desc: 'Payment received in cash' },
+  { value: 'Credit Card', desc: 'Card payment taken outside the app' },
+  { value: 'Bank transfer', desc: 'Zelle, Venmo, check or bank transfer' },
+  { value: 'Gift / Complimentary', desc: 'No charge — gift or comp session' },
+]
+
+export function RecordPaymentModal({ invoice, setData, toast, onClose }) {
+  const next = nextInstallment(invoice)
+  const balance = Math.max(0, Math.round((invoice.amount - invoice.paid) * 100) / 100)
+  const [amount, setAmount] = useState(String(next?.remaining ?? balance))
+  const [method, setMethod] = useState(null)
+  const value = Math.round((parseFloat(amount) || 0) * 100) / 100
+  const schedule = paymentSchedule(invoice)
+
+  const confirm = () => {
+    if (!method) { toast('Select a payment method'); return }
+    if (value <= 0) { toast('Enter the amount received'); return }
+    if (value > balance) { toast(`That's more than the ${fmt$(balance)} still owed`); return }
+    const updated = applyPayment(invoice, { id: uid(), amount: value, method })
+    setData(d => ({ ...d, invoices: d.invoices.map(i => i.id === invoice.id ? { ...updated, lineData: { ...(i.lineData || {}), ...updated.lineData } } : i) }))
+    toast(updated.status === 'paid' ? `${invoiceLabel(invoice)} paid in full · ${method}` : `${fmt$(value)} recorded · ${fmt$(updated.amount - updated.paid)} still owed`)
+    onClose()
+  }
+
+  const presets = [
+    ...(next && next.remaining < balance ? [{ label: `${next.label} · ${fmt$(next.remaining)}`, value: next.remaining }] : []),
+    { label: `Full balance · ${fmt$(balance)}`, value: balance },
+  ]
+
+  return (
+    <Overlay onClose={onClose} maxWidth={560}>
+      <Header title="Record a payment" onClose={onClose} />
+      <div style={{ marginBottom: 16, padding: '12px 16px', background: C.surface2, borderRadius: 10, fontSize: 13 }}>
+        <div style={{ fontWeight: 500 }}>{invoiceLabel(invoice)} · {invoice.client}</div>
+        <div style={{ color: C.muted, marginTop: 2 }}>Total {fmt$(invoice.amount)} · paid {fmt$(invoice.paid)} · <strong style={{ color: C.text }}>{fmt$(balance)} owed</strong></div>
+        {schedule.length > 1 && (
+          <div style={{ marginTop: 8, display: 'grid', gap: 3 }}>
+            {schedule.map(row => (
+              <div key={row.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, color: row.status === 'paid' ? C.green : C.muted }}>
+                <span>{row.label}{row.due ? ` · due ${fmtLongDate(row.due)}` : ''}</span>
+                <span>{row.status === 'paid' ? 'Paid' : fmt$(row.remaining)}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+      <div style={T.formGroup}>
+        <label style={T.formLabel}>Amount received</label>
+        <div className="payment-plan-amount">
+          <span>$</span>
+          <input style={{ ...T.formInput, paddingLeft: 22, fontSize: 16 }} type="number" min="0" step="0.01" inputMode="decimal" value={amount} onChange={e => setAmount(e.target.value)} autoFocus />
+        </div>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
+          {presets.map(preset => (
+            <button key={preset.label} type="button" style={{ ...T.btnSm, ...(value === preset.value ? { borderColor: C.text, color: C.text } : {}) }} onClick={() => setAmount(String(preset.value))}>{preset.label}</button>
+          ))}
+        </div>
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {PAY_METHODS.map(opt => (
+          <div key={opt.value} onClick={() => setMethod(opt.value)} role="radio" aria-checked={method === opt.value}
+            style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '12px 14px', borderRadius: 10, border: `1.5px solid ${method === opt.value ? C.text : C.border}`, background: method === opt.value ? C.surface3 : C.surface, cursor: 'pointer' }}>
+            <div style={{ width: 18, height: 18, borderRadius: '50%', border: `2px solid ${method === opt.value ? C.text : C.border2}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              {method === opt.value && <div style={{ width: 9, height: 9, borderRadius: '50%', background: C.text }} />}
+            </div>
+            <div>
+              <div style={{ fontWeight: 500, fontSize: 14 }}>{opt.value}</div>
+              <div style={{ fontSize: 12, color: C.muted }}>{opt.desc}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+      <div style={T.modalFooter}>
+        <div style={{ flex: 1 }} />
+        <button style={T.btn} onClick={onClose}>Cancel</button>
+        <button style={T.btnPrimary} onClick={confirm}>Record {fmt$(value)}</button>
+      </div>
+    </Overlay>
+  )
+}
+
 // ── Email invoice to client ───────────────────────────────────────
 export function defaultInvoiceEmail(invoice, clientName) {
   const first = (clientName || '').split(/\s+/)[0] || 'there'
   const number = invoiceLabel(invoice)
-  const balance = Math.max(0, (invoice.amount || 0) - (invoice.paid || 0))
-  const due = invoice.due && invoice.status !== 'paid' ? ` Payment is due by ${fmtLongDate(invoice.due)}.` : ''
+  const next = invoice.status !== 'paid' ? nextInstallment(invoice) : null
+  const planned = paymentSchedule(invoice).length > 1
+  const dueLine = !next ? '' : planned
+    ? ` To get started, your ${next.label.toLowerCase()} of ${fmt$(next.remaining)} is due${next.due ? ` by ${fmtLongDate(next.due)}` : ''}.`
+    : ` ${fmt$(next.remaining)} is due${next.due ? ` by ${fmtLongDate(next.due)}` : ''}.`
   return {
     subject: `Your invoice ${number} is ready`,
-    message: `Hi ${first},\n\nThank you so much for choosing us! Your invoice ${number} for ${fmt$(balance || invoice.amount)} is ready.${due}\n\nClick the button below to view your invoice and its details. If you have any questions, just reply to this email.`,
+    message: `Hi ${first},\n\nThank you so much for choosing us! Your invoice ${number} is ready.${dueLine}\n\nClick the button below to view your invoice and pay securely online. If you have any questions, just reply to this email.`,
   }
 }
 

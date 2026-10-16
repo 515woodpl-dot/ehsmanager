@@ -5,6 +5,80 @@ every round of changes, and keep the "Open / follow-ups" list current.
 
 ---
 
+## 2026-10-16 (round 9) — Payment plans, studio countersigning, live chat
+
+### ⚠️ Before using
+- [ ] No database migration needed. Payment plans and payments live with the
+      invoice's line items; signatures live in the contract's fields.
+- [ ] For online payments: in Stripe, add the webhook to
+      `https://<your app>/api/webhook` with the event
+      **`payment_intent.succeeded`**, and save the `whsec_…` secret in
+      Settings → Payments. Stripe Checkout needs no extra events.
+
+### Invoices — clients pay the installment, not the whole invoice
+- [x] **Payment plan** on every invoice: *Pay in full*, *Deposit + balance*
+      (50% today, the rest by the due date) or *3 payments*. Each payment
+      has a name, amount and due date; add or remove payments, and the last
+      one always takes whatever is left so it adds up to the total.
+- [x] **"Let the client pay the whole balance at once"** switch per invoice
+      (on by default). Turn it off and the client can only pay the
+      installment that's due.
+- [x] **Client invoice page** leads with **Due now** (e.g. *Deposit ·
+      $600*) and its due date, then the plan with what's paid and what's
+      left. The total is still on the invoice, but the pay button is for
+      the installment.
+- [x] **Pay online**: *Pay Deposit · $600* through secure Stripe Checkout,
+      plus *Pay the full balance instead* when allowed. The amount is always
+      worked out on the server from the invoice. The browser can't change it.
+- [x] Stripe payments are added to what's already paid instead of marking
+      the whole invoice paid. Each payment is counted once, even if Stripe
+      sends it twice, and the app tells you which installment came in
+      ("💰 Payment received · Deposit").
+- [x] **Record payment** (replaces "Mark paid") takes any amount, with
+      one-tap *Deposit · $600* / *Full balance* buttons, and adds Bank
+      transfer (Zelle/Venmo/check) as a method. Partial payments leave the
+      invoice orange ("partial") and record the date and method.
+- [x] Invoice cards show the next payment ("Next: Balance $1,800 · due Dec
+      1"); invoice details list the plan and every payment received.
+- [x] The invoice email and its default message say what's due now ("your
+      deposit of $600 is due by Oct 20") instead of the full total.
+- [x] An open copy of the app can no longer overwrite an online payment
+      that came in while it was open.
+
+### Contracts — studio signs too, client gets the signed copy
+- [x] **Your signature** panel on every contract you haven't signed. Draw
+      it or use your typed name; the name is remembered on this device. You
+      can sign before sending or after the client signs.
+- [x] When **both** have signed, the client is **emailed their signed
+      copy** automatically (with a link to view, print or save it as PDF).
+      A copy goes to the studio email too. **Email copy again** resends it.
+- [x] Contracts turn green only once both have signed. A client-signed
+      contract shows **Add your signature** / "sign now" on its card.
+- [x] **Sign in person** now uses the same drawn-or-typed signature pad
+      and saves on the server, so it also triggers the signed copy.
+- [x] The client's signing page shows the studio's signature, says "Signed
+      by both", and offers Print / save as PDF. If the studio hasn't signed
+      yet, it tells the client a copy will follow.
+- [x] Typed-name signatures now show the name in the signature line instead
+      of a blank line.
+- [x] Signatures made from links can't be undone by an older copy of the
+      app that was still open.
+
+### Chat — new messages appear without refreshing
+- [x] Studio replies are saved on the server the moment they're sent, so the
+      client's open chat shows them within a few seconds. Before, they only
+      reached the chat after the app's background save.
+- [x] The client chat checks for new messages every 4 seconds while it's on
+      screen, and straight away when the client comes back to the tab or
+      their phone reconnects.
+- [x] While the Inbox is open, the studio app checks for client messages
+      every 10 seconds (every minute elsewhere).
+- [x] Tested: studio reply showed in the open client chat without a reload,
+      the client's answer showed in the open Inbox about 7 seconds later,
+      and there were no duplicate messages.
+
+---
+
 ## 2026-10-14 (round 8) — Push notifications
 
 ### ⚠️ Before using
@@ -558,9 +632,13 @@ every round of changes, and keep the "Open / follow-ups" list current.
 ---
 
 ## Open / follow-ups
-- [ ] The public invoice page doesn't take card payments yet. Stripe keys
-      can now be saved in Settings, but there's no client-facing "Pay now"
-      button.
+- [ ] Online payments were tested against a stand-in for Stripe (signed
+      webhook events), not a real Stripe account. Make one test payment in
+      Stripe test mode before going live.
+- [ ] The signed-contract copy is a link to the signed page (print / save
+      as PDF), not a PDF attachment.
+- [ ] Payment reminders before each installment's due date aren't sent
+      automatically yet.
 - [ ] `NEXT_PUBLIC_APP_URL` must be set in production so email buttons
       and webhook URLs point at the right domain.
 - [ ] No notification email to the studio yet when a client accepts a

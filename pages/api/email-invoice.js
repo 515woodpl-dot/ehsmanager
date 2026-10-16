@@ -1,6 +1,7 @@
 import { emailWrap, sendStudioEmail, signOffHtml } from '../../lib/email'
 import { requireUser } from '../../lib/api-auth'
 import { createInvoiceToken } from '../../lib/signingTokens'
+import { invoiceFromRow, payableOptions, paymentSchedule } from '../../lib/invoices'
 
 const escapeHtml = value => String(value ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;')
   .replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;')
@@ -31,6 +32,11 @@ export default async function handler(req, res) {
   const fmt = n => '$' + Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })
   const fmtDate = iso => iso ? new Date(iso + 'T00:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : 'TBD'
 
+  const plan = paymentSchedule(invoiceFromRow(row))
+  const dueNow = payableOptions(invoiceFromRow(row))[0] || null
+  const planHtml = plan.length > 1
+    ? plan.map(p => `<div class="box-row"><span class="label">${escapeHtml(p.label)}${p.due ? ` · due ${fmtDate(p.due)}` : ''}</span><span class="value">${p.status === 'paid' ? 'Paid' : fmt(p.remaining)}</span></div>`).join('')
+    : ''
   const statusLabel = invoice.status === 'paid' ? 'Paid in full' : invoice.status === 'partial' ? `${fmt(invoice.paid)} paid · ${fmt(owing)} remaining` : `${fmt(invoice.amount)} due`
 
   const lineItemsHtml = invoice.lineItems?.length
@@ -52,7 +58,7 @@ export default async function handler(req, res) {
   const intro = customMessage
     ? customMessage.split(/\n{2,}/).map(paragraph => `<p>${escapeHtml(paragraph).replace(/\n/g, '<br/>')}</p>`).join('')
     : `<p>Hi ${escapeHtml(clientName || 'there')},</p>
-    <p>Please find your invoice details below. ${invoice.status !== 'paid' ? 'Payment is due by ' + fmtDate(invoice.due) + '.' : 'Thank you for your payment!'}</p>`
+    <p>Please find your invoice details below. ${invoice.status !== 'paid' ? (dueNow ? `${plan.length > 1 ? `Your ${escapeHtml(dueNow.label.toLowerCase())} of ` : ''}${fmt(dueNow.amount)} is due${dueNow.due ? ' by ' + fmtDate(dueNow.due) : ''}.` : '') : 'Thank you for your payment!'}</p>`
   const customSubject = typeof req.body?.subject === 'string' ? req.body.subject.replace(/[\r\n]+/g, ' ').trim().slice(0, 200) : ''
 
   const html = emailWrap(`
@@ -60,12 +66,17 @@ export default async function handler(req, res) {
     ${intro}
     ${viewUrl ? `<p><a href="${escapeHtml(viewUrl)}" class="btn" style="color:#ffffff;">View invoice ${escapeHtml(label)}</a></p>` : ''}
 
-    <div class="amount">${fmt(invoice.amount)}</div>
+    ${dueNow
+      ? `<p style="margin:16px 0 0;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#9B9B98;">${plan.length > 1 ? `Due now · ${escapeHtml(dueNow.label)}` : 'Amount due'}</p>
+    <div class="amount">${fmt(dueNow.amount)}</div>${dueNow.due ? `<p>Due by ${fmtDate(dueNow.due)}</p>` : ''}`
+      : `<div class="amount">${fmt(invoice.amount)}</div><p>Paid in full — thank you!</p>`}
+
+    ${planHtml ? `<div class="box"><div class="box-row"><span class="label"><strong>Payment plan</strong></span><span class="value"></span></div>${planHtml}</div>` : ''}
 
     <div class="box">
       ${lineItemsHtml}
       <div class="box-row"><span class="label">Invoice</span><span class="value">${escapeHtml(label)}</span></div>
-      <div class="box-row"><span class="label">Due date</span><span class="value">${fmtDate(invoice.due)}</span></div>
+      <div class="box-row"><span class="label">Invoice total</span><span class="value">${fmt(invoice.amount)}</span></div>
       <div class="box-row"><span class="label">Status</span><span class="value">${statusLabel}</span></div>
       ${invoice.note ? `<div class="box-row"><span class="label">Note</span><span class="value">${escapeHtml(invoice.note)}</span></div>` : ''}
     </div>

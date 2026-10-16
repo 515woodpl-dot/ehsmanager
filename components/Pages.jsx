@@ -2,10 +2,10 @@ import { useState, useRef, useEffect } from 'react'
 import { T, C } from '../lib/tokens'
 import { pibase } from '../lib/pibase'
 import { Modal, Badge, Avatar, SearchBar } from './UI'
-import { InvoiceModal, SendInvoiceModal } from './InvoiceModals'
-import { invoiceLabel } from '../lib/invoices'
+import { InvoiceModal, RecordPaymentModal, SendInvoiceModal } from './InvoiceModals'
+import { invoiceLabel, nextInstallment, paymentSchedule } from '../lib/invoices'
 import { docTone } from '../lib/documents'
-import { ContractModal } from './ActionModals'
+import { ContractModal, ContractSignPanel } from './ActionModals'
 
 const uid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => { const r = Math.random() * 16 | 0; return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16) })
 const fmtDate = iso => { if (!iso) return 'TBD'; const d = new Date(iso + 'T00:00:00'); return isNaN(d) ? iso : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) }
@@ -451,19 +451,12 @@ export function Calendar({ data, setData, toast, openClientCard }) {
 export function Invoices({ data, setData, toast }) {
   const [modal, setModal] = useState(false)
   const [payModal, setPayModal] = useState(null) // invoice being marked paid
-  const [payMethod, setPayMethod] = useState(null)
   const [sendFor, setSendFor] = useState(null) // invoice being emailed
   const [editFor, setEditFor] = useState(null) // invoice being edited
   const [viewId, setViewId] = useState(null)
   const [show, setShow] = useState('all') // all | open | paid
   const viewInvoice = viewId ? data.invoices.find(i => i.id === viewId) : null
   const clientFor = inv => data.clients.find(c => c.id === inv.clientId) || data.clients.find(c => c.name === inv.client)
-  const confirmPaid = () => {
-    if (!payMethod) { toast('Select a payment method'); return }
-    const now = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-    setData(d => ({ ...d, invoices: d.invoices.map(i => i.id === payModal.id ? { ...i, status: 'paid', paid: i.amount, paymentMethod: payMethod, paidAt: now } : i) }))
-    toast(`Marked as paid · ${payMethod}`); setPayModal(null); setPayMethod(null)
-  }
   const del = inv => { if (!confirm(`Delete ${invoiceLabel(inv)}? This cannot be undone.`)) return; setData(d => ({ ...d, invoices: d.invoices.filter(i => i.id !== inv.id) })); setViewId(null); toast(`${invoiceLabel(inv)} deleted`) }
   const total = data.invoices.reduce((s, i) => s + i.amount, 0)
   const collected = data.invoices.reduce((s, i) => s + i.paid, 0)
@@ -485,7 +478,7 @@ export function Invoices({ data, setData, toast }) {
                 <div style={{ minWidth: 0 }}>
                   <div className="inv-card-num">{invoiceLabel(inv)} <Badge type={inv.status} label={inv.status} /></div>
                   <div className="inv-card-client">{inv.client}</div>
-                  <div className="inv-card-meta">Due {fmtDate(inv.due)}{inv.paymentMethod ? ` · Paid via ${inv.paymentMethod}` : ''}</div>
+                  <div className="inv-card-meta">{(() => { const next = paymentSchedule(inv).length > 1 && nextInstallment(inv); return next ? `Next: ${next.label} ${fmt$(next.remaining)}${next.due ? ` · due ${fmtDate(next.due)}` : ''}` : `Due ${fmtDate(inv.due)}${inv.paymentMethod ? ` · Paid via ${inv.paymentMethod}` : ''}` })()}</div>
                 </div>
                 <div className="inv-card-amount">
                   <div>{fmt$(inv.amount)}</div>
@@ -494,7 +487,7 @@ export function Invoices({ data, setData, toast }) {
               </div>
               <div style={T.progress}><div style={{ height: '100%', borderRadius: 2, background: inv.status === 'paid' ? C.green : inv.status === 'partial' ? C.amber : C.border2, width: pct + '%', transition: 'width 0.4s' }} /></div>
               <div className="card-actions">
-                {inv.status !== 'paid' && owing > 0 && <button style={{ ...T.btnSm, color: C.green, borderColor: C.green }} onClick={event => { event.stopPropagation(); setPayModal(inv); setPayMethod(null) }}>Mark paid</button>}
+                {inv.status !== 'paid' && owing > 0 && <button style={{ ...T.btnSm, color: C.green, borderColor: C.green }} onClick={event => { event.stopPropagation(); setPayModal(inv) }}>Record payment</button>}
                 <button style={T.btnSm} onClick={event => { event.stopPropagation(); setEditFor(inv) }}>Edit</button>
                 <button style={T.btnSm} onClick={event => { event.stopPropagation(); setSendFor(inv) }}>Send</button>
               </div>
@@ -505,43 +498,15 @@ export function Invoices({ data, setData, toast }) {
       {modal && <InvoiceModal data={data} setData={setData} toast={toast} onClose={() => setModal(false)} />}
       {editFor && <InvoiceModal invoice={editFor} client={clientFor(editFor)} data={data} setData={setData} toast={toast} onClose={() => setEditFor(null)} />}
       {sendFor && <SendInvoiceModal invoice={sendFor} client={clientFor(sendFor)} toast={toast} onClose={() => setSendFor(null)} />}
-      {viewInvoice && <Modal title={`${invoiceLabel(viewInvoice)} · ${viewInvoice.client}`} onClose={() => setViewId(null)} wide footer={<><button style={{ ...T.btn, color: C.red, borderColor: C.red }} onClick={() => del(viewInvoice)}>Delete</button><div style={{ flex: 1 }} /><button style={T.btn} onClick={() => { setEditFor(viewInvoice); setViewId(null) }}>Edit</button><button style={T.btn} onClick={() => { setSendFor(viewInvoice); setViewId(null) }}>Email client</button>{viewInvoice.status !== 'paid' && <button style={T.btnPrimary} onClick={() => { setPayModal(viewInvoice); setPayMethod(null); setViewId(null) }}>Record payment</button>}</>}>
+      {viewInvoice && <Modal title={`${invoiceLabel(viewInvoice)} · ${viewInvoice.client}`} onClose={() => setViewId(null)} wide footer={<><button style={{ ...T.btn, color: C.red, borderColor: C.red }} onClick={() => del(viewInvoice)}>Delete</button><div style={{ flex: 1 }} /><button style={T.btn} onClick={() => { setEditFor(viewInvoice); setViewId(null) }}>Edit</button><button style={T.btn} onClick={() => { setSendFor(viewInvoice); setViewId(null) }}>Email client</button>{viewInvoice.status !== 'paid' && <button style={T.btnPrimary} onClick={() => { setPayModal(viewInvoice); setViewId(null) }}>Record payment</button>}</>}>
         <div className="invoice-detail-grid"><div><span>Status</span><Badge type={viewInvoice.status} label={viewInvoice.status} /></div><div><span>Total</span><strong>{fmt$(viewInvoice.amount)}</strong></div><div><span>Paid</span><strong>{fmt$(viewInvoice.paid)}</strong></div><div><span>Balance</span><strong>{fmt$(viewInvoice.amount - viewInvoice.paid)}</strong></div><div><span>Due date</span><strong>{fmtDate(viewInvoice.due)}</strong></div><div><span>Payment</span><strong>{viewInvoice.paymentMethod || 'Not recorded'}</strong></div></div>
+        {paymentSchedule(viewInvoice).length > 1 && <div className="invoice-line-items"><h3>Payment plan</h3>{paymentSchedule(viewInvoice).map(row => <div key={row.id}><span><strong style={{ fontWeight: 500 }}>{row.label}</strong>{row.due ? <><br /><small style={{ color: C.muted }}>Due {fmtDate(row.due)}</small></> : null}</span><strong style={{ color: row.status === 'paid' ? C.green : row.status === 'partial' ? C.amber : C.text }}>{row.status === 'paid' ? `${fmt$(row.amount)} · paid` : row.status === 'partial' ? `${fmt$(row.remaining)} of ${fmt$(row.amount)} left` : fmt$(row.amount)}</strong></div>)}</div>}
+        {!!viewInvoice.lineData?.payments?.length && <div className="invoice-line-items"><h3>Payments received</h3>{viewInvoice.lineData.payments.map(p => <div key={p.id}><span>{new Date(p.at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}<br /><small style={{ color: C.muted }}>{p.method || 'Payment'}</small></span><strong>{fmt$(p.amount)}</strong></div>)}</div>}
         {viewInvoice.note && <div className="invoice-note"><span>Invoice note</span><p>{viewInvoice.note}</p></div>}
         {!!viewInvoice.lineData?.items?.length && <div className="invoice-line-items"><h3>Items</h3>{viewInvoice.lineData.items.map(item => <div key={item.id}><span><strong style={{ fontWeight: 500 }}>{item.name || 'Item'}</strong>{item.description ? <><br /><small style={{ color: C.muted, whiteSpace: 'pre-wrap' }}>{item.description}</small></> : null}</span><strong>{item.qty} × {fmt$(item.price)}</strong></div>)}</div>}
       </Modal>}
 
-      {/* 1.6 — Payment method modal */}
-      {payModal && (
-        <Modal title="How was this payment received?" onClose={() => { setPayModal(null); setPayMethod(null) }}
-          footer={<><button style={T.btn} onClick={() => { setPayModal(null); setPayMethod(null) }}>Cancel</button><button style={T.btnPrimary} onClick={confirmPaid}>Confirm payment</button></>}>
-          <div style={{ marginBottom: 16, padding: '12px 16px', background: C.surface2, borderRadius: 10, fontSize: 13 }}>
-            <div style={{ fontWeight: 500 }}>{invoiceLabel(payModal)} · {payModal.client}</div>
-            <div style={{ color: C.muted, marginTop: 2 }}>Amount: <strong style={{ color: C.text }}>${payModal.amount.toLocaleString()}</strong></div>
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {[
-              { value: 'Cash', label: 'Cash', desc: 'Payment received in cash' },
-              { value: 'Credit Card', label: 'Credit Card', desc: 'Manual card payment (not via Stripe)' },
-              { value: 'Gift / Complimentary', label: 'Gift / Complimentary', desc: 'No charge — gift or comp session' },
-            ].map(opt => (
-              <div key={opt.value} onClick={() => setPayMethod(opt.value)}
-                style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 16px', borderRadius: 10, border: `1.5px solid ${payMethod === opt.value ? C.text : C.border}`, background: payMethod === opt.value ? C.surface3 : C.surface, cursor: 'pointer', transition: 'all 0.12s' }}>
-                <div style={{ width: 20, height: 20, borderRadius: '50%', border: `2px solid ${payMethod === opt.value ? C.text : C.border2}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                  {payMethod === opt.value && <div style={{ width: 10, height: 10, borderRadius: '50%', background: C.text }} />}
-                </div>
-                <div>
-                  <div style={{ fontWeight: 500, fontSize: 14 }}>{opt.label}</div>
-                  <div style={{ fontSize: 12, color: C.muted }}>{opt.desc}</div>
-                </div>
-              </div>
-            ))}
-          </div>
-          <div style={{ marginTop: 14, fontSize: 12, color: C.faint, padding: '10px 14px', background: C.surface2, borderRadius: 8 }}>
-            Use this form to record a payment you have already received.
-          </div>
-        </Modal>
-      )}
+      {payModal && <RecordPaymentModal invoice={data.invoices.find(i => i.id === payModal.id) || payModal} setData={setData} toast={toast} onClose={() => setPayModal(null)} />}
     </div>
   )
 }
@@ -552,16 +517,9 @@ export function Contracts({ data, setData, toast }) {
   const [viewModal, setViewModal] = useState(null)
   const [sendModal, setSendModal] = useState(null)
   const [signModal, setSignModal] = useState(null)
-  const [signName, setSignName] = useState('')
-  const confirmSign = () => {
-    if (!signName.trim()) { toast('Please type your full name to sign'); return }
-    const signedAt = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
-    setData(d => ({ ...d, contracts: d.contracts.map(k => k.id === signModal.id ? { ...k, status: 'signed', signedBy: signName.trim(), signedAt } : k) }))
-    toast('Contract signed'); setSignModal(null); setSignName('')
-  }
   return (
     <div>
-      <div style={T.pageHeader} className="page-header-wrap"><div><div style={T.pageTitle}>Contracts</div><div style={T.pageSub}>{data.contracts.filter(k => k.status === 'signed').length} signed · {data.contracts.filter(k => k.status === 'pending').length} pending</div></div><button style={T.btnPrimary} onClick={() => setModal(true)}>+ New contract</button></div>
+      <div style={T.pageHeader} className="page-header-wrap"><div><div style={T.pageTitle}>Contracts</div><div style={T.pageSub}>{data.contracts.filter(k => docTone('contract', k) === 'done').length} fully signed · {data.contracts.filter(k => docTone('contract', k) !== 'done').length} waiting</div></div><button style={T.btnPrimary} onClick={() => setModal(true)}>+ New contract</button></div>
       <div className="invoice-card-grid">
         {data.contracts.length === 0 && <div style={{ ...T.card, color: C.faint, textAlign: 'center' }}>No contracts yet</div>}
         {data.contracts.map(k => (
@@ -570,14 +528,15 @@ export function Contracts({ data, setData, toast }) {
               <div style={{ minWidth: 0 }}>
                 <div className="inv-card-num">{k.type || 'Contract'}</div>
                 <div className="inv-card-client">{k.client}</div>
-                <div className="inv-card-meta">{k.status === 'signed' ? `Signed${k.signedBy ? ` by ${k.signedBy}` : ''}${k.signedAt ? ` · ${k.signedAt}` : ''}` : `Created ${k.sent || '—'} · waiting for signature`}</div>
+                <div className="inv-card-meta">{k.status === 'signed' ? `Signed${k.signedBy ? ` by ${k.signedBy}` : ''}${k.signedAt ? ` · ${k.signedAt}` : ''}${k.fields?.studioSignature?.name ? '' : ' · needs your signature'}` : `Created ${k.sent || '—'} · waiting for signature`}</div>
               </div>
-              <Badge type={k.status} label={k.status === 'signed' ? 'signed' : 'awaiting'} />
+              <Badge type={docTone('contract', k) === 'done' ? 'signed' : 'pending'} label={docTone('contract', k) === 'done' ? 'signed' : k.status === 'signed' ? 'sign now' : 'awaiting'} />
             </div>
             <div className="card-actions">
               <button style={T.btnSm} onClick={e => { e.stopPropagation(); setViewModal(k) }}>View</button>
+              {k.status === 'signed' && !k.fields?.studioSignature?.name && <button style={{ ...T.btnSm, color: C.green, borderColor: C.green }} onClick={e => { e.stopPropagation(); setViewModal(k) }}>Add your signature</button>}
               {k.status === 'pending' && <button style={T.btnSm} onClick={e => { e.stopPropagation(); setSendModal(k) }}>Send to sign</button>}
-              {k.status === 'pending' && <button style={{ ...T.btnSm, color: C.green, borderColor: C.green }} onClick={e => { e.stopPropagation(); setSignModal(k); setSignName('') }}>Sign in person</button>}
+              {k.status === 'pending' && <button style={{ ...T.btnSm, color: C.green, borderColor: C.green }} onClick={e => { e.stopPropagation(); setSignModal(k) }}>Sign in person</button>}
             </div>
           </article>
         ))}
@@ -586,25 +545,8 @@ export function Contracts({ data, setData, toast }) {
       {viewModal && <ContractModal contract={viewModal} data={data} setData={setData} toast={toast} onClose={() => setViewModal(null)} />}
       {sendModal && <ContractModal contract={sendModal} startMode="send" data={data} setData={setData} toast={toast} onClose={() => setSendModal(null)} />}
       {signModal && (
-        <Modal title="Sign contract" onClose={() => { setSignModal(null); setSignName('') }}
-          footer={<><button style={T.btn} onClick={() => { setSignModal(null); setSignName('') }}>Cancel</button><button style={T.btnPrimary} onClick={confirmSign}>Sign contract</button></>}>
-          <div style={{ marginBottom: 20, padding: '14px 16px', background: C.surface2, borderRadius: 10, fontSize: 13 }}>
-            <div style={{ fontWeight: 500 }}>{signModal.type || 'Contract'}</div>
-            <div style={{ color: C.muted, marginTop: 2 }}>{signModal.client} · Sent {signModal.sent}</div>
-          </div>
-          <div style={T.formGroup}>
-            <label style={T.formLabel}>Type your full legal name to sign</label>
-            <input style={{ ...T.formInput, fontSize: 18, fontFamily: "'DM Serif Display', Georgia, serif", letterSpacing: '0.01em' }}
-              placeholder="Your full name"
-              value={signName}
-              onChange={e => setSignName(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && confirmSign()}
-              autoFocus
-            />
-          </div>
-          <div style={{ marginTop: 14, fontSize: 12, color: C.faint, padding: '10px 14px', background: C.surface2, borderRadius: 8, lineHeight: 1.6 }}>
-            By typing your name above, you agree this constitutes a valid electronic signature and that you have read and agree to the terms of this contract.
-          </div>
+        <Modal title={`${signModal.type || 'Contract'} — ${signModal.client} signs in person`} onClose={() => setSignModal(null)} wide>
+          <ContractSignPanel contract={signModal} role="client" clientName={signModal.client} setData={setData} toast={toast} onDone={() => setSignModal(null)} onCancel={() => setSignModal(null)} />
         </Modal>
       )}
     </div>
@@ -653,12 +595,14 @@ export function Inbox({ data, setData, toast, openClientCard }) {
 
   useEffect(() => { endRef.current?.scrollIntoView({ block: 'end' }) }, [active?.id, active?.thread?.length])
 
-  const deliver = async ({ clientId, clientName, message }) => {
+  // The server saves the reply to the conversation too (same entry id), so
+  // the client's open chat shows it within seconds.
+  const deliver = async ({ clientId, clientName, message, entryId }) => {
     const { data: { session } } = await pibase.auth.getSession()
-    const response = await fetch('/api/email-message', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token || ''}` }, body: JSON.stringify({ clientId, clientName, message }) })
+    const response = await fetch('/api/email-message', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token || ''}` }, body: JSON.stringify({ clientId, clientName, message, entryId }) })
     const payload = await response.json().catch(() => ({}))
     if (!response.ok) throw new Error(payload.error || 'Message could not be sent')
-    return payload.client
+    return payload
   }
   const entry = text => ({ id: uid(), from: 'You', text, time: new Date().toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }), at: new Date().toISOString(), out: true, via: 'email' })
   const open = m => {
@@ -669,8 +613,9 @@ export function Inbox({ data, setData, toast, openClientCard }) {
     if (!draft.trim() || !active || sending) return
     setSending(true)
     try {
-      await deliver({ clientId: activeClient?.id, clientName: active.from, message: draft })
-      setData(d => ({ ...d, messages: d.messages.map(m => m.id === active.id ? { ...m, clientId: activeClient?.id || m.clientId, thread: [...m.thread, entry(draft)], unread: false } : m) }))
+      const item = entry(draft)
+      await deliver({ clientId: activeClient?.id, clientName: active.from, message: draft, entryId: item.id })
+      setData(d => ({ ...d, messages: d.messages.map(m => m.id === active.id ? { ...m, clientId: activeClient?.id || m.clientId, thread: [...m.thread, item], unread: false } : m) }))
       setDraft(''); toast('Email sent')
     } catch (error) { toast(error.message) }
     setSending(false)
@@ -681,13 +626,15 @@ export function Inbox({ data, setData, toast, openClientCard }) {
     if (!nf.body.trim() || sending) return
     setSending(true)
     try {
-      await deliver({ clientId: selected.id, clientName: selected.name, message: nf.body })
+      const item = entry(nf.body)
+      const sent = await deliver({ clientId: selected.id, clientName: selected.name, message: nf.body, entryId: item.id })
       const existing = data.messages.find(m => m.clientId === selected.id)
       if (existing) {
-        setData(d => ({ ...d, messages: d.messages.map(m => m.id === existing.id ? { ...m, thread: [...m.thread, entry(nf.body)] } : m) }))
+        setData(d => ({ ...d, messages: d.messages.map(m => m.id === existing.id ? { ...m, thread: [...m.thread, item] } : m) }))
         setActiveId(existing.id)
       } else {
-        const nm = { id: uid(), clientId: selected.id, from: selected.name, thread: [entry(nf.body)], unread: false }
+        // Use the conversation the server just created, so there's only one.
+        const nm = { id: sent.conversationId || uid(), clientId: selected.id, from: selected.name, thread: [item], unread: false }
         setData(d => ({ ...d, messages: [nm, ...d.messages] })); setActiveId(nm.id)
       }
       setMobileThread(true); setNewModal(false); setNf({ clientId: '', body: '' }); toast('Email sent')

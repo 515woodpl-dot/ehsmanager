@@ -786,3 +786,21 @@ body { padding-left: env(safe-area-inset-left); padding-right: env(safe-area-ins
   button, .chip-tabs, .inbox-row { -webkit-user-select: none; user-select: none; }
 }
 .settings-note { font-size: 13.5px; color: var(--muted); line-height: 1.6; margin: 0 0 16px; padding: 12px 14px; background: var(--surface2); border-radius: 10px; }
+
+/* ── Payment plan (invoice editor) ── */
+.payment-plan { margin-top: 18px; padding: 14px 16px; border: 1px solid var(--border, #EAEAEA); border-radius: 12px; background: var(--surface2, #F8F8F7); }
+.payment-plan-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 10px; }
+.payment-plan-head .chip-tabs { margin: 0; }
+.payment-plan-row { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, .9fr) minmax(0, 1fr) auto; gap: 8px; align-items: center; margin-bottom: 8px; }
+.payment-plan-amount { position: relative; }
+.payment-plan-amount span { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--muted, #7F7E7C); font-size: 14px; pointer-events: none; }
+.payment-plan-amount input[readonly] { background: transparent; }
+.payment-plan-status { display: flex; align-items: center; gap: 6px; font-size: 12px; white-space: nowrap; min-width: 64px; justify-content: flex-end; }
+@media (max-width: 640px) {
+  .payment-plan-row { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); padding: 10px; border: 1px solid var(--border, #EAEAEA); border-radius: 10px; background: var(--surface, #fff); }
+  .payment-plan-row > input:first-child { grid-column: 1 / -1; }
+  .payment-plan-status { grid-column: 1 / -1; justify-content: space-between; }
+}
+.contract-signature-typed { font-family: 'DM Serif Display', Georgia, serif; font-size: 24px; line-height: 64px; height: 64px; border-bottom: 1px solid #ddd; margin-bottom: 7px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.payment-plan-head .chip-tabs { flex-wrap: wrap; overflow: visible; }
+.payment-plan-status button { margin-left: auto; }
