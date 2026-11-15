@@ -58,6 +58,41 @@ Then abuse it:
 - Phone width (390px): nothing wider than the screen, buttons reachable, modals closable.
 - Watch the browser console, failed network requests, the "Saved / Save failed" indicator and the server log for every step.
 
+## Hard mode: many clients at once
+
+When asked for hard mode (or a load / concurrency run), act like a busy
+studio on a real day instead of one client at a time:
+
+- Create at least 10 clients across different project types and business
+  types (photography, web design, digital creative studio). Give each its own
+  pipeline: some book online, some come through the contact form, some get a
+  quote, invoice with a payment plan, contract (all agreements, including the
+  Creative Services Agreement with different service mixes), questionnaire
+  and chat.
+- Run them **in parallel**: separate browser contexts and scripted API
+  calls firing together (Promise.all), not one after another. Mix in the
+  owner working in two tabs (and on a phone-width tab) while clients act.
+- Aim at races and hand-offs: several clients booking the same or
+  overlapping slots at the same moment; the same coupon or gift card used by
+  several clients at once; many quotes accepted at once (invoice numbers
+  must stay unique and in order); clients signing while the owner edits or
+  countersigns the same contract; many chat messages and owner replies
+  interleaved (no lost or duplicated messages); the owner's open app saving
+  over changes clients just made (signatures, payments, answers, messages);
+  deleting or archiving a client while their documents are being used;
+  switching business type while clients are mid-pipeline.
+- After each burst, check the database for consistency: every row belongs to
+  the right owner and client, totals and paid amounts add up, slot claims
+  match active bookings, discount uses and balances match bookings, invoice
+  numbers are unique, nothing is orphaned or duplicated. Note anything the
+  owner's screen shows that differs from the database.
+- Public forms are rate limited per connection. Say whether the limit can be
+  bypassed (for example with a made-up X-Forwarded-For header) and use
+  distinct addresses per simulated client only when the limit gets in the way
+  of the test.
+- Stay under the database's request limits (about 100 requests per second
+  per project); bursts of 10–30 parallel requests are enough to expose races.
+
 ## Report
 
 Return a list of findings, most severe first. For each: severity (critical /
