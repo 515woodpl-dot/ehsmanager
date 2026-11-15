@@ -195,7 +195,9 @@ setting HEARTBEAT_SECRET "$(secret)" keep
 say "Building the app and setting up the database"
 update_args=(--no-start --no-backup)
 [ ! -e "$dir/current" ] || update_args=(--no-start --no-backup --force)
-MANAGER_BASE="$base" "$dir/repo/scripts/update.sh" "$name" "${update_args[@]}"
+# Use the updater shipped with this installer. An existing checkout may still
+# contain an older updater that cannot migrate the new deployment layout.
+MANAGER_BASE="$base" "$here/scripts/update.sh" "$name" "${update_args[@]}"
 
 # 6. The owner's account and business profile.
 say "Setting up the owner's account"
@@ -294,7 +296,7 @@ EOF
   fi
 else
   say "Starting the app in the background (no systemd)"
-  MANAGER_BASE="$base" "$dir/repo/scripts/update.sh" "$name" --no-backup --force >/dev/null
+  MANAGER_BASE="$base" "$here/scripts/update.sh" "$name" --no-backup --force >/dev/null
 fi
 
 # Check it answers.
