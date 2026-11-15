@@ -195,8 +195,9 @@ setting HEARTBEAT_SECRET "$(secret)" keep
 
 # 5. First version: packages, database schema, build.
 say "Building the app and setting up the database"
-update_args=(--no-start --no-backup)
-[ ! -e "$dir/current" ] || update_args=(--no-start --no-backup --force)
+# An explicit install retry must retry a previously failed release after the
+# operator fixes its environment (for example, local CA trust in a test VM).
+update_args=(--no-start --no-backup --force)
 # Use the updater shipped with this installer. An existing checkout may still
 # contain an older updater that cannot migrate the new deployment layout.
 MANAGER_BASE="$base" "$here/scripts/update.sh" "$name" "${update_args[@]}"

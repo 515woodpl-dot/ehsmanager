@@ -127,6 +127,22 @@ backup** of every project.
 password. The managers don't need the dashboard. To use it later, run
 `scripts/create-account.sh` and see PIBASE's `docs/VPS.md`.
 
+**Test VM without public DNS:** pass `--tls-internal` to PIBASE setup and use
+local `.localhost` names. Before installing a company, trust Caddy's local CA
+for Node.js as well as the system. On Ubuntu 24.04 with Node 22:
+
+```bash
+install -m 0644 /var/lib/caddy/.local/share/caddy/pki/authorities/local/root.crt /usr/local/share/ca-certificates/caddy-internal.crt
+update-ca-certificates
+printf '\nNODE_OPTIONS=--use-system-ca\n' >> /etc/environment
+install -d -m 0755 /etc/systemd/system.conf.d
+printf '[Manager]\nDefaultEnvironment=NODE_OPTIONS=--use-system-ca\n' > /etc/systemd/system.conf.d/caddy-internal-test.conf
+systemctl daemon-reexec
+```
+
+These commands are for an isolated test server using Caddy's internal CA.
+Public HTTPS uses a publicly trusted certificate and does not need them.
+
 **Check it:**
 
 ```bash
