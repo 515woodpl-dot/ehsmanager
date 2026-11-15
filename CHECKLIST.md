@@ -5,6 +5,20 @@ every round of changes, and keep the "Open / follow-ups" list current.
 
 ---
 
+## 2026-11-15 (round 19) — Production readiness review brief
+
+- [x] **[docs/PRODUCTION-READINESS-REVIEW.md](docs/PRODUCTION-READINESS-REVIEW.md)**:
+      instructions for an independent AI reviewer to decide GO / NO-GO for
+      PIBASE and Local Manager. It covers ground rules (no production data,
+      evidence tags, severity and verdict rules), how to set up a test server,
+      and a checklist for build, install, updates and rollback, migrations,
+      security, concurrency, every workflow per business type, real
+      Resend/Stripe test accounts, operations (backup restore drill,
+      monitoring, memory on 2 GB), front end, and legal review of the contract
+      templates. It ends with the report format.
+- [ ] Run the review before launch. Its first priority is the systemd, timer
+      and Caddy steps of the installer, which haven't been run on a real server.
+
 ## 2026-11-15 (round 18) — Fixes from the hard-mode run (many clients at once), install guide
 
 ### ⚠️ Before using
