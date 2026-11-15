@@ -186,8 +186,9 @@ At the end it prints a summary. **The owner's first password** is in:
 cat /srv/manager/acme/shared/owner-login.txt
 ```
 
-The file is owned by root with mode 600. Each company's `.env.local` is readable
-only by its own runtime account and root; its project-key file is root-only.
+The file is owned by root with mode 600. The `shared` directory is controlled
+by root and traversable only by that company's account. Its `.env.local` is
+readable only by that account and root; its project-key file is root-only.
 Send the password to the owner securely; they can change it later. Running the same
 install command again is safe: it keeps the project, the secrets and the owner.
 

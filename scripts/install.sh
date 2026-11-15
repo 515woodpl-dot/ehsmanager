@@ -104,7 +104,9 @@ if [ "$system" -eq 1 ]; then
     chown -R "$app_user:$app_user" "$dir"
   fi
   install -d -m 0755 -o root -g root "$dir"
-  install -d -m 0700 -o "$app_user" -g "$app_user" "$dir/shared"
+  # The tenant may read its .env.local but must not replace root-only deploy
+  # metadata by renaming files in a directory it owns.
+  install -d -m 0750 -o root -g "$app_user" "$dir/shared"
   install -d -m 0750 -o "$app_user" -g "$app_user" "$dir/releases"
 else
   as_app mkdir -p "$dir/shared" "$dir/releases"
@@ -201,11 +203,14 @@ MANAGER_BASE="$base" "$here/scripts/update.sh" "$name" "${update_args[@]}"
 
 # 6. The owner's account and business profile.
 say "Setting up the owner's account"
+owner_login_tmp="$dir/releases/.owner-login-$$"
+trap 'rm -f "$owner_login_tmp"' EXIT
 owner="$(cd "$dir/current" && as_app node --no-warnings scripts/provision.mjs --env "$env_file" --email "$owner_email" \
   --business-name "$business_name" --business-type "$business_type" ${owner_name:+--owner-name "$owner_name"} \
-  --password-file "$dir/shared/owner-login.txt")"
+  --password-file "$owner_login_tmp")"
 owner_id="$(printf '%s' "$owner" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>console.log(JSON.parse(s).userId))')"
 setting STUDIO_OWNER_USER_ID "$owner_id"
+if [ -f "$owner_login_tmp" ]; then cp "$owner_login_tmp" "$dir/shared/owner-login.txt"; fi
 if [ -f "$dir/shared/owner-login.txt" ]; then
   chmod 0600 "$dir/shared/owner-login.txt"
   [ "$system" -eq 0 ] || chown root:root "$dir/shared/owner-login.txt"
