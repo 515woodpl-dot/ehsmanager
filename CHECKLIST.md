@@ -5,6 +5,61 @@ every round of changes, and keep the "Open / follow-ups" list current.
 
 ---
 
+## 2026-11-15 (round 17) — Hands-off deployment, and a PIBASE fix
+
+### ⚠️ Before using
+- [ ] Read [docs/DEPLOY.md](docs/DEPLOY.md). Existing servers keep working
+      as they are; new companies are installed with `scripts/install.sh`.
+- [ ] PIBASE: deploy the fix on branch `claude/bold-johnson-ajedtz` of
+      `515woodpl-dot/pibase` (merge it, then PIBASE's `scripts/update.sh`).
+
+### One-command install per company (`scripts/install.sh`)
+- [x] Creates the company's own PIBASE project, writes settings with fresh
+      secrets, applies the database, creates the owner already confirmed
+      (random password saved root-only), fills in business name, type,
+      stages and lists, runs the app as a systemd service, adds HTTPS in
+      Caddy, checks it's healthy. Several companies per server; ports picked
+      automatically. Safe to run again.
+- [x] No email confirmation, sign-up or Settings clicks are needed before
+      the owner can sign in.
+
+### Automatic updates (`scripts/update.sh`, nightly with `--auto-update`)
+- [x] Backs up the PIBASE project, builds the new version in its own folder,
+      applies new database updates, switches over, health-checks, and puts
+      the previous version back if the new one doesn't build or isn't
+      healthy. A failed version is skipped until a newer one arrives.
+- [x] Database updates apply automatically (`scripts/migrate.mjs`): a new
+      project gets the full schema, then every numbered migration once;
+      PIBASE records each by name. Older projects set up by hand are fine.
+- [x] Health check every 10 minutes restarts an app that stops answering.
+- [x] `deploy.sh` now just runs the updater (the old one reset to `main` and
+      restarted with pm2, with no database updates or checks).
+
+### PIBASE fix (found by the bug-hunter in PIBASE mode)
+- [x] A raw `;` in a data-API query string made PIBASE silently drop that
+      filter, so a read, update or delete could touch more rows than asked
+      (all of a user's rows, or every user's rows with the service key). The
+      gateway now refuses such query strings with a 400. Encoded values
+      (`%3B`), which is what the app sends, work as before.
+- [ ] Also reported, not changed: `/metrics` answers without a key (counts
+      only, no data), and database error details reach the client (same as
+      Supabase).
+
+### Verified
+- [x] Full install of a new company against a real local PIBASE (no
+      systemd): project created, schema applied, owner signed in to a
+      dashboard showing the company's name and creative studio stages.
+      Re-running the installer kept the project and the owner.
+- [x] Updates: nothing new → nothing done; good version → live and
+      healthy; broken build → old version kept; unhealthy version → rolled
+      back; same broken version next night → skipped.
+- [x] Database updates run twice: second run changes nothing.
+- [x] PIBASE: the attack's read and delete now get 400 and no rows change;
+      normal reads work; gateway unit tests pass.
+- [ ] systemd units, timers and the Caddy site were written but not run here
+      (no systemd/Caddy in the test machine). First real install should be
+      watched once.
+
 ## 2026-11-15 (round 16) — Digital creative studio and the modular Creative Services Agreement
 
 ### ⚠️ Before using

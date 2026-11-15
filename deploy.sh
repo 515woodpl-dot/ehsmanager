@@ -1,25 +1,8 @@
 #!/bin/bash
-
-echo "🚀 Local Manager — Deploying..."
-
-cd /var/www/ehsmanager
-
-echo "📥 Pulling latest code..."
-git fetch origin
-git reset --hard origin/main
-
-echo "📦 Installing dependencies..."
-npm install --legacy-peer-deps
-
-echo "🔨 Building..."
-npm run build
-
-if [ $? -ne 0 ]; then
-  echo "❌ Build failed. Check errors above. App not restarted."
-  exit 1
-fi
-
-echo "♻️  Restarting app..."
-pm2 restart studio-manager
-
-echo "✅ Done!${APP_URL:+ App is live at $APP_URL}"
+# Kept for old habits. Installs and updates are now done per company by
+# scripts/install.sh and scripts/update.sh; see docs/DEPLOY.md.
+#
+#   ./deploy.sh <name>        same as scripts/update.sh <name>
+set -euo pipefail
+[ -n "${1:-}" ] || { echo "usage: $0 <name>   (see docs/DEPLOY.md)" >&2; exit 2; }
+exec "$(dirname "$0")/scripts/update.sh" "$@"

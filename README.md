@@ -41,18 +41,11 @@ address on a domain verified in Resend (Settings → Email, or
 copyable signing link.
 
 Set `NEXT_PUBLIC_APP_URL` to the manager's public address in production. If it
-is empty, links in emails and webhook addresses use the address the request
-came in on.
+is empty, links in emails and webhook addresses use the address the signed-in
+owner opens the app on.
 
-## Deploy update to server
+## Deploy
 
-```bash
-# From your local machine
-scp -r ehsmanager root@YOUR_IP:/var/www/
-
-# On the server
-cd /var/www/ehsmanager
-npm install
-npm run build
-pm2 restart studio-manager
-```
+One command installs a company on a server running PIBASE, and updates then
+run on their own every night (backup, database updates, build, health check,
+automatic roll back). See [docs/DEPLOY.md](docs/DEPLOY.md).
