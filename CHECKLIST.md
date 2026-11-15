@@ -5,6 +5,32 @@ every round of changes, and keep the "Open / follow-ups" list current.
 
 ---
 
+## 2026-11-15 (round 20) — Production review blocker fixes
+
+- [x] Each system-mode company now has its own unprivileged Unix account. The
+      code checkout and deployment metadata are root-controlled; the owner
+      password and PIBASE project keys are root-owned mode 600. The app can read
+      only its own `.env.local`. Rerunning the installer migrates an older
+      shared-`manager` installation to the company account.
+- [x] Updates build before applying migrations. A failed build leaves the
+      running release and database untouched. An unhealthy new release rolls
+      back application code, while migrations remain applied; new migrations
+      must stay compatible with the previous application version. The install
+      and deploy guides now say this explicitly.
+- [x] System-mode verification in a disposable Ubuntu 24.04 **container** with
+      systemd, Caddy and a disposable PostgreSQL 16 database: creative,
+      photography and web-design companies installed on distinct ports and
+      projects; services and health/update timers were active; Caddy validated
+      and local HTTPS returned 200. Cross-company file reads failed, owner
+      password sign-ins succeeded, and an old shared-account installation was
+      migrated successfully. A synthetic update with migration 007 and a
+      broken build left the prior release live and migration count at seven.
+- [ ] Still required before production: repeat the full `INSTALL.md` procedure
+      on a fresh Ubuntu 24.04 **VM/server** with real test DNS, reboot, nightly
+      timer execution, backup/restore, and the remaining checks in
+      `docs/PRODUCTION-READINESS-REVIEW.md`. The container drill does not prove
+      the full production path.
+
 ## 2026-11-15 (round 19) — Production readiness review brief
 
 - [x] **[docs/PRODUCTION-READINESS-REVIEW.md](docs/PRODUCTION-READINESS-REVIEW.md)**:
