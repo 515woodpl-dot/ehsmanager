@@ -11,10 +11,10 @@ export function AppHead() {
     <Head>
       <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
       <meta name="theme-color" content="#ffffff" />
-      <meta name="application-name" content="EHS Studio" />
+      <meta name="application-name" content="Local Manager" />
       <meta name="mobile-web-app-capable" content="yes" />
       <meta name="apple-mobile-web-app-capable" content="yes" />
-      <meta name="apple-mobile-web-app-title" content="EHS Studio" />
+      <meta name="apple-mobile-web-app-title" content="Local Manager" />
       <meta name="apple-mobile-web-app-status-bar-style" content="default" />
       <link rel="manifest" href="/api/manifest" />
       <link rel="icon" type="image/png" sizes="32x32" href="/api/app-icon/favicon-32.png" />
@@ -74,14 +74,14 @@ export function PwaManager() {
       {offline && <div className="pwa-offline" role="status">You're offline. Changes will save when you reconnect.</div>}
       {waiting && (
         <div className="pwa-bar" role="status">
-          <span>A new version of EHS Studio is ready.</span>
+          <span>A new version of Local Manager is ready.</span>
           <button className="pwa-primary" onClick={() => waiting.postMessage('SKIP_WAITING')}>Reload</button>
         </div>
       )}
       {!waiting && installable && (
         <div className="pwa-bar" role="dialog" aria-label="Install app">
           <img src="/api/app-icon/icon-192.png" alt="" />
-          <span><strong>Install EHS Studio</strong><br />Open it from your home screen like an app.</span>
+          <span><strong>Install Local Manager</strong><br />Open it from your home screen like an app.</span>
           <button onClick={dismiss}>Not now</button>
           <button className="pwa-primary" onClick={async () => { const outcome = await promptInstall(); if (outcome !== 'accepted') dismiss() }}>Install</button>
         </div>
@@ -89,7 +89,7 @@ export function PwaManager() {
       {!waiting && !installable && iosHint && (
         <div className="pwa-bar" role="dialog" aria-label="Install app">
           <img src="/api/app-icon/icon-192.png" alt="" />
-          <span><strong>Install EHS Studio</strong><br />Tap <b>Share</b> <span aria-hidden="true">⎋</span> then <b>Add to Home Screen</b>.</span>
+          <span><strong>Install Local Manager</strong><br />Tap <b>Share</b> <span aria-hidden="true">⎋</span> then <b>Add to Home Screen</b>.</span>
           <button onClick={dismiss}>Got it</button>
         </div>
       )}

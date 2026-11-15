@@ -144,7 +144,7 @@ function NotificationsSection({ toast, integrations, setIntegrations, saveButton
       {!supported ? (
         <p className="settings-note">This browser can't receive notifications. Try Chrome, Edge, Firefox, or Safari on a Mac{isIOS() ? ', or install the app on your iPhone/iPad first' : ''}.</p>
       ) : iosNeedsInstall ? (
-        <p className="settings-note">On iPhone and iPad, notifications only work in the installed app: tap <strong>Share → Add to Home Screen</strong>, open EHS Studio from your home screen, and come back here.</p>
+        <p className="settings-note">On iPhone and iPad, notifications only work in the installed app: tap <strong>Share → Add to Home Screen</strong>, open Local Manager from your home screen, and come back here.</p>
       ) : !hasWorker ? (
         <p className="settings-note">Notifications work in the live (deployed) app. They can't be turned on in this preview.</p>
       ) : info && (
@@ -186,11 +186,11 @@ function InstallSection({ toast }) {
   useEffect(() => { setInstalled(isStandalone()); return subscribe(() => rerender(n => n + 1)) }, [])
   const ios = typeof navigator !== 'undefined' && isIOS()
   return (
-    <Section title="App" subtitle="Install EHS Studio on your phone, tablet or computer to open it from your home screen, full-screen, like a regular app." status={installed ? true : undefined}>
+    <Section title="App" subtitle="Install Local Manager on your phone, tablet or computer to open it from your home screen, full-screen, like a regular app." status={installed ? true : undefined}>
       {installed ? (
         <p style={{ fontSize: 13.5, color: C.muted, margin: 0 }}>You're using the installed app. 🎉</p>
       ) : canPromptInstall() ? (
-        <button style={T.btnPrimary} onClick={async () => { if (await promptInstall() === 'accepted') toast('Installing EHS Studio…') }}>Install app</button>
+        <button style={T.btnPrimary} onClick={async () => { if (await promptInstall() === 'accepted') toast('Installing Local Manager…') }}>Install app</button>
       ) : ios ? (
         <p style={{ fontSize: 13.5, color: C.muted, margin: 0 }}>In Safari, tap <strong>Share</strong> and choose <strong>Add to Home Screen</strong>.</p>
       ) : (
@@ -312,7 +312,7 @@ export default function Settings({ toast = () => {}, data = null, setData = () =
           <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
             {[{ size: 64, radius: 14 }, { size: 40, radius: 10 }].map(({ size, radius }) => (
               <div key={size} aria-hidden="true" style={{ width: size, height: size, borderRadius: radius, background: branding.logo ? (branding.iconBackground || '#ffffff') : '#111110', border: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', flex: 'none' }}>
-                {branding.logo ? <img src={branding.logo} alt="" style={{ maxWidth: '74%', maxHeight: '74%' }} /> : <span style={{ color: '#fff', fontFamily: 'Georgia, serif', fontSize: size * 0.38 }}>EH</span>}
+                {branding.logo ? <img src={branding.logo} alt="" style={{ maxWidth: '74%', maxHeight: '74%' }} /> : <span style={{ color: '#fff', fontFamily: 'Georgia, serif', fontSize: size * 0.38 }}>LM</span>}
               </div>
             ))}
             <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: C.muted }}>

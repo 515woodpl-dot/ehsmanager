@@ -1,4 +1,4 @@
-# EHS Studio Manager notes
+# Local Manager notes
 
 ## Backend
 

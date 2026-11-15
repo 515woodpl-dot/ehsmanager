@@ -1,4 +1,4 @@
-# EHS Studio Manager
+# Local Manager
 
 A studio CRM for service businesses — v2.0. Clients, projects, bookings,
 quotes, invoices, contracts, questionnaires and messages in one place.

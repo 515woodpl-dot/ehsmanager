@@ -49,7 +49,7 @@ export default function Login() {
   return (
     <>
       <Head>
-        <title>EHS Studio Manager</title>
+        <title>Local Manager</title>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Serif+Display&display=swap" rel="stylesheet" />
@@ -59,7 +59,7 @@ export default function Login() {
 
           {/* Logo */}
           <div style={{ textAlign: 'center', marginBottom: 40 }}>
-            <div style={{ fontFamily: "'DM Serif Display', Georgia, serif", fontSize: 28, color: C.text, letterSpacing: '-0.5px' }}>EHS Studio</div>
+            <div style={{ fontFamily: "'DM Serif Display', Georgia, serif", fontSize: 28, color: C.text, letterSpacing: '-0.5px' }}>Local</div>
             <div style={{ fontFamily: "'DM Serif Display', Georgia, serif", fontSize: 28, color: C.text, letterSpacing: '-0.5px', marginTop: -4 }}>Manager</div>
             <div style={{ fontSize: 12, color: C.faint, marginTop: 6, letterSpacing: '0.08em', textTransform: 'uppercase' }}>Clients · Projects · Invoices</div>
           </div>

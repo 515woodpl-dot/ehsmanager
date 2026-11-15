@@ -34,7 +34,7 @@ export function ConfirmModal({ title, message, confirmLabel = 'Confirm', onConfi
     <button style={danger ? T.btnDanger : T.btnPrimary} onClick={onConfirm}>{confirmLabel}</button>
   </>}>
     <div className="brand-confirm">
-      <div className="brand-confirm-mark">EH</div>
+      <div className="brand-confirm-mark">LM</div>
       <div><strong>{title}</strong><p>{message}</p></div>
     </div>
   </Modal>

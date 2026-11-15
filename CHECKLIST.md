@@ -5,6 +5,28 @@ every round of changes, and keep the "Open / follow-ups" list current.
 
 ---
 
+## 2026-11-15 (round 13) — Renamed to Local Manager
+
+- [x] The app is now **Local Manager** everywhere people see it: sidebar,
+      login page, browser tab, loading and error screens, install banner and
+      Settings → App, offline page, notifications, calendar export and the
+      default installed-app name (when no business name is set).
+- [x] New default **"LM" icons** (home screen, favicon, Apple icon, Android
+      badge) replace the "EH" ones. A logo uploaded in Settings still wins.
+- [x] Package name is `local-manager`. Service worker cache bumped (`ehs-v4`)
+      so installed apps pick up the new name and icons.
+- [x] Kept on purpose: internal storage keys, event names and the encryption
+      and reply-address salts still start with `ehs`. Changing them would
+      sign people out of saved views and make saved API keys and reply
+      addresses stop working.
+- [x] Verified: build passes; login, dashboard and tab title show "Local
+      Manager"; no console errors.
+- [ ] iPhones keep the old icon and name until the app is removed and added
+      to the Home Screen again.
+- [ ] The repository and server folder are still named `ehsmanager`; rename
+      them on GitHub and the server when convenient (update `deploy.sh` and
+      the pm2 name with them).
+
 ## 2026-11-15 (round 12) — Web design + photography agreement
 
 ### ⚠️ Before using

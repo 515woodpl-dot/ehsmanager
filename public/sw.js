@@ -1,4 +1,4 @@
-/* EHS Studio Manager service worker.
+/* Local Manager service worker.
  *
  * - App pages ("/", "/login"): network first, last good copy or the
  *   offline page when there's no connection.
@@ -11,7 +11,7 @@
  *
  * Bump VERSION to drop old caches.
  */
-const VERSION = 'ehs-v3'
+const VERSION = 'ehs-v4'
 const SHELL = `${VERSION}-shell`
 const ASSETS = `${VERSION}-assets`
 const PRECACHE = ['/offline.html', '/icons/icon-192.png', '/icons/icon-512.png']
@@ -91,7 +91,7 @@ async function cacheFirst(request) {
 self.addEventListener('push', event => {
   let data = {}
   try { data = event.data ? event.data.json() : {} } catch { data = { body: event.data?.text() } }
-  event.waitUntil(self.registration.showNotification(data.title || 'EHS Studio', {
+  event.waitUntil(self.registration.showNotification(data.title || 'Local Manager', {
     body: data.body || '',
     icon: data.icon || '/icons/icon-192.png',
     badge: '/icons/badge-96.png',

@@ -360,7 +360,7 @@ export function Calendar({ data, setData, toast, openClientCard }) {
       const endDate = `${end.getFullYear()}${pad(end.getMonth()+1)}${pad(end.getDate())}T${pad(end.getHours())}${pad(end.getMinutes())}00`
       return `BEGIN:VEVENT\r\nUID:${b.id}@studio-manager\r\nDTSTART;TZID=${data.availability?.timezone || 'America/New_York'}:${dt(b.date,b.time)}\r\nDTEND;TZID=${data.availability?.timezone || 'America/New_York'}:${endDate}\r\nSUMMARY:${escape([b.type, b.client].filter(Boolean).join(' - '))}\r\nLOCATION:${escape(b.location)}\r\nEND:VEVENT`
     })
-    const file = `BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//EHS Studio Manager//EN\r\n${events.join('\r\n')}\r\nEND:VCALENDAR\r\n`
+    const file = `BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Local Manager//EN\r\n${events.join('\r\n')}\r\nEND:VCALENDAR\r\n`
     const url = URL.createObjectURL(new Blob([file], { type: 'text/calendar;charset=utf-8' }))
     const link = document.createElement('a'); link.href = url; link.download = `${(data.branding?.businessName || 'studio').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'studio'}-${terms.sessionsLower}.ics`; link.click(); URL.revokeObjectURL(url)
   }

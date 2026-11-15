@@ -1,6 +1,6 @@
 #!/bin/bash
 
-echo "🚀 EHS Studio Manager — Deploying..."
+echo "🚀 Local Manager — Deploying..."
 
 cd /var/www/ehsmanager
 
