@@ -34,8 +34,15 @@ npm run dev
 ```
 
 The public booking page is at `/booking`; the production host is
-`booking.elliesheartstrings.com`. Email sending requires `RESEND_API_KEY`;
-without it, use the contract's copyable signing link.
+your own domain. Optionally set `BOOKING_HOST` to a separate host whose root
+shows the booking page. Email sending needs a Resend API key and a sending
+address on a domain verified in Resend (Settings → Email, or
+`RESEND_API_KEY` / `RESEND_FROM_EMAIL`); without them, use the contract's
+copyable signing link.
+
+Set `NEXT_PUBLIC_APP_URL` to the manager's public address in production. If it
+is empty, links in emails and webhook addresses use the address the request
+came in on.
 
 ## Deploy update to server
 

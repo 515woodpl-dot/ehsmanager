@@ -1,6 +1,6 @@
 import { emailWrap, sendStudioEmail, signOffHtml } from '../../lib/email'
 import { requireUser } from '../../lib/api-auth'
-import { APP_URL } from '../../lib/studioConfig'
+import { baseUrl as appBase } from '../../lib/studioConfig'
 import { createInvoiceToken } from '../../lib/signingTokens'
 import { invoiceFromRow, payableOptions, paymentSchedule } from '../../lib/invoices'
 
@@ -47,7 +47,7 @@ export default async function handler(req, res) {
   const label = invoice.number || 'Invoice'
   let viewUrl = null
   try {
-    const baseUrl = APP_URL
+    const baseUrl = appBase(req)
     viewUrl = new URL(`/invoice/${createInvoiceToken(invoice.id)}`, baseUrl).toString()
   } catch {
     viewUrl = null

@@ -347,8 +347,8 @@ export default function Settings({ toast = () => {}, data = null, setData = () =
 
       <Section title="Email (Resend)" status={state.status.email} subtitle="Sends invoices, quotes, contracts, questionnaires, reminders and messages to your clients.">
         <KeyField label="Resend API key" field="resendApiKey" info={state.keys.resendApiKey} value={keys.resendApiKey} onChange={setKey} onRemove={removeKey} placeholder="re_…" hint="resend.com → API Keys → Create API key (Sending access is enough)." />
-        <Field label="Send emails from" hint="Must be on a domain you've verified in Resend → Domains. Leave blank to use the default address.">
-          <input style={T.formInput} type="email" placeholder="hello@yourstudio.com" value={integrations.fromEmail || ''} onChange={e => setIntegrations({ ...integrations, fromEmail: e.target.value })} />
+        <Field label="Send emails from" hint="Required to send email. Must be on a domain you've verified in Resend → Domains.">
+          <input style={T.formInput} type="email" placeholder="hello@yourdomain.com" value={integrations.fromEmail || ''} onChange={e => setIntegrations({ ...integrations, fromEmail: e.target.value })} />
         </Field>
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, flexWrap: 'wrap' }}>
           <button type="button" style={T.btn} disabled={!!busy} onClick={() => test('email')}>{busy === 'test-email' ? 'Sending…' : 'Send test email'}</button>

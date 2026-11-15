@@ -22,4 +22,4 @@ fi
 echo "♻️  Restarting app..."
 pm2 restart studio-manager
 
-echo "✅ Done! App is live at https://manager.elliesheartstrings.com"
+echo "✅ Done!${APP_URL:+ App is live at $APP_URL}"

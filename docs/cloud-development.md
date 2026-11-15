@@ -10,7 +10,7 @@ Use the existing checkouts in `/workspace`; do not create a worktree for setup.
 
 If the Docker builder cannot resolve Debian package hosts in this cloud environment, the optional PostgreSQL extension image can be replaced with `postgres:16-bookworm` through a temporary Compose override outside either repository. The EHS schema needs only the standard PostgreSQL image. Keep PIBASE's generated `.env`, EHS `.env.local`, and any owner credentials out of Git.
 
-Production booking host: `booking.elliesheartstrings.com`. Configure DNS and the hosting proxy separately; the app's `next.config.js` routes that host's root to `/booking`.
+Optional separate booking host: set `BOOKING_HOST` (for example `booking.yourdomain.com`). Configure DNS and the hosting proxy separately; `next.config.js` routes that host's root to `/booking`.
 
 ## Without Docker
 

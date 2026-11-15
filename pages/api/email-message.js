@@ -21,7 +21,7 @@ export default async function handler(req, res) {
   if (!client?.email) return res.status(400).json({ error: 'Choose a client with an email address' })
 
   const businessName = auth.config.branding.businessName
-  const chat = chatUrl(client.id)
+  const chat = chatUrl(client.id, auth.config)
   const html = emailWrap(`
     <h1>A message from ${escapeHtml(businessName)}</h1>
     <p>Hi ${escapeHtml(client.name || 'there')},</p>

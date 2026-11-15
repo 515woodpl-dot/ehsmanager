@@ -1,7 +1,7 @@
 import { createServiceClient } from '../../lib/pibase'
 import { notifyStudio } from '../../lib/push'
 import { emailWrap, sendStudioEmail } from '../../lib/email'
-import { loadStudioConfig, APP_URL } from '../../lib/studioConfig'
+import { loadStudioConfig, baseUrl } from '../../lib/studioConfig'
 import { DEFAULT_BUSINESS_TYPE, isBusinessType } from '../../lib/businessTypes'
 
 const escapeHtml = (value = '') => String(value)
@@ -96,7 +96,7 @@ export default async function handler(req, res) {
 
       // 3. Notify the studio owner by email (best-effort)
       try {
-        const config = await loadStudioConfig(db, studioId)
+        const config = await loadStudioConfig(db, studioId, req)
         if (config.branding.studioEmail) {
           const fmtDate = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })
           const html = emailWrap(`
@@ -110,7 +110,7 @@ export default async function handler(req, res) {
               <div class="box-row"><span class="label">Received</span><span class="value">${escapeHtml(fmtDate)}</span></div>
             </div>
             ${safeLead.message ? `<div class="box" style="font-family:Arial,sans-serif;font-size:13px;line-height:1.7;color:#444;"><strong>Message:</strong><br/><br/>${escapeHtml(safeLead.message)}</div>` : ''}
-            <a href="${escapeHtml(APP_URL)}" class="btn">Open Studio Manager</a>
+            <a href="${escapeHtml(baseUrl(req))}" class="btn">Open Studio Manager</a>
             <p style="margin-top:20px;font-size:13px;color:#9B9B98;">This lead has been added to your client list.</p>
           `, config)
           const result = await sendStudioEmail(config, {

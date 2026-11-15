@@ -17,7 +17,7 @@ export default async function handler(req, res) {
 
   const title = row.questions?.title || 'Questionnaire'
   let buttonUrl = null
-  try { buttonUrl = appUrl(`/questionnaire/${createQuestionnaireToken(row.id)}`) } catch { buttonUrl = null }
+  try { buttonUrl = appUrl(`/questionnaire/${createQuestionnaireToken(row.id)}`, req) } catch { buttonUrl = null }
 
   const result = await sendDocumentEmail(res, auth, {
     client,

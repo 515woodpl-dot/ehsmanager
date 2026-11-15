@@ -22,8 +22,8 @@ function describe(config) {
     canStoreSecrets: canStoreSecrets(),
     migrationNeeded: config.migrationNeeded,
     webhooks: {
-      stripe: appUrl(`/api/webhook?studio=${studio}`),
-      inbound: appUrl(`/api/inbound-email?studio=${studio}`),
+      stripe: appUrl(`/api/webhook?studio=${studio}`, config),
+      inbound: appUrl(`/api/inbound-email?studio=${studio}`, config),
     },
     status: {
       email: !!config.secrets.resendApiKey,

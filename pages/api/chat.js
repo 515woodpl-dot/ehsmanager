@@ -59,7 +59,7 @@ export default async function handler(req, res) {
       const html = emailWrap(`
         <h1>New message from ${escapeHtml(chat.client.name)}</h1>
         <div class="box" style="white-space:pre-wrap;font-family:Arial,sans-serif;font-size:14px;line-height:1.7;color:#444;">${escapeHtml(text)}</div>
-        <a href="${escapeHtml(appUrl('/?view=inbox'))}" class="btn" style="color:#ffffff;">Reply in Studio Manager</a>
+        <a href="${escapeHtml(appUrl('/?view=inbox', req))}" class="btn" style="color:#ffffff;">Reply in Studio Manager</a>
       `, config)
       const result = await sendStudioEmail(config, { to: config.branding.studioEmail, subject: `New chat message from ${chat.client.name}`, html, replyToStudio: false })
       if (result.error) console.error('[chat] notify failed', result.error)

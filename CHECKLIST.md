@@ -5,6 +5,25 @@ every round of changes, and keep the "Open / follow-ups" list current.
 
 ---
 
+## 2026-11-15 (round 11) — No built-in studio domain
+
+### ⚠️ Before deploying
+- [ ] **Set the sending address**: Settings → Email → "Send emails from", or
+      `RESEND_FROM_EMAIL` on the server. Email no longer has a built-in
+      address, so without one it stops with a message saying so.
+- [ ] Keep `NEXT_PUBLIC_APP_URL` set in production (recommended). `BOOKING_HOST`
+      no longer defaults to a booking.elliesheartstrings.com host: set it if
+      you use a separate booking host.
+- [ ] `scripts/heartbeat.sh` now reads `APP_URL` from its environment.
+
+### What changed
+- [x] Links in emails, the signing link, chat link, Stripe return address and
+      webhook addresses use `NEXT_PUBLIC_APP_URL` if set, otherwise the
+      address the request came in on (also behind a proxy).
+- [x] The sending address comes from Settings or `RESEND_FROM_EMAIL` only.
+- [x] No fixed booking host, deploy message, heartbeat address or push contact
+      address any more.
+
 ## 2026-11-15 (round 10) — Works for web design businesses too, review fixes
 
 ### ⚠️ Before using
@@ -763,10 +782,6 @@ every round of changes, and keep the "Open / follow-ups" list current.
       delete the ones that no longer apply.
 - [ ] The app itself is still named "EHS Studio" (install banner, login,
       browser title). Client-facing pages use the business name.
-- [ ] The default sending address and app URL still fall back to the
-      elliesheartstrings.com values when `RESEND_FROM_EMAIL` /
-      `NEXT_PUBLIC_APP_URL` and the Settings fields are empty. A different
-      business must set its own.
 - [ ] Only two business types exist. Others can be added in
       `lib/businessTypes.js`.
 - [ ] Online payments were tested against a stand-in for Stripe (signed

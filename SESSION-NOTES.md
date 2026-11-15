@@ -64,7 +64,8 @@ contact form at `/contact`, and client signing pages at `/sign/[token]`.
 
 - Resend: contract, invoice, reminder, inquiry, and inbox email delivery.
 - Stripe: payment intents and webhook payment confirmation.
-- `booking.elliesheartstrings.com`: public booking host.
+- Optional `BOOKING_HOST`: a separate public booking host.
+- Links: `appUrl(path, reqOrConfig)` uses `NEXT_PUBLIC_APP_URL`, else the request's host. Pass `req` (or a config loaded with `loadStudioConfig(db, id, req)`); don't hard-code a domain.
 
 Integration secrets must be configured as server environment variables. The
 Settings page reports whether each integration is ready without returning any
