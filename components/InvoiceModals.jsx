@@ -36,7 +36,7 @@ const emptyLineData = () => ({ items: [{ id: uid(), name: '', description: '', q
 function lineDataFor(invoice) {
   if (!invoice) return emptyLineData()
   if (invoice.lineData?.items?.length) return invoice.lineData
-  return { ...emptyLineData(), items: [{ id: uid(), name: invoice.note || 'Photography services', description: '', qty: 1, price: invoice.amount || '' }], notes: invoice.note || '' }
+  return { ...emptyLineData(), items: [{ id: uid(), name: invoice.note || 'Services', description: '', qty: 1, price: invoice.amount || '' }], notes: invoice.note || '' }
 }
 
 // ── Create / edit invoice ─────────────────────────────────────────
@@ -241,7 +241,7 @@ const PAY_METHODS = [
   { value: 'Cash', desc: 'Payment received in cash' },
   { value: 'Credit Card', desc: 'Card payment taken outside the app' },
   { value: 'Bank transfer', desc: 'Zelle, Venmo, check or bank transfer' },
-  { value: 'Gift / Complimentary', desc: 'No charge — gift or comp session' },
+  { value: 'Gift / Complimentary', desc: 'No charge — gift or complimentary' },
 ]
 
 export function RecordPaymentModal({ invoice, setData, toast, onClose }) {

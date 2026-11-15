@@ -39,7 +39,7 @@ export default async function handler(req, res) {
 
   if (error) return res.status(500).json({ error: 'Unable to sign contract' })
   if (!signed?.length) return res.status(409).json({ error: 'Contract has already been signed' })
-  await notifyStudio(db, current.user_id, { type: 'documents', title: `✍️ ${current.client_name || String(signerName).trim()} signed`, body: `${current.type || 'Photography agreement'}${current.fields?.studioSignature?.name ? ' · fully signed, copy emailed' : ' · add your signature to complete it'}`, url: '/?view=contracts', tag: `contract-${parsed.contractId}` })
+  await notifyStudio(db, current.user_id, { type: 'documents', title: `✍️ ${current.client_name || String(signerName).trim()} signed`, body: `${current.type || 'Contract'}${current.fields?.studioSignature?.name ? ' · fully signed, copy emailed' : ' · add your signature to complete it'}`, url: '/?view=contracts', tag: `contract-${parsed.contractId}` })
   // If the studio already signed, the client gets their signed copy now.
   const copy = current.fields?.studioSignature?.name ? await sendSignedCopy(db, await loadStudioConfig(db, current.user_id), parsed.contractId) : null
   return res.status(200).json({ ok: true, signedAt, copySent: !!copy?.sent, studioSigned: !!current.fields?.studioSignature?.name })

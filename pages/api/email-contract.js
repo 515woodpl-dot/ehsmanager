@@ -1,5 +1,6 @@
 import { emailWrap, sendStudioEmail, signOffHtml } from '../../lib/email'
 import { requireUser } from '../../lib/api-auth'
+import { appUrl } from '../../lib/studioConfig'
 import { createContractToken } from '../../lib/signingTokens'
 import { messageHtml, cleanSubject } from '../../lib/documentEmail'
 
@@ -35,17 +36,17 @@ export default async function handler(req, res) {
   const clientEmail = client.email
   const clientName = client.name
   const signUrl = contract.id
-    ? `${process.env.NEXT_PUBLIC_APP_URL || 'https://manager.elliesheartstrings.com'}/sign/${createContractToken(contract.id)}`
+    ? appUrl(`/sign/${createContractToken(contract.id)}`)
     : null
   const preview = escapeHtml(contract.body || '').substring(0, 2000)
 
   const html = emailWrap(`
-    <h1>${escapeHtml(contract.type || 'Photography Agreement')}</h1>
+    <h1>${escapeHtml(contract.type || auth.config.terms.agreement)}</h1>
     ${messageHtml(req.body?.message) || `<p>Hi ${escapeHtml(clientName || 'there')},</p>
-    <p>Please review your photography contract below. You can sign it securely using the button in this email.</p>`}
+    <p>Please review your contract below. You can sign it securely using the button in this email.</p>`}
 
     <div class="box">
-      <div class="box-row"><span class="label">Contract</span><span class="value">${escapeHtml(contract.type || 'Photography Agreement')}</span></div>
+      <div class="box-row"><span class="label">Contract</span><span class="value">${escapeHtml(contract.type || auth.config.terms.agreement)}</span></div>
       <div class="box-row"><span class="label">Sent</span><span class="value">${escapeHtml(contract.sent || new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }))}</span></div>
       <div class="box-row"><span class="label">Status</span><span class="value">Awaiting signature</span></div>
     </div>
@@ -61,7 +62,7 @@ export default async function handler(req, res) {
   const result = await sendStudioEmail(auth.config, {
     to: clientEmail,
     clientId: row.client_id,
-    subject: cleanSubject(req.body?.subject) || `Your ${contract.type || 'Photography Agreement'} — ${bizName}`,
+    subject: cleanSubject(req.body?.subject) || `Your ${contract.type || auth.config.terms.agreement} — ${bizName}`,
     html,
   })
   if (result.error) return res.status(400).json({ error: result.error })

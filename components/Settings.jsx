@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { T, C } from '../lib/tokens'
 import { pibase } from '../lib/pibase'
+import { BUSINESS_TYPE_OPTIONS, businessDefaults, businessTerms, remapStage } from '../lib/businessTypes'
 import { canPromptInstall, currentSubscription, deviceName, isIOS, isStandalone, promptInstall, pushSupported, subscribe, subscribePush } from '../lib/pwa'
 
 async function api(path, options = {}) {
@@ -199,7 +200,7 @@ function InstallSection({ toast }) {
   )
 }
 
-export default function Settings({ toast = () => {} }) {
+export default function Settings({ toast = () => {}, data = null, setData = () => {} }) {
   const [state, setState] = useState(null)
   const [error, setError] = useState('')
   const [branding, setBranding] = useState(null)
@@ -219,10 +220,46 @@ export default function Settings({ toast = () => {} }) {
   const save = async (section, payload) => {
     setBusy(section)
     try {
-      apply(await api('/api/settings', { method: 'POST', body: JSON.stringify(payload) }))
+      const body = await api('/api/settings', { method: 'POST', body: JSON.stringify(payload) })
+      apply(body)
+      if (payload.branding) applyBusinessProfile(body.branding)
       toast('Settings saved')
     } catch (err) { toast(err.message) }
     setBusy('')
+  }
+
+  // The rest of the app words itself from the business type and pre-fills
+  // contracts from the business details, so pass saved changes along. When
+  // the type changes, the starting lists (project types, stages, contact
+  // form options) switch too. Lists the owner has edited are only replaced
+  // if they agree.
+  const applyBusinessProfile = saved => {
+    const from = data?.businessType || 'photography'
+    const to = saved.businessType
+    const profile = { businessName: saved.businessName || '', studioEmail: saved.studioEmail || '', address: saved.address || '', ownerName: saved.ownerName || '' }
+    if (!data || from === to) { setData(d => ({ ...d, branding: profile, businessTypeSaved: true })); return }
+    const before = businessDefaults(from), after = businessDefaults(to)
+    const same = (a, b) => JSON.stringify(a) === JSON.stringify(b)
+    const untouched = {
+      stages: same(data.stages, before.stages),
+      sessionTypes: same(data.sessionTypes, before.sessionTypes),
+      checkboxOptions: same(data.formSettings?.checkboxOptions, before.checkboxOptions),
+    }
+    const names = { sessionTypes: `${businessTerms(from).typeLabelLower}s`, stages: 'pipeline stages', checkboxOptions: 'contact form options' }
+    const edited = Object.keys(names).filter(key => !untouched[key]).map(key => names[key])
+    const replaceEdited = edited.length > 0 && confirm(`Switch your lists to the ${businessTerms(to).label} starting set?\n\nYou changed your ${edited.join(' and ')}. OK replaces ${edited.length > 1 ? 'them' : 'that list'} with the ${businessTerms(to).label} set; Cancel keeps ${edited.length > 1 ? 'them' : 'it'} as ${edited.length > 1 ? 'they are' : 'it is'}.`)
+    const swap = key => untouched[key] || replaceEdited
+    setData(d => {
+      const next = { ...d, businessType: to, businessTypeSaved: true, branding: profile }
+      if (swap('sessionTypes')) next.sessionTypes = after.sessionTypes
+      if (swap('checkboxOptions')) next.formSettings = { ...d.formSettings, checkboxOptions: after.checkboxOptions }
+      if (swap('stages')) {
+        next.stages = after.stages
+        // Everyone keeps their place: first stage stays first, finished stays finished.
+        next.clients = d.clients.map(client => ({ ...client, status: remapStage(client.status, d.stages || before.stages, after.stages) }))
+      }
+      return next
+    })
   }
 
   const test = async kind => {
@@ -285,12 +322,17 @@ export default function Settings({ toast = () => {} }) {
             {!branding.logo && <span style={{ fontSize: 12, color: C.faint }}>Upload a logo above to use it as the icon.</span>}
           </div>
         </Field>
+        <Field label="Type of business" hint="Sets the wording across the app, your emails and client pages (for example “sessions” or “meetings”), the contract template, and the starting project types and stages.">
+          <select style={T.formInput} value={branding.businessType || 'photography'} onChange={e => setBranding({ ...branding, businessType: e.target.value })}>
+            {BUSINESS_TYPE_OPTIONS.map(option => <option key={option.id} value={option.id}>{option.label}</option>)}
+          </select>
+        </Field>
         <div style={T.formRow} className="form-row-2">
           <Field label="Business name">{b('businessName')}</Field>
           <Field label="Your name">{b('ownerName')}</Field>
         </div>
         <div style={T.formRow} className="form-row-2">
-          <Field label="Studio email" hint="Where client replies (copies) and notifications go.">{b('studioEmail', { type: 'email' })}</Field>
+          <Field label="Business email" hint="Where client replies (copies) and notifications go.">{b('studioEmail', { type: 'email' })}</Field>
           <Field label="Phone">{b('phone')}</Field>
         </div>
         <div style={T.formRow} className="form-row-2">
@@ -298,7 +340,7 @@ export default function Settings({ toast = () => {} }) {
           <Field label="Address">{b('address')}</Field>
         </div>
         <Field label="Email signature" hint="Ends every email. Leave blank for “Warmly, [your first name]”.">
-          <textarea style={{ ...T.formInput, resize: 'vertical' }} rows={3} value={branding.signature || ''} onChange={e => setBranding({ ...branding, signature: e.target.value })} placeholder={`Warmly,\n${branding.ownerName || 'Ellie'}`} />
+          <textarea style={{ ...T.formInput, resize: 'vertical' }} rows={3} value={branding.signature || ''} onChange={e => setBranding({ ...branding, signature: e.target.value })} placeholder={`Warmly,\n${branding.ownerName || 'Your name'}`} />
         </Field>
         <div style={{ display: 'flex', justifyContent: 'flex-end' }}>{saveButton('branding', { branding })}</div>
       </Section>
@@ -328,7 +370,7 @@ export default function Settings({ toast = () => {} }) {
         <KeyField label="Webhook signing secret" field="resendWebhookSecret" info={state.keys.resendWebhookSecret} value={keys.resendWebhookSecret} onChange={setKey} onRemove={removeKey} placeholder="whsec_…" />
         <label style={{ display: 'flex', gap: 10, alignItems: 'flex-start', fontSize: 13.5, margin: '4px 0 16px', cursor: 'pointer' }}>
           <input type="checkbox" checked={integrations.copyRepliesToStudio !== false} onChange={e => setIntegrations({ ...integrations, copyRepliesToStudio: e.target.checked })} style={{ marginTop: 3 }} />
-          <span>Also send client replies to my studio email{branding.studioEmail ? ` (${branding.studioEmail})` : ''}<br /><span style={{ color: C.faint, fontSize: 12 }}>Replies then appear in both places. New chat messages always notify your studio email.</span></span>
+          <span>Also send client replies to my business email{branding.studioEmail ? ` (${branding.studioEmail})` : ''}<br /><span style={{ color: C.faint, fontSize: 12 }}>Replies then appear in both places. New chat messages always notify your business email.</span></span>
         </label>
         <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
           {saveButton('replies', { keys: keysFor(['resendWebhookSecret']), integrations: { inboundDomain: integrations.inboundDomain || '', copyRepliesToStudio: integrations.copyRepliesToStudio !== false } })}

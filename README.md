@@ -1,6 +1,19 @@
 # EHS Studio Manager
 
-Photography CRM — v2.0
+A studio CRM for service businesses — v2.0. Clients, projects, bookings,
+quotes, invoices, contracts, questionnaires and messages in one place.
+
+It is set up for one of two kinds of business, chosen at sign-up or in
+**Settings → Business profile → Type of business**:
+
+- **Photography** — sessions, session types, the photography agreement.
+- **Web design** — meetings, services, project stages from Inquiry to
+  Launched, the website design agreement.
+
+The choice sets the wording across the app, emails and client pages, the
+starting lists and the contract template. It all lives in
+[`lib/businessTypes.js`](lib/businessTypes.js); add another kind of business
+there.
 
 The app stores its data in PIBASE. The only third-party database code is the
 `@supabase/supabase-js` package, used in `lib/pibase.js` as the client for

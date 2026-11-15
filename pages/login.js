@@ -3,6 +3,10 @@ import Head from 'next/head'
 import { useRouter } from 'next/router'
 import { pibase } from '../lib/pibase'
 import { T, C } from '../lib/tokens'
+import { BUSINESS_TYPE_OPTIONS, DEFAULT_BUSINESS_TYPE } from '../lib/businessTypes'
+
+// A server problem can come back with no readable message.
+const errorText = error => (typeof error?.message === 'string' && error.message.trim() && error.message !== '{}') ? error.message : 'Something went wrong on the server. Please try again in a moment.'
 
 export default function Login() {
   const router = useRouter()
@@ -10,6 +14,7 @@ export default function Login() {
   const [email, setEmail]   = useState('')
   const [password, setPass] = useState('')
   const [name, setName]     = useState('')
+  const [businessType, setBusinessType] = useState(DEFAULT_BUSINESS_TYPE)
   const [loading, setLoading] = useState(false)
   const [error, setError]   = useState(null)
   const [success, setSuccess] = useState(null)
@@ -20,7 +25,7 @@ export default function Login() {
     setLoading(true); setError(null)
     const { error } = await pibase.auth.signInWithPassword({ email, password })
     setLoading(false)
-    if (error) { setError(error.message); return }
+    if (error) { setError(errorText(error)); return }
     router.push('/')
   }
 
@@ -31,10 +36,10 @@ export default function Login() {
     setLoading(true); setError(null)
     const { error } = await pibase.auth.signUp({
       email, password,
-      options: { data: { full_name: name } }
+      options: { data: { full_name: name, business_type: businessType } }
     })
     setLoading(false)
-    if (error) { setError(error.message); return }
+    if (error) { setError(errorText(error)); return }
     setSuccess('Account created! Check your email to confirm, then log in.')
     setTab('login')
   }
@@ -56,7 +61,7 @@ export default function Login() {
           <div style={{ textAlign: 'center', marginBottom: 40 }}>
             <div style={{ fontFamily: "'DM Serif Display', Georgia, serif", fontSize: 28, color: C.text, letterSpacing: '-0.5px' }}>EHS Studio</div>
             <div style={{ fontFamily: "'DM Serif Display', Georgia, serif", fontSize: 28, color: C.text, letterSpacing: '-0.5px', marginTop: -4 }}>Manager</div>
-            <div style={{ fontSize: 12, color: C.faint, marginTop: 6, letterSpacing: '0.08em', textTransform: 'uppercase' }}>Photography CRM</div>
+            <div style={{ fontSize: 12, color: C.faint, marginTop: 6, letterSpacing: '0.08em', textTransform: 'uppercase' }}>Clients · Projects · Invoices</div>
           </div>
 
           {/* Card */}
@@ -87,13 +92,22 @@ export default function Login() {
             {tab === 'signup' && (
               <div style={T.formGroup}>
                 <label style={T.formLabel}>Full name</label>
-                <input style={T.formInput} placeholder="Ellie Heartstrings" value={name} onChange={e => setName(e.target.value)} onKeyDown={handleKey} autoFocus />
+                <input style={T.formInput} placeholder="Your name" value={name} onChange={e => setName(e.target.value)} onKeyDown={handleKey} autoFocus />
+              </div>
+            )}
+
+            {tab === 'signup' && (
+              <div style={T.formGroup}>
+                <label style={T.formLabel}>Type of business</label>
+                <select style={T.formInput} value={businessType} onChange={e => setBusinessType(e.target.value)}>
+                  {BUSINESS_TYPE_OPTIONS.map(option => <option key={option.id} value={option.id}>{option.label}</option>)}
+                </select>
               </div>
             )}
 
             <div style={T.formGroup}>
               <label style={T.formLabel}>Email</label>
-              <input style={T.formInput} type="email" placeholder="ellie@example.com" value={email} onChange={e => setEmail(e.target.value)} onKeyDown={handleKey} autoFocus={tab === 'login'} />
+              <input style={T.formInput} type="email" placeholder="you@example.com" value={email} onChange={e => setEmail(e.target.value)} onKeyDown={handleKey} autoFocus={tab === 'login'} />
             </div>
 
             <div style={{ ...T.formGroup, marginBottom: 24 }}>
@@ -109,9 +123,6 @@ export default function Login() {
             </button>
           </div>
 
-          <div style={{ textAlign: 'center', marginTop: 20, fontSize: 12, color: C.faint }}>
-            Ellie&apos;s Heartstrings Photography
-          </div>
         </div>
       </div>
     </>

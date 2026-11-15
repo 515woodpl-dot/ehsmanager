@@ -1,36 +1,51 @@
 import { useState, useRef } from 'react'
+import Papa from 'papaparse'
 import { T, C } from '../lib/tokens'
-import { Modal, Badge, Avatar, SearchBar } from './UI'
+import { Modal, Badge, Avatar, SearchBar, withCurrent } from './UI'
+import { useTerms } from '../lib/businessTypes'
 import { removeClient } from '../lib/data'
 import { CardModalExport as CardModal } from './Projects'
 
 const uid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => { const r = Math.random() * 16 | 0; return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16) })
 const fmtDate = iso => { if (!iso) return 'TBD'; const d = new Date(iso + 'T00:00:00'); return isNaN(d) ? iso : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) }
 
-function parseCSV(text) {
-  const lines = text.trim().split('\n')
-  if (lines.length < 2) return []
-  const headers = lines[0].split(',').map(h => h.trim().toLowerCase().replace(/["']/g, ''))
-  return lines.slice(1).map(line => {
-    const vals = line.split(',').map(v => v.trim().replace(/["']/g, ''))
-    const obj = {}
-    headers.forEach((h, i) => { obj[h] = vals[i] || '' })
+// Dates in a spreadsheet come in many shapes ("7/4/2026", "July 4, 2026").
+// The database only takes YYYY-MM-DD, so convert what we can and drop the rest.
+function toIsoDate(value) {
+  const text = String(value || '').trim()
+  if (!text) return ''
+  if (/^\d{4}-\d{2}-\d{2}$/.test(text)) return isNaN(new Date(text + 'T00:00:00')) ? '' : text
+  const d = new Date(text)
+  if (isNaN(d)) return ''
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+function parseCSV(text, { stages = [], defaultType = '' } = {}) {
+  const { data: rows } = Papa.parse(text.replace(/^\uFEFF/, ''), { header: true, skipEmptyLines: 'greedy', transformHeader: h => h.trim().toLowerCase() })
+  const stageFor = value => {
+    const wanted = String(value || '').trim().toLowerCase()
+    const match = stages.find(stage => stage.id.toLowerCase() === wanted || stage.label.toLowerCase() === wanted)
+    return match?.id || stages[0]?.id || 'inquiry'
+  }
+  return rows.map(row => {
+    const obj = Object.fromEntries(Object.entries(row).map(([key, value]) => [key, String(value ?? '').trim()]))
     // Map common column names
     return {
       id: uid(),
-      name: obj.name || obj['full name'] || obj.fullname || obj.client || '',
+      name: obj.name || obj['full name'] || obj.fullname || obj.client || [obj['first name'], obj['last name']].filter(Boolean).join(' '),
       email: obj.email || obj['email address'] || '',
       phone: obj.phone || obj['phone number'] || obj.mobile || '',
-      type: obj.type || obj['session type'] || 'Family',
-      date: obj.date || obj['session date'] || '',
+      type: obj.type || obj['session type'] || obj['project type'] || obj.service || defaultType,
+      date: toIsoDate(obj.date || obj['session date'] || obj['kickoff date'] || obj['start date']),
       notes: obj.notes || obj.note || '',
-      status: obj.status || 'inquiry',
+      status: stageFor(obj.status || obj.stage),
       archived: false,
     }
   }).filter(c => c.name)
 }
 
 export default function Clients({ data, setData, toast, sessionTypes }) {
+  const terms = useTerms()
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState('all')
   const [addModal, setAddModal] = useState(false)
@@ -40,10 +55,10 @@ export default function Clients({ data, setData, toast, sessionTypes }) {
   const [importPreview, setImportPreview] = useState([])
   const [importError, setImportError] = useState('')
   const fileRef = useRef()
-  const blank = { name: '', email: '', phone: '', type: sessionTypes?.[0] || 'Family', date: '', notes: '' }
+  const blank = { name: '', email: '', phone: '', type: sessionTypes?.[0] || '', date: '', notes: '' }
   const [form, setForm] = useState(blank)
 
-  const types = sessionTypes || ['Family', 'Maternity', 'Newborn', 'Portrait']
+  const types = sessionTypes || terms.projectTypes
 
   const filtered = data.clients.filter(c => {
     if (c.archived) return false
@@ -53,7 +68,7 @@ export default function Clients({ data, setData, toast, sessionTypes }) {
 
   const add = () => {
     if (!form.name.trim()) return
-    setData(d => ({ ...d, clients: [...d.clients, { id: uid(), ...form, status: 'inquiry', archived: false }] }))
+    setData(d => ({ ...d, clients: [...d.clients, { id: uid(), ...form, name: form.name.trim(), status: data.stages?.[0]?.id || 'inquiry', archived: false }] }))
     toast('Client added'); setAddModal(false); setForm(blank)
   }
 
@@ -76,7 +91,7 @@ export default function Clients({ data, setData, toast, sessionTypes }) {
     try {
       if (file.name.endsWith('.csv') || file.name.endsWith('.txt')) {
         const text = await file.text()
-        const parsed = parseCSV(text)
+        const parsed = parseCSV(text, { stages: data.stages || [], defaultType: types[0] || '' })
         if (parsed.length === 0) { setImportError('No valid contacts found. Make sure the CSV has a header row with at least a "name" column.'); return }
         setImportPreview(parsed)
         setImportModal(true)
@@ -140,7 +155,7 @@ export default function Clients({ data, setData, toast, sessionTypes }) {
               <Badge type={c.status} label={(data.stages || []).find(s => s.id === c.status)?.label || c.status} />
             </div>
             <div className="client-card-bottom">
-              <div className="client-card-meta">{c.type || 'No session type'} · {fmtDate(c.date)}</div>
+              <div className="client-card-meta">{c.type || `No ${terms.typeLabelLower}`} · {fmtDate(c.date)}</div>
               <div className="client-card-actions">
                 <button style={{ ...T.btnGhost, padding: '6px 8px' }} onClick={event => { event.stopPropagation(); setEditModal({ ...c }) }} title="Quick edit" aria-label={`Edit ${c.name}`}>
                   <svg width={iconSize} height={iconSize} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -165,7 +180,7 @@ export default function Clients({ data, setData, toast, sessionTypes }) {
           footer={<><button style={T.btn} onClick={() => setAddModal(false)}>Cancel</button><button style={T.btnPrimary} onClick={add}>Add client</button></>}>
           <div style={T.formRow} className="form-row-2">
             <div style={T.formGroup}><label style={T.formLabel}>Full name</label><input style={T.formInput} value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} autoFocus /></div>
-            <div style={T.formGroup}><label style={T.formLabel}>Session type</label>
+            <div style={T.formGroup}><label style={T.formLabel}>{terms.typeLabel}</label>
               <select style={T.formInput} value={form.type} onChange={e => setForm({ ...form, type: e.target.value })}>
                 {types.map(t => <option key={t}>{t}</option>)}
               </select>
@@ -175,7 +190,7 @@ export default function Clients({ data, setData, toast, sessionTypes }) {
             <div style={T.formGroup}><label style={T.formLabel}>Email</label><input style={T.formInput} type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} /></div>
             <div style={T.formGroup}><label style={T.formLabel}>Phone</label><input style={T.formInput} value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} /></div>
           </div>
-          <div style={T.formGroup}><label style={T.formLabel}>Session date</label><input style={T.formInput} type="date" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} /></div>
+          <div style={T.formGroup}><label style={T.formLabel}>{terms.dateLabel}</label><input style={T.formInput} type="date" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} /></div>
           <div style={T.formGroup}><label style={T.formLabel}>Notes</label><textarea style={{ ...T.formInput, resize: 'none' }} rows={3} value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} /></div>
         </Modal>
       )}
@@ -197,10 +212,10 @@ export default function Clients({ data, setData, toast, sessionTypes }) {
             <div style={T.formGroup}><label style={T.formLabel}>Phone</label><input style={T.formInput} value={editModal.phone || ''} onChange={e => setEditModal({ ...editModal, phone: e.target.value })} /></div>
           </div>
           <div style={T.formRow} className="form-row-2">
-            <div style={T.formGroup}><label style={T.formLabel}>Session date</label><input style={T.formInput} type="date" value={editModal.date || ''} onChange={e => setEditModal({ ...editModal, date: e.target.value })} /></div>
+            <div style={T.formGroup}><label style={T.formLabel}>{terms.dateLabel}</label><input style={T.formInput} type="date" value={editModal.date || ''} onChange={e => setEditModal({ ...editModal, date: e.target.value })} /></div>
             <div style={T.formGroup}><label style={T.formLabel}>Type</label>
               <select style={T.formInput} value={editModal.type} onChange={e => setEditModal({ ...editModal, type: e.target.value })}>
-                {types.map(t => <option key={t}>{t}</option>)}
+                {withCurrent(types, editModal.type).map(t => <option key={t}>{t}</option>)}
               </select>
             </div>
           </div>

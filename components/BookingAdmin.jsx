@@ -1,12 +1,13 @@
 import { useMemo, useState } from 'react'
 import { T, C } from '../lib/tokens'
 import { Modal, Badge } from './UI'
-import { DEMO_SESSION_CATALOG, DEFAULT_AVAILABILITY } from '../lib/data'
+import { DEFAULT_AVAILABILITY } from '../lib/data'
+import { sampleCatalog, useTerms } from '../lib/businessTypes'
 import { availabilitySettings, durationLabel, money, publicBookingBase, safeImageUrl, slugify } from '../lib/booking'
 import s from '../styles/BookingAdmin.module.css'
 
 const uid = () => crypto.randomUUID()
-const blankType = { name: '', slug: '', category: 'Portrait', description: '', imageUrl: '', durationMinutes: 60, price: 0, location: '', color: '#5db8be', public: false }
+const blankType = { name: '', slug: '', category: '', description: '', imageUrl: '', durationMinutes: 60, price: 0, location: '', color: '#5db8be', public: false }
 const blankDiscount = { name: '', code: '', kind: 'coupon', mode: 'percent', amount: 10, balance: null, uses: 0, maxUses: null, startsOn: '', endsOn: '', active: true }
 // "Sat, Jul 4, 2026 · 7:00 PM" — either part may be missing.
 const fmtWhen = (date, time) => {
@@ -21,6 +22,7 @@ const field = (label, node) => <label className={s.field}><span>{label}</span>{n
 const input = (value, onChange, props = {}) => <input className={s.input} value={value ?? ''} onChange={e => onChange(e.target.value)} {...props} />
 
 export function SessionTypes({ data, setData, toast, setView }) {
+  const terms = useTerms()
   const [editing, setEditing] = useState(null)
   const [availabilityOpen, setAvailabilityOpen] = useState(false)
   const [draftAvailability, setDraftAvailability] = useState(null)
@@ -28,22 +30,22 @@ export function SessionTypes({ data, setData, toast, setView }) {
   const types = [...(data.sessionCatalog || [])].sort((a,b) => (a.sortOrder || 0) - (b.sortOrder || 0))
   const saveType = () => {
     const name = editing.name.trim(), slug = slugify(editing.slug || name)
-    if (!name || !slug) return toast('Enter a session name')
+    if (!name || !slug) return toast('Enter a name')
     if (types.some(item => item.id !== editing.id && item.slug === slug)) return toast('That page URL is already in use')
     if (editing.durationMinutes < 30 || editing.durationMinutes > 480 || editing.durationMinutes % 30 || Number(editing.price) < 0) return toast('Use a duration in 30-minute steps and a valid price')
     if (editing.imageUrl && !safeImageUrl(editing.imageUrl)) return toast('Use an HTTPS image URL')
-    const row = { ...editing, id: editing.id || uid(), name, slug, durationMinutes: Number(editing.durationMinutes), price: Number(editing.price), sortOrder: editing.sortOrder ?? types.length }
+    const row = { ...editing, id: editing.id || uid(), name, slug, category: (editing.category || '').trim() || terms.defaultCategory, durationMinutes: Number(editing.durationMinutes), price: Number(editing.price), sortOrder: editing.sortOrder ?? types.length }
     setData(current => ({ ...current, sessionCatalog: editing.id ? current.sessionCatalog.map(item => item.id === editing.id ? row : item) : [...current.sessionCatalog, row], sessionTypes: current.sessionTypes.includes(name) ? current.sessionTypes : [...current.sessionTypes, name] }))
-    setEditing(null); toast('Session type saved')
+    setEditing(null); toast(`${terms.service} saved`)
   }
   const remove = item => {
-    if (!confirm(`Delete “${item.name}”? Existing bookings will keep their session name.`)) return
+    if (!confirm(`Delete “${item.name}”? Existing bookings will keep its name.`)) return
     setData(current => ({ ...current, sessionCatalog: current.sessionCatalog.filter(row => row.id !== item.id) }))
-    toast('Session type deleted')
+    toast(`${terms.service} deleted`)
   }
   const importSamples = () => {
     const existing = new Set(types.map(item => item.slug))
-    const additions = DEMO_SESSION_CATALOG.filter(item => !existing.has(item.slug)).map((item, index) => ({ ...item, id: uid(), public: false, sortOrder: types.length + index }))
+    const additions = sampleCatalog(terms.id).filter(item => !existing.has(item.slug)).map((item, index) => ({ ...item, id: uid(), public: false, sortOrder: types.length + index }))
     setData(current => ({ ...current, sessionCatalog: [...current.sessionCatalog, ...additions] }))
     toast(`${additions.length} sample packages added as drafts`)
   }
@@ -56,7 +58,7 @@ export function SessionTypes({ data, setData, toast, setView }) {
     setAvailabilityOpen(false); toast('Availability saved')
   }
   return <div>
-    <div className={s.heading}><div><h1>Session Types</h1><p>Manage the packages shown on your public booking page. Drafts stay private until published.</p></div><div className={s.actions}><button className={s.softButton} onClick={openAvailability}>Availability settings</button><button className={s.primaryButton} onClick={() => setEditing({ ...blankType })}>+ New session type</button></div></div>
+    <div className={s.heading}><div><h1>{terms.services}</h1><p>Manage the packages shown on your public booking page. Drafts stay private until published.</p></div><div className={s.actions}><button className={s.softButton} onClick={openAvailability}>Availability settings</button><button className={s.primaryButton} onClick={() => setEditing({ ...blankType })}>+ New {terms.serviceLower}</button></div></div>
     <div className={s.publicIntro}><h2>Public</h2><span>Available to book at <a href={base} target="_blank" rel="noreferrer">{base.replace(/^https?:\/\//, '')}</a></span></div>
     {!types.length && <div className={s.empty}><h2>Your collections start here</h2><p>Create a package from scratch or load the reference packages as private drafts to review before publishing.</p><button className={s.softButton} onClick={importSamples}>Load sample packages</button></div>}
     <div className={s.typeGrid}>{types.map(item => <article className={s.typeCard} key={item.id}>
@@ -65,15 +67,15 @@ export function SessionTypes({ data, setData, toast, setView }) {
       <div className={s.cardActions}>{item.public ? <><a className={s.softButton} href={`${base}/${item.slug}`} target="_blank" rel="noreferrer">View Page</a><button className={s.textButton} onClick={() => { navigator.clipboard?.writeText(`${base}/${item.slug}`); toast('Page link copied') }} aria-label={`Copy link for ${item.name}`}>↗ Copy link</button></> : <span className={s.meta}>Publish to view page</span>}<button className={s.textButton} onClick={() => setEditing({ ...item })}>Edit</button><button className={s.dangerText} onClick={() => remove(item)}>Delete</button></div>
     </article>)}</div>
     {types.length > 0 && <button className={s.textButton} onClick={importSamples}>Load missing sample packages as drafts</button>}
-    <div className={s.related}><button onClick={() => setView('sessions')}>View sessions →</button><button onClick={() => setView('discounts')}>Manage discounts →</button></div>
-    {editing && <Modal wide title={editing.id ? 'Edit Session Type' : 'New Session Type'} onClose={() => setEditing(null)} footer={<><button style={T.btn} onClick={() => setEditing(null)}>Cancel</button><button style={T.btnPrimary} onClick={saveType}>Save Session Type</button></>}>
-      <div className={s.formGrid}>{field('Name', input(editing.name, name => setEditing(v => ({ ...v, name, slug: v.id ? v.slug : slugify(name) })), { required: true }))}{field('Page URL', input(editing.slug, slug => setEditing(v => ({ ...v, slug: slugify(slug) })), { placeholder: 'maternity-classic' }))}{field('Category', input(editing.category, category => setEditing(v => ({ ...v, category }))))}{field('Duration (minutes)', input(editing.durationMinutes, durationMinutes => setEditing(v => ({ ...v, durationMinutes: Number(durationMinutes) })), { type: 'number', min: 30, max: 480, step: 30 }))}{field('Price (USD)', input(editing.price, price => setEditing(v => ({ ...v, price: Number(price) })), { type: 'number', min: 0, step: '.01' }))}{field('Location', input(editing.location, location => setEditing(v => ({ ...v, location }))))}{field('Photo URL (HTTPS)', input(editing.imageUrl, imageUrl => setEditing(v => ({ ...v, imageUrl })), { type: 'url', placeholder: 'https://...' }))}{field('Category color', input(editing.color, color => setEditing(v => ({ ...v, color })), { type: 'color' }))}</div>
+    <div className={s.related}><button onClick={() => setView('sessions')}>View {terms.sessionsLower} →</button><button onClick={() => setView('discounts')}>Manage discounts →</button></div>
+    {editing && <Modal wide title={editing.id ? `Edit ${terms.service}` : `New ${terms.service}`} onClose={() => setEditing(null)} footer={<><button style={T.btn} onClick={() => setEditing(null)}>Cancel</button><button style={T.btnPrimary} onClick={saveType}>Save {terms.service}</button></>}>
+      <div className={s.formGrid}>{field('Name', input(editing.name, name => setEditing(v => ({ ...v, name, slug: v.id ? v.slug : slugify(name) })), { required: true }))}{field('Page URL', input(editing.slug, slug => setEditing(v => ({ ...v, slug: slugify(slug) })), { placeholder: terms.slugExample }))}{field('Category', input(editing.category, category => setEditing(v => ({ ...v, category })), { placeholder: terms.defaultCategory }))}{field('Duration (minutes)', input(editing.durationMinutes, durationMinutes => setEditing(v => ({ ...v, durationMinutes: Number(durationMinutes) })), { type: 'number', min: 30, max: 480, step: 30 }))}{field('Price (USD)', input(editing.price, price => setEditing(v => ({ ...v, price: Number(price) })), { type: 'number', min: 0, step: '.01' }))}{field('Location', input(editing.location, location => setEditing(v => ({ ...v, location }))))}{field(terms.imageLabel, input(editing.imageUrl, imageUrl => setEditing(v => ({ ...v, imageUrl })), { type: 'url', placeholder: 'https://...' }))}{field('Category color', input(editing.color, color => setEditing(v => ({ ...v, color })), { type: 'color' }))}</div>
       {field('Description', <textarea className={s.input} rows={4} value={editing.description} onChange={e => setEditing(v => ({ ...v, description: e.target.value }))} />)}
       <label className={s.checkbox}><input type="checkbox" checked={editing.public} onChange={e => setEditing(v => ({ ...v, public: e.target.checked }))} /> Publish on booking page</label>
     </Modal>}
     {availabilityOpen && draftAvailability && <Modal wide title="Availability Settings" onClose={() => setAvailabilityOpen(false)} footer={<><button style={T.btn} onClick={() => setAvailabilityOpen(false)}>Cancel</button><button style={T.btnPrimary} onClick={saveAvailability}>Save Availability</button></>}>
-      <p className={s.hint}>All times use the studio timezone. Sessions are offered every 30 minutes within working hours.</p>
-      <div className={s.formGrid}>{field('Timezone', <select className={s.input} value={draftAvailability.timezone} onChange={e => setDraftAvailability(v => ({ ...v, timezone: e.target.value }))}>{['America/New_York','America/Chicago','America/Denver','America/Los_Angeles','UTC'].map(zone => <option key={zone}>{zone}</option>)}</select>)}{field('Minimum notice (days)', input(draftAvailability.noticeDays, noticeDays => setDraftAvailability(v => ({ ...v, noticeDays: Number(noticeDays) })), { type: 'number', min: 0, max: 30 }))}{field('Book up to (days)', input(draftAvailability.horizonDays, horizonDays => setDraftAvailability(v => ({ ...v, horizonDays: Number(horizonDays) })), { type: 'number', min: 1, max: 365 }))}{field('Buffer after sessions (minutes)', input(draftAvailability.bufferMinutes, bufferMinutes => setDraftAvailability(v => ({ ...v, bufferMinutes: Number(bufferMinutes) })), { type: 'number', min: 0, max: 120, step: 30 }))}</div>
+      <p className={s.hint}>All times use your business timezone. Times are offered every 30 minutes within working hours.</p>
+      <div className={s.formGrid}>{field('Timezone', <select className={s.input} value={draftAvailability.timezone} onChange={e => setDraftAvailability(v => ({ ...v, timezone: e.target.value }))}>{['America/New_York','America/Chicago','America/Denver','America/Los_Angeles','UTC'].map(zone => <option key={zone}>{zone}</option>)}</select>)}{field('Minimum notice (days)', input(draftAvailability.noticeDays, noticeDays => setDraftAvailability(v => ({ ...v, noticeDays: Number(noticeDays) })), { type: 'number', min: 0, max: 30 }))}{field('Book up to (days)', input(draftAvailability.horizonDays, horizonDays => setDraftAvailability(v => ({ ...v, horizonDays: Number(horizonDays) })), { type: 'number', min: 1, max: 365 }))}{field(`Buffer after ${terms.sessionsLower} (minutes)`, input(draftAvailability.bufferMinutes, bufferMinutes => setDraftAvailability(v => ({ ...v, bufferMinutes: Number(bufferMinutes) })), { type: 'number', min: 0, max: 120, step: 30 }))}</div>
       <h3>Weekly hours</h3>{days.map((day, index) => { const range = draftAvailability.weekdays[index]?.[0]; return <div className={s.hours} key={day}><span>{day}</span><label><input type="checkbox" checked={!!range} onChange={e => setDraftAvailability(v => ({ ...v, weekdays: { ...v.weekdays, [index]: e.target.checked ? [{ start: '09:00', end: '17:00' }] : [] } }))} /> Available</label>{range && <><input type="time" step="1800" value={range.start} onChange={e => setDraftAvailability(v => ({ ...v, weekdays: { ...v.weekdays, [index]: [{ ...range, start: e.target.value }] } }))} /><span>to</span><input type="time" step="1800" value={range.end} onChange={e => setDraftAvailability(v => ({ ...v, weekdays: { ...v.weekdays, [index]: [{ ...range, end: e.target.value }] } }))} /></>}</div> })}
       <h3>Block off dates</h3><p className={s.hint}>Blocked dates disappear from public availability and show on the calendar.</p><div className={s.inline}><input type="date" className={s.input} onChange={e => { const date = e.target.value; if (date && !draftAvailability.blockedDates.includes(date)) setDraftAvailability(v => ({ ...v, blockedDates: [...v.blockedDates, date].sort() })); e.target.value = '' }} /></div><div className={s.pills}>{draftAvailability.blockedDates.map(date => <button key={date} onClick={() => setDraftAvailability(v => ({ ...v, blockedDates: v.blockedDates.filter(d => d !== date) }))}>{date} ×</button>)}</div>
     </Modal>}
@@ -81,7 +83,8 @@ export function SessionTypes({ data, setData, toast, setView }) {
 }
 
 export function Sessions({ data, setData, toast, setView }) {
-  const [tab, setTab] = useState('All Sessions')
+  const terms = useTerms()
+  const [tab, setTab] = useState('All')
   const [query, setQuery] = useState('')
   const [creating, setCreating] = useState(false)
   const [selected, setSelected] = useState(null)
@@ -99,26 +102,26 @@ export function Sessions({ data, setData, toast, setView }) {
   }), [data.bookings, data.clients, query, tab, today])
   const create = () => {
     const client = data.clients.find(c => c.id === form.clientId), type = data.sessionCatalog.find(t => t.id === form.typeId)
-    if (!client || !type || !form.date || !form.time) return toast('Choose a client, session type, date and time')
+    if (!client || !type || !form.date || !form.time) return toast(`Choose a client, ${terms.serviceLower}, date and time`)
     const start = Number(form.time.slice(0,2)) * 60 + Number(form.time.slice(3,5))
     const conflict = data.bookings.some(b => { if (b.date !== form.date || !b.time || b.status === 'canceled') return false; const other = Number(b.time.slice(0,2)) * 60 + Number(b.time.slice(3,5)); return start < other + (b.durationMinutes || 60) && start + type.durationMinutes > other })
-    if (conflict) return toast('That time overlaps another session')
+    if (conflict) return toast(`That time overlaps another ${terms.sessionLower}`)
     const booking = { id: uid(), clientId: client.id, client: client.name, sessionTypeId: type.id, type: type.name, date: form.date, time: form.time, durationMinutes: type.durationMinutes, price: type.price, finalPrice: type.price, location: type.location, notes: form.notes, status: 'pending', source: 'manual' }
-    setData(v => ({ ...v, bookings: [...v.bookings, booking] })); setCreating(false); toast('Session created')
+    setData(v => ({ ...v, bookings: [...v.bookings, booking] })); setCreating(false); toast(`${terms.session} created`)
   }
-  return <div><div className={s.heading}><div><h1>Sessions</h1><p>Booking requests and scheduled sessions in one place.</p></div><button className={s.primaryButton} onClick={() => setCreating(true)}>+ New session</button></div>
+  return <div><div className={s.heading}><div><h1>{terms.sessions}</h1><p>Booking requests and scheduled {terms.sessionsLower} in one place.</p></div><button className={s.primaryButton} onClick={() => setCreating(true)}>+ New {terms.sessionLower}</button></div>
     <input className={s.search} placeholder="Search email or contact name" value={query} onChange={e => setQuery(e.target.value)} />
-    <div className={s.tabs}>{['All Sessions','Upcoming','Inquiry','Awaiting Client','Past','Canceled'].map(t => <button key={t} className={tab === t ? s.activeTab : ''} onClick={() => setTab(t)}>{t}</button>)}</div>
-    {!rows.length ? <div className={s.empty}><div className={s.emptyIcon}>▦</div><h2>{tab === 'All Sessions' ? 'Book & schedule sessions easily' : `No ${tab.toLowerCase()} sessions`}</h2><p>Get started by creating a new session or a bookable session type.</p><button className={s.primaryButton} onClick={() => setCreating(true)}>New Session</button><button className={s.textButton} onClick={() => setView('sessiontypes')}>Session Types</button></div> : <div className={s.sessionGrid}>{rows.map(b => <article className={s.sessionCard} key={b.id} onClick={() => setSelected(b)}><div style={{ minWidth: 0 }}><Badge type={b.status} label={b.status === 'pending' ? 'Awaiting Client' : b.status} /><strong>{b.client}</strong><small>{b.type}</small><small className={s.sessionWhen}>{fmtWhen(b.date, b.time)}</small><small>{b.location || 'Location TBD'}{b.source === 'public' ? ' · Online request' : ''}</small>{b.discountCode && <small>{b.discountCode} · {money(b.finalPrice)} after discount</small>}</div><button className={s.textButton} onClick={event => { event.stopPropagation(); setSelected(b) }}>View details →</button><span className={s.sessionChevron} aria-hidden="true">›</span></article>)}</div>}
-    {creating && <Modal title="New Session" onClose={() => setCreating(false)} footer={<><button style={T.btn} onClick={() => setCreating(false)}>Cancel</button><button style={T.btnPrimary} onClick={create}>Create Session</button></>}>
-      {field('Client', <select className={s.input} value={form.clientId} onChange={e => setForm(v => ({ ...v, clientId: e.target.value }))}><option value="">Choose a client</option>{data.clients.map(c => <option key={c.id} value={c.id}>{c.name} · {c.email}</option>)}</select>)}
-      {field('Session Type', <select className={s.input} value={form.typeId} onChange={e => setForm(v => ({ ...v, typeId: e.target.value }))}><option value="">Choose a session type</option>{data.sessionCatalog.map(t => <option key={t.id} value={t.id}>{t.name} · {money(t.price)}</option>)}</select>)}
+    <div className={s.tabs}>{['All','Upcoming','Inquiry','Awaiting Client','Past','Canceled'].map(t => <button key={t} className={tab === t ? s.activeTab : ''} onClick={() => setTab(t)}>{t === 'All' ? `All ${terms.sessions}` : t}</button>)}</div>
+    {!rows.length ? <div className={s.empty}><div className={s.emptyIcon}>▦</div><h2>{tab === 'All' ? `Book & schedule ${terms.sessionsLower} easily` : `No ${tab.toLowerCase()} ${terms.sessionsLower}`}</h2><p>Get started by creating a new {terms.sessionLower} or a bookable {terms.serviceLower}.</p><button className={s.primaryButton} onClick={() => setCreating(true)}>New {terms.session}</button><button className={s.textButton} onClick={() => setView('sessiontypes')}>{terms.services}</button></div> : <div className={s.sessionGrid}>{rows.map(b => <article className={s.sessionCard} key={b.id} onClick={() => setSelected(b)}><div style={{ minWidth: 0 }}><Badge type={b.status} label={b.status === 'pending' ? 'Awaiting Client' : b.status} /><strong>{b.client}</strong><small>{b.type}</small><small className={s.sessionWhen}>{fmtWhen(b.date, b.time)}</small><small>{b.location || 'Location TBD'}{b.source === 'public' ? ' · Online request' : ''}</small>{b.discountCode && <small>{b.discountCode} · {money(b.finalPrice)} after discount</small>}</div><button className={s.textButton} onClick={event => { event.stopPropagation(); setSelected(b) }}>View details →</button><span className={s.sessionChevron} aria-hidden="true">›</span></article>)}</div>}
+    {creating && <Modal title={`New ${terms.session}`} onClose={() => setCreating(false)} footer={<><button style={T.btn} onClick={() => setCreating(false)}>Cancel</button><button style={T.btnPrimary} onClick={create}>Create {terms.session}</button></>}>
+      {field('Client', <select className={s.input} value={form.clientId} onChange={e => setForm(v => ({ ...v, clientId: e.target.value }))}><option value="">Choose a client</option>{data.clients.filter(c => !c.archived).map(c => <option key={c.id} value={c.id}>{[c.name, c.email].filter(Boolean).join(' · ')}</option>)}</select>)}
+      {field(terms.service, <select className={s.input} value={form.typeId} onChange={e => setForm(v => ({ ...v, typeId: e.target.value }))}><option value="">Choose a {terms.serviceLower}</option>{data.sessionCatalog.map(t => <option key={t.id} value={t.id}>{t.name} · {money(t.price)}</option>)}</select>)}
       <div className={s.formGrid}>{field('Date', input(form.date, date => setForm(v => ({ ...v, date })), { type: 'date' }))}{field('Time', input(form.time, time => setForm(v => ({ ...v, time })), { type: 'time', step: 1800 }))}</div>
       {field('Notes', <textarea className={s.input} rows={3} value={form.notes} onChange={e => setForm(v => ({ ...v, notes: e.target.value }))} />)}
     </Modal>}
-    {selected && <Modal title={`${selected.client} · ${selected.type}`} onClose={() => setSelected(null)} footer={<><button style={T.btn} onClick={() => setSelected(null)}>Close</button><button style={T.btnDanger} onClick={() => { if (confirm(`Delete session for ${selected.client}?`)) { setData(v => ({ ...v, bookings: v.bookings.filter(item => item.id !== selected.id) })); setSelected(null); toast('Session deleted') } }}>Delete session</button></>}>
+    {selected && <Modal title={`${selected.client} · ${selected.type}`} onClose={() => setSelected(null)} footer={<><button style={T.btn} onClick={() => setSelected(null)}>Close</button><button style={T.btnDanger} onClick={() => { if (confirm(`Delete this ${terms.sessionLower} for ${selected.client}?`)) { setData(v => ({ ...v, bookings: v.bookings.filter(item => item.id !== selected.id) })); setSelected(null); toast(`${terms.session} deleted`) } }}>Delete {terms.sessionLower}</button></>}>
       <div className={s.sessionDetail}><div><span>Date</span><strong>{fmtWhen(selected.date)}</strong></div><div><span>Time</span><strong>{fmtWhen('', selected.time) || 'TBD'}</strong></div><div><span>Location</span><strong>{selected.location || 'TBD'}</strong></div><div><span>Price</span><strong>{money(selected.finalPrice ?? selected.price)}</strong></div></div>
-      {field('Status', <select className={s.input} value={selected.status} onChange={e => { const next={...selected,status:e.target.value}; setSelected(next); setData(v => ({ ...v, bookings: v.bookings.map(item => item.id === selected.id ? next : item) })); toast('Session updated') }}><option value="inquiry">Inquiry</option><option value="pending">Awaiting Client</option><option value="confirmed">Confirmed</option><option value="canceled">Canceled</option></select>)}
+      {field('Status', <select className={s.input} value={selected.status} onChange={e => { const next={...selected,status:e.target.value}; setSelected(next); setData(v => ({ ...v, bookings: v.bookings.map(item => item.id === selected.id ? next : item) })); toast(`${terms.session} updated`) }}><option value="inquiry">Inquiry</option><option value="pending">Awaiting Client</option><option value="confirmed">Confirmed</option><option value="canceled">Canceled</option></select>)}
       {selected.notes && <p className={s.hint}>{selected.notes}</p>}
     </Modal>}
   </div>

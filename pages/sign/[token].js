@@ -2,6 +2,7 @@ import { useState } from 'react'
 import Head from 'next/head'
 import { createServiceClient } from '../../lib/pibase'
 import { verifyContractToken } from '../../lib/signingTokens'
+import { loadStudioConfig } from '../../lib/studioConfig'
 import ContractDocument from '../../components/ContractDocument'
 import { contractHighlights } from '../../lib/contractTemplate'
 import SignaturePad from '../../components/SignaturePad'
@@ -50,13 +51,13 @@ export default function SignContractPage({ token, contract }) {
   return (
     <>
       <Head>
-        <title>Sign Contract</title>
+        <title>{[contract.type || contract.fallbackTitle, contract.businessName].filter(Boolean).join(' · ')}</title>
         <meta name="viewport" content="width=device-width, initial-scale=1" />
       </Head>
       <main className="sign-page">
         <section className="sign-card">
-          <p className="sign-eyebrow">Ellie's Heartstrings Photography</p>
-          <h1>{contract.type || 'Photography Agreement'}</h1>
+          {contract.businessName && <p className="sign-eyebrow">{contract.businessName}</p>}
+          <h1>{contract.type || contract.fallbackTitle}</h1>
           <div className="sign-meta">
             <span>{contract.client}</span>
             <span>{contract.sent ? `Sent ${contract.sent}` : 'Ready for review'}</span>
@@ -142,17 +143,20 @@ export async function getServerSideProps({ params }) {
 
   const { data } = await db
     .from('contracts')
-    .select('id, client_name, type, body, status, sent, signed_by, signed_at, fields')
+    .select('id, user_id, client_name, type, body, status, sent, signed_by, signed_at, fields')
     .eq('id', parsed.contractId)
     .single()
 
   if (!data) return { notFound: true }
+  const config = await loadStudioConfig(db, data.user_id)
 
   return {
     props: {
       token: params.token,
       contract: {
         id: data.id,
+        businessName: config.branding.businessName || '',
+        fallbackTitle: config.terms.agreement,
         client: data.client_name || '',
         type: data.type || '',
         body: data.body || '',

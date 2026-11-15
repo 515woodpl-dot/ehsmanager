@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react'
 import { T, C } from '../lib/tokens'
-import { CONTRACT_TEMPLATE, fillContract, highlightValues } from '../lib/contractTemplate'
+import { contractTemplateFor, fillContract, highlightValues } from '../lib/contractTemplate'
+import { businessTerms, useTerms } from '../lib/businessTypes'
 import ContractDocument from './ContractDocument'
 
 const uid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => { const r = Math.random() * 16 | 0; return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16) })
@@ -42,28 +43,35 @@ function pickInvoice(invoices = [], c) {
   return (open.length ? open : mine)[0]
 }
 
+const isWeb = terms => terms.id === 'webdesign'
+
 // Build the full field set for a client (or blank defaults)
-function buildFields(c, data) {
+function buildFields(c, data, terms) {
   const booking = c ? pickBooking(data?.bookings, c) : null
   const invoice = c ? pickInvoice(data?.invoices, c) : null
   const sessionType = booking ? (data?.sessionCatalog || []).find(item => item.id === booking.sessionTypeId || item.name === booking.type) : null
   const today = new Date().toISOString().slice(0, 10)
   return {
     fields: {
-      contractTitle: 'Portrait Photography Services Agreement',
+      contractTitle: terms.contractTitle,
+      businessName: data?.branding?.businessName || '',
       effectiveDate: today,
       clientName: c?.name || '',
       clientEmail: c?.email || '',
-      sessionType: booking?.type || c?.type || 'Portrait',
-      sessionDate: booking?.date || c?.date || '',
+      sessionType: (isWeb(terms) ? c?.type || booking?.type : booking?.type || c?.type) || terms.projectTypes[0] || '',
+      sessionDate: (isWeb(terms) ? c?.date || booking?.date : booking?.date || c?.date) || '',
       sessionTime: booking?.time || '',
       location: booking?.location || '',
       totalFee: invoice?.amount ? String(invoice.amount) : '',
       retainerPct: '50',
-      remainingDueDate: invoice?.due || 'Proof Delivery Date',
+      remainingDueDate: invoice?.due || terms.remainingDue,
       governingState: 'New Jersey',
-      photographerEmail: 'hello@elliesheartstrings.com',
-      photographerCity: 'Linden, NJ',
+      photographerEmail: data?.branding?.studioEmail || '',
+      photographerCity: data?.branding?.address || '',
+      projectScope: '',
+      websiteAddress: '',
+      // Which agreement this is, so reopening it keeps the same wording.
+      template: terms.id,
       headerImageUrl: sessionType?.imageUrl || '',
     },
     sources: { booking, invoice },
@@ -72,8 +80,13 @@ function buildFields(c, data) {
 
 export default function ContractBuilder({ client, contract = null, data, onSave, onClose }) {
   // Editing keeps what was saved; a new contract auto-fills from the client.
-  const built = buildFields(client, data)
-  const initial = contract?.fields ? { fields: { ...built.fields, ...contract.fields }, sources: built.sources } : built
+  // A saved contract keeps the agreement it was written with (contracts from
+  // before business types are photography agreements).
+  const currentTerms = useTerms()
+  const terms = contract?.fields ? businessTerms(contract.fields.template || 'photography') : currentTerms
+  const web = isWeb(terms)
+  const built = buildFields(client, data, terms)
+  const initial = contract?.fields ? { fields: { ...built.fields, ...contract.fields, template: terms.id }, sources: built.sources } : built
   const [selectedClientId, setSelectedClientId] = useState(client?.id || '')
   const [fields, setFields] = useState(initial.fields)
   const [sources, setSources] = useState(initial.sources)
@@ -88,7 +101,7 @@ export default function ContractBuilder({ client, contract = null, data, onSave,
     if (touched && !confirm('Switching client will refill the form and overwrite your edits. Continue?')) return
     setSelectedClientId(id)
     const c = data?.clients?.find(x => x.id === id) || null
-    const next = buildFields(c, data)
+    const next = buildFields(c, data, terms)
     setFields(next.fields)
     setSources(next.sources)
     setTouched(false)
@@ -100,7 +113,7 @@ export default function ContractBuilder({ client, contract = null, data, onSave,
     const bits = ['contact details']
     if (sources.booking) {
       const d = sources.booking.date ? new Date(sources.booking.date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : null
-      bits.push(d ? `session on ${d}` : 'session details')
+      bits.push(d ? `${terms.sessionLower} on ${d}` : `${terms.sessionLower} details`)
     }
     if (sources.invoice) bits.push(`fee from invoice ${sources.invoice.number || sources.invoice.id}`)
     return `Auto-filled ${bits.join(' · ')}`
@@ -128,7 +141,10 @@ export default function ContractBuilder({ client, contract = null, data, onSave,
     effectiveDate: fmtD(fields.effectiveDate),
     clientName: fields.clientName || '[Client Name]',
     clientEmail: fields.clientEmail || '[Client Email]',
-    sessionType: fields.sessionType || '[Session Type]',
+    businessName: fields.businessName || '[Business Name]',
+    sessionType: fields.sessionType || `[${terms.typeLabel}]`,
+    projectScope: (fields.projectScope || '').trim() || `${fields.sessionType || 'Website'}, as described in the quote or proposal accepted by Client.`,
+    websiteAddress: (fields.websiteAddress || '').trim() || 'To be confirmed',
     sessionDate: fmtD(fields.sessionDate),
     sessionTime: fmtT(fields.sessionTime),
     location: fields.location || '[Location]',
@@ -136,12 +152,12 @@ export default function ContractBuilder({ client, contract = null, data, onSave,
     retainerAmount: totalFee > 0 ? money(retainerAmt) : '[Retainer]',
     remainingAmount: totalFee > 0 ? money(remainingAmt) : '[Remaining]',
     remainingDueDate: fmtD(fields.remainingDueDate),
-    photographerEmail: fields.photographerEmail || '[Photographer Email]',
-    photographerCity: fields.photographerCity || '[Photographer City]',
+    photographerEmail: fields.photographerEmail || `[${terms.provider} Email]`,
+    photographerCity: fields.photographerCity || `[${terms.provider} City]`,
     governingState: fields.governingState || '[Governing State]',
-  }), [fields, totalFee, retainerAmt, remainingAmt])
+  }), [fields, totalFee, retainerAmt, remainingAmt, terms])
 
-  const previewText = useMemo(() => fillContract(CONTRACT_TEMPLATE, contractFields), [contractFields])
+  const previewText = useMemo(() => fillContract(contractTemplateFor(terms.id), contractFields), [contractFields, terms.id])
 
   const save = () => {
     if (fields.headerImageUrl && !/^https:\/\//i.test(fields.headerImageUrl)) {
@@ -149,8 +165,10 @@ export default function ContractBuilder({ client, contract = null, data, onSave,
       setTab('fields')
       return
     }
-    if (!activeClient || !fields.clientName.trim() || !fields.clientEmail.trim() || !fields.sessionDate || !fields.sessionTime || !fields.location.trim() || !fields.remainingDueDate || !Number.isFinite(totalFee) || totalFee <= 0 || !Number.isFinite(retainerPct) || retainerPct < 0 || retainerPct > 100) {
-      alert('Select a client and complete the client, session, and payment details before saving.')
+    // A photo session needs a time and place; a web project only a start date.
+    const detailsMissing = !fields.sessionDate || (!web && (!fields.sessionTime || !fields.location.trim()))
+    if (!activeClient || !fields.clientName.trim() || !fields.clientEmail.trim() || !(fields.businessName || '').trim() || !(fields.photographerEmail || '').trim() || detailsMissing || !fields.remainingDueDate || !Number.isFinite(totalFee) || totalFee <= 0 || !Number.isFinite(retainerPct) || retainerPct < 0 || retainerPct > 100) {
+      alert(`Select a client and complete the client, ${web ? 'project' : 'session'}, payment and business details before saving.`)
       setTab('fields')
       return
     }
@@ -204,8 +222,8 @@ export default function ContractBuilder({ client, contract = null, data, onSave,
             {fillSummary && (
               <div style={{ fontSize: 12, color: C.green, marginTop: 8, fontWeight: 500 }}>{fillSummary}</div>
             )}
-            {selectedClientId && !sources.booking && (
-              <div style={{ fontSize: 11.5, color: C.faint, marginTop: 4 }}>No booking found — enter session date, time and location below.</div>
+            {selectedClientId && (web ? !activeClient?.date : !sources.booking) && (
+              <div style={{ fontSize: 11.5, color: C.faint, marginTop: 4 }}>{web ? 'Enter the project details below.' : 'No booking found — enter session date, time and location below.'}</div>
             )}
             {selectedClientId && !sources.invoice && (
               <div style={{ fontSize: 11.5, color: C.faint, marginTop: 2 }}>No invoice found — enter the total fee below.</div>
@@ -216,33 +234,51 @@ export default function ContractBuilder({ client, contract = null, data, onSave,
           <Field label="Contract title">
             <input style={inp} value={fields.contractTitle} onChange={e => set('contractTitle', e.target.value)} />
           </Field>
-          <Field label="Contract header image URL" hint="Optional · auto-filled from the booked session type. Use any HTTPS image or leave blank.">
+          <Field label="Contract header image URL" hint={`Optional · auto-filled from the booked ${terms.serviceLower}. Use any HTTPS image or leave blank.`}>
             <div style={{ display: 'flex', gap: 8 }}>
               <input style={inp} type="url" placeholder="https://…" value={fields.headerImageUrl || ''} onChange={e => set('headerImageUrl', e.target.value)} />
               {!!fields.headerImageUrl && <button type="button" style={T.btn} onClick={() => set('headerImageUrl', '')}>Remove</button>}
             </div>
           </Field>
 
-          <Section title="Session details">
+          <Section title={web ? 'Project details' : 'Session details'}>
             <div style={row2} className="form-row-2">
               <Field label="Effective date">
                 <input style={inp} type="date" value={fields.effectiveDate} onChange={e => set('effectiveDate', e.target.value)} />
               </Field>
-              <Field label="Session type">
+              <Field label={terms.typeLabel}>
                 <input style={inp} value={fields.sessionType} onChange={e => set('sessionType', e.target.value)} />
               </Field>
             </div>
-            <div style={row2} className="form-row-2">
-              <Field label="Session date">
-                <input style={inp} type="date" value={fields.sessionDate} onChange={e => set('sessionDate', e.target.value)} />
-              </Field>
-              <Field label="Session time">
-                <input style={inp} type="time" value={fields.sessionTime} onChange={e => set('sessionTime', e.target.value)} />
-              </Field>
-            </div>
-            <Field label="Location">
-              <input style={inp} value={fields.location} onChange={e => set('location', e.target.value)} />
-            </Field>
+            {web ? (
+              <>
+                <div style={row2} className="form-row-2">
+                  <Field label="Project start date">
+                    <input style={inp} type="date" value={fields.sessionDate} onChange={e => set('sessionDate', e.target.value)} />
+                  </Field>
+                  <Field label="Website address">
+                    <input style={inp} placeholder="example.com · leave blank if not chosen yet" value={fields.websiteAddress || ''} onChange={e => set('websiteAddress', e.target.value)} />
+                  </Field>
+                </div>
+                <Field label="Scope of work">
+                  <textarea style={{ ...inp, resize: 'vertical' }} rows={3} placeholder="e.g. Design and build of a 5-page website with a contact form, mobile layouts and basic SEO setup. Leave blank to refer to the accepted quote." value={fields.projectScope || ''} onChange={e => set('projectScope', e.target.value)} />
+                </Field>
+              </>
+            ) : (
+              <>
+                <div style={row2} className="form-row-2">
+                  <Field label="Session date">
+                    <input style={inp} type="date" value={fields.sessionDate} onChange={e => set('sessionDate', e.target.value)} />
+                  </Field>
+                  <Field label="Session time">
+                    <input style={inp} type="time" value={fields.sessionTime} onChange={e => set('sessionTime', e.target.value)} />
+                  </Field>
+                </div>
+                <Field label="Location">
+                  <input style={inp} value={fields.location} onChange={e => set('location', e.target.value)} />
+                </Field>
+              </>
+            )}
           </Section>
 
           <Section title="Client information">
@@ -265,7 +301,7 @@ export default function ContractBuilder({ client, contract = null, data, onSave,
                 </div>
               </Field>
               <Field
-                label="Retainer %"
+                label={web ? 'Deposit %' : 'Retainer %'}
                 hint={totalFee > 0 ? `${money(retainerAmt)} due on signing · ${money(remainingAmt)} remaining` : ''}
               >
                 <div style={{ position: 'relative' }}>
@@ -279,18 +315,23 @@ export default function ContractBuilder({ client, contract = null, data, onSave,
             </Field>
           </Section>
 
-          <Section title="Terms and contact">
+          <Section title="Your business and terms">
             <div style={row2} className="form-row-2">
-              <Field label="Photographer email">
+              <Field label="Business name">
+                <input style={inp} value={fields.businessName || ''} onChange={e => set('businessName', e.target.value)} />
+              </Field>
+              <Field label="Business email">
                 <input style={inp} value={fields.photographerEmail} onChange={e => set('photographerEmail', e.target.value)} />
               </Field>
+            </div>
+            <div style={row2} className="form-row-2">
+              {!web && <Field label="Business city">
+                <input style={inp} value={fields.photographerCity} onChange={e => set('photographerCity', e.target.value)} />
+              </Field>}
               <Field label="Governing state">
                 <input style={inp} value={fields.governingState} onChange={e => set('governingState', e.target.value)} />
               </Field>
             </div>
-            <Field label="Photographer city">
-              <input style={inp} value={fields.photographerCity} onChange={e => set('photographerCity', e.target.value)} />
-            </Field>
           </Section>
         </div>
       ) : (

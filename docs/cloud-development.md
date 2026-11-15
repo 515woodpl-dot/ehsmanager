@@ -11,3 +11,13 @@ Use the existing checkouts in `/workspace`; do not create a worktree for setup.
 If the Docker builder cannot resolve Debian package hosts in this cloud environment, the optional PostgreSQL extension image can be replaced with `postgres:16-bookworm` through a temporary Compose override outside either repository. The EHS schema needs only the standard PostgreSQL image. Keep PIBASE's generated `.env`, EHS `.env.local`, and any owner credentials out of Git.
 
 Production booking host: `booking.elliesheartstrings.com`. Configure DNS and the hosting proxy separately; the app's `next.config.js` routes that host's root to `/booking`.
+
+## Without Docker
+
+PIBASE is a Go binary plus PostgreSQL 16, so it also runs directly:
+
+1. Start a local PostgreSQL 16 (for example on port 55432).
+2. `go build -o pibase ./cmd/pibase` in the PIBASE checkout.
+3. Export `PIBASE_ADMIN_DATABASE_URL`, `PIBASE_AUTHENTICATOR_PASSWORD`, `PIBASE_DATABASE_URL` (the `authenticator` role on `_control`), `PIBASE_MASTER_KEY` (32 random bytes, base64), `PIBASE_LISTEN_ADDR=127.0.0.1:18080` and `PIBASE_STORAGE_ROOT`.
+4. `./pibase bootstrap`, then `./pibase project-create "EHS local"` (prints the keys), then `./pibase migration-apply PROJECT_ID 0001_ehsmanager < pibase-schema.sql`, then `./pibase serve`.
+5. Sign up in the app. Without SMTP, confirm the owner in the project database: `update auth.users set email_confirmed_at = now(), confirmation_token_hash = null`.

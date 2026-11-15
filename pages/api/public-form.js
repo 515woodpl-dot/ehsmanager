@@ -1,7 +1,8 @@
 import { createServiceClient } from '../../lib/pibase'
 import { notifyStudio } from '../../lib/push'
 import { emailWrap, sendStudioEmail } from '../../lib/email'
-import { loadStudioConfig } from '../../lib/studioConfig'
+import { loadStudioConfig, APP_URL } from '../../lib/studioConfig'
+import { DEFAULT_BUSINESS_TYPE, isBusinessType } from '../../lib/businessTypes'
 
 const escapeHtml = (value = '') => String(value)
   .replace(/&/g, '&amp;')
@@ -18,7 +19,7 @@ const escapeHtml = (value = '') => String(value)
  *                                             as client + lead row, emails the owner
  *
  * If no studio id is given, falls back to STUDIO_OWNER_USER_ID env var
- * (single-tenant mode — set this to Ellie's user id).
+ * (single-tenant mode — set this to the owner's user id).
  */
 export default async function handler(req, res) {
   try {
@@ -32,14 +33,19 @@ export default async function handler(req, res) {
     if (req.method === 'GET') {
       const { data, error } = await db
         .from('studio_settings')
-        .select('form_settings')
+        .select('form_settings, branding')
         .eq('user_id', studioId)
         .single()
       if (error) {
         console.error('[public-form] settings lookup failed', error)
         return res.status(404).json({ error: 'Studio not found' })
       }
-      return res.status(200).json({ settings: data.form_settings })
+      const branding = data.branding || {}
+      return res.status(200).json({
+        settings: data.form_settings,
+        businessName: branding.businessName || '',
+        businessType: isBusinessType(branding.businessType) ? branding.businessType : DEFAULT_BUSINESS_TYPE,
+      })
     }
 
     // ── POST: submit a lead ────────────────────────────────────────
@@ -72,15 +78,17 @@ export default async function handler(req, res) {
       }
 
       // 2. Create client in inquiry stage. Lead is already captured, so this is best-effort.
-      const { data: existingClient } = await db.from('clients').select('id').eq('user_id', studioId).eq('email', safeLead.email).single()
-      if (!existingClient) {
+      // New leads start in the first stage of this business's pipeline.
+      const { data: existing } = await db.from('clients').select('id').eq('user_id', studioId).eq('email', safeLead.email).limit(1)
+      const { data: pipeline } = await db.from('studio_settings').select('stages').eq('user_id', studioId).maybeSingle()
+      if (!existing?.length) {
         const { error: clientErr } = await db.from('clients').insert({
           user_id: studioId,
           name: safeLead.name,
           email: safeLead.email,
           phone: safeLead.phone,
           type: safeLead.interest.split(', ')[0] || null,
-          status: 'inquiry',
+          status: pipeline?.stages?.[0]?.id || 'inquiry',
           notes: safeLead.message || null,
         })
         if (clientErr) console.error('[public-form] client insert failed', clientErr)
@@ -102,7 +110,7 @@ export default async function handler(req, res) {
               <div class="box-row"><span class="label">Received</span><span class="value">${escapeHtml(fmtDate)}</span></div>
             </div>
             ${safeLead.message ? `<div class="box" style="font-family:Arial,sans-serif;font-size:13px;line-height:1.7;color:#444;"><strong>Message:</strong><br/><br/>${escapeHtml(safeLead.message)}</div>` : ''}
-            <a href="${escapeHtml(process.env.NEXT_PUBLIC_APP_URL || 'https://manager.elliesheartstrings.com')}" class="btn">Open Studio Manager</a>
+            <a href="${escapeHtml(APP_URL)}" class="btn">Open Studio Manager</a>
             <p style="margin-top:20px;font-size:13px;color:#9B9B98;">This lead has been added to your client list.</p>
           `, config)
           const result = await sendStudioEmail(config, {

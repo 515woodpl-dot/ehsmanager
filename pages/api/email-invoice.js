@@ -1,5 +1,6 @@
 import { emailWrap, sendStudioEmail, signOffHtml } from '../../lib/email'
 import { requireUser } from '../../lib/api-auth'
+import { APP_URL } from '../../lib/studioConfig'
 import { createInvoiceToken } from '../../lib/signingTokens'
 import { invoiceFromRow, payableOptions, paymentSchedule } from '../../lib/invoices'
 
@@ -46,7 +47,7 @@ export default async function handler(req, res) {
   const label = invoice.number || 'Invoice'
   let viewUrl = null
   try {
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://manager.elliesheartstrings.com'
+    const baseUrl = APP_URL
     viewUrl = new URL(`/invoice/${createInvoiceToken(invoice.id)}`, baseUrl).toString()
   } catch {
     viewUrl = null

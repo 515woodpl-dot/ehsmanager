@@ -25,6 +25,30 @@ chosen). Resend's `email.received` webhook (`/api/inbound-email?studio=<id>`)
 adds the reply to the client's conversation. Clients can also use their
 private chat page at `/chat/<token>`.
 
+## Business types
+
+The manager works for photography and web design businesses. The type is
+saved as `studio_settings.branding.businessType` (no migration; missing means
+`photography`) and set from Settings → Business profile, or at sign-up
+(`user_metadata.business_type`, applied on first load in `pages/index.js`).
+
+`lib/businessTypes.js` holds everything that differs: wording (`session` /
+`meeting`, `Session Types` / `Services`…), starting project types, stages,
+contact form options, sample services, booking page copy, reminder text and
+questionnaire questions. Components read it with `useTerms()`; server code
+uses `config.terms` from `loadStudioConfig`; public pages get the type from
+their API (`/api/public-booking`, `/api/public-form`). Don't hard-code
+"session", "photography" or a business name in new UI or emails. Add it to
+the presets instead.
+
+Contracts: `contractTemplateFor(type)` in `lib/contractTemplate.js` picks the
+photography or web design agreement. A saved contract remembers its template
+in `fields.template` and keeps it when reopened. The business name in the
+agreement is the `{{businessName}}` field, filled from the business profile.
+
+Internal names stay as they were (`bookings`, `session_catalog`,
+`sessionTypes`, the `sessions` / `sessiontypes` view ids), only labels change.
+
 ## Local development
 
 1. Run PIBASE on `http://localhost:18080`.

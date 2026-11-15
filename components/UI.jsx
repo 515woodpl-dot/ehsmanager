@@ -94,3 +94,8 @@ export function SearchBar({ value, onChange, placeholder = 'Search...' }) {
 export function Divider({ margin = '20px 0' }) {
   return <div style={{ height: 1, background: C.border, margin }} />
 }
+
+// Options for a type picker. Keeps a value that's no longer in the list
+// (an older client, or one booked online) so editing doesn't silently show
+// a different type.
+export const withCurrent = (list = [], value) => value && !list.includes(value) ? [value, ...list] : list

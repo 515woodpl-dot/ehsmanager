@@ -5,6 +5,120 @@ every round of changes, and keep the "Open / follow-ups" list current.
 
 ---
 
+## 2026-11-15 (round 10) — Works for web design businesses too, review fixes
+
+### ⚠️ Before using
+- [ ] No database migration needed. The type of business is saved with the
+      business profile.
+- [ ] Deploy as usual (`npm install`, `npm run build`, restart). Next.js moved
+      from 16.4.0 to 16.4.6, see "Security" below.
+- [ ] Nothing changes for the current photography setup until you switch the
+      type in Settings.
+
+### Type of business: Photography or Web design
+- [x] **Settings → Business profile → Type of business.** New accounts pick
+      it on the sign-up form.
+- [x] **Wording follows the type** everywhere: the menu (*Session Types /
+      Sessions* become *Services / Meetings*), dashboard, analytics,
+      calendar, project cards, client forms (*Session type / Session date*
+      become *Project type / Kickoff date*), toasts, search, the calendar
+      export file name and the tagline under the app name.
+- [x] **Starting lists switch with the type**: project types (New Website,
+      Website Redesign, Online Store…), pipeline stages (Inquiry → Signed →
+      Design → Development → Review → Launched) and contact form options.
+      Lists you edited yourself are only replaced if you say OK. Clients keep
+      their place in the pipeline (first stage stays first, finished stays
+      finished).
+- [x] **Sample services** for web design (Discovery Call, Website Audit,
+      Landing Page, Starter / Business Website, Online Store, Care Plan).
+      "Load sample packages" adds the set for your type.
+- [x] **Public booking page** uses your business name and the type's wording
+      and copy instead of the fixed "Ellie's Heartstrings · Photography". A
+      free service shows "Free" and hides the discount and total lines.
+- [x] **Contact form** asks "What can we help you with?" for web design, and
+      the page title includes the business name.
+- [x] **Emails and client pages**: the reminder, questionnaire and contract
+      emails, the email header, the signing page and chat page use the
+      business name and type. The signing page no longer says "Ellie's
+      Heartstrings Photography" for every business.
+- [x] **Questionnaires** start with web design questions (goal of the site,
+      customers, sites you like, domain / hosting / content).
+- [x] Quick replies, line-item hints and meeting-notes hints match the type.
+
+### Contracts
+- [x] **Website Design Services Agreement** template for web design: scope,
+      revisions, deposit, third-party costs, client content and approvals,
+      delays, ownership on payment, hosting and maintenance after launch,
+      liability. Fields: project type, start date, website address, scope of
+      work, fee, deposit %, balance due date or milestone.
+- [x] The **business name** in both agreements comes from your business
+      profile and can be edited per contract. It was fixed text before.
+- [x] Business email and city are filled from your profile instead of fixed
+      values.
+- [x] A saved contract keeps the agreement it was written with, even after
+      the type of business changes.
+- [ ] The web design agreement is a starting template. Have a lawyer review
+      it before relying on it.
+
+### Fixes found in the review
+- [x] **Projects board** with more than four stages made the whole page wider
+      than the screen and pushed "+ New project" off the edge. The board now
+      scrolls inside the page.
+- [x] **CSV import**: names with commas inside quotes were split, dates like
+      `7/4/2026` were stored as typed and then blocked saving ("Save failed ·
+      retrying"), and unknown stages hid the client from the board. Import now
+      uses a real CSV reader, converts dates, matches stages by name, and
+      understands "First name / Last name", "Project type", "Stage" columns.
+- [x] **Type pickers** showed the first type when a client's type wasn't in
+      the list (booked online, or after renaming types). They now show the
+      client's actual type.
+- [x] **Calendar → New**: the type shown in the picker and the type saved
+      could differ. Fixed, and services from the booking catalog can be
+      picked too.
+- [x] **New clients** from "Add client" and the contact form start in your
+      first pipeline stage instead of a fixed "inquiry".
+- [x] **Contact form**: when an email already belonged to more than one
+      client, each new submission added another copy. The form could not be sent when all checkbox
+      options were removed. Other businesses' default options no longer flash
+      while the form loads.
+- [x] **Reminder email** no longer shows the internal note "Public booking
+      request" to the client, and a failed reminder now says why.
+- [x] **Sign-in page** showed `{}` when the server had a problem. It now
+      shows a readable message.
+- [x] A questionnaire for a client without a type is titled "Questionnaire"
+      instead of "Session Questionnaire".
+- [x] Search results and the calendar export no longer show a stray "·" or
+      "-" when a type, email or location is missing.
+
+### Security
+- [x] **Next.js 16.4.0 → 16.4.6.** 16.4.0 has a published critical
+      vulnerability; the build stopped once with a warning because of it.
+      `npm audit` now reports 0 vulnerabilities.
+
+### Verified
+- [x] Ran the app against a real local PIBASE (PostgreSQL 16 + the PIBASE
+      gateway) with a fresh project and `pibase-schema.sql`.
+- [x] `next build` passes.
+- [x] All 13 screens load with no console or network errors, in both types,
+      at 1400px, 1100px and 390px wide, with nothing wider than the screen.
+- [x] CSV import with a quoted comma, `7/4/2026`, `July 9, 2026`, an invalid
+      date and stage names: all saved correctly.
+- [x] Switching Web design → Photography moves clients back onto the
+      photography stages.
+- [x] Photography: new project, sample session types, publish, invoice,
+      contract with the business name filled in.
+- [x] Switch to Web design in Settings: wording, stages and lists change and
+      survive a reload. New sign-up as Web design starts with the web lists.
+- [x] Web design, end to end: sample services → public booking page → a
+      client books a Discovery Call → contact form lead → both appear as
+      clients. Quote → client accepts → invoice created. Questionnaire →
+      client answers. Contract → client signs on the signing page. Client
+      chat message appears in the Inbox.
+- [ ] Email sending (Resend), online payments (Stripe) and push were not
+      exercised: no keys in the test setup.
+
+---
+
 ## 2026-10-16 (round 9) — Payment plans, studio countersigning, contract highlights, live chat
 
 ### ⚠️ Before using
@@ -643,6 +757,18 @@ every round of changes, and keep the "Open / follow-ups" list current.
 ---
 
 ## Open / follow-ups
+- [ ] Have a lawyer review the web design agreement template.
+- [ ] Existing session types / services stay as they are when the type of
+      business changes (they may be on the public booking page). Unpublish or
+      delete the ones that no longer apply.
+- [ ] The app itself is still named "EHS Studio" (install banner, login,
+      browser title). Client-facing pages use the business name.
+- [ ] The default sending address and app URL still fall back to the
+      elliesheartstrings.com values when `RESEND_FROM_EMAIL` /
+      `NEXT_PUBLIC_APP_URL` and the Settings fields are empty. A different
+      business must set its own.
+- [ ] Only two business types exist. Others can be added in
+      `lib/businessTypes.js`.
 - [ ] Online payments were tested against a stand-in for Stripe (signed
       webhook events), not a real Stripe account. Make one test payment in
       Stripe test mode before going live.
