@@ -49,11 +49,11 @@ exec 9>"$dir/shared/update.lock"
 flock -n 9 || { log "another update is running"; exit 0; }
 
 log "Checking $BRANCH for a new version"
-as_app git -C "$dir/repo" fetch -q origin "$BRANCH"
-sha="$(as_app git -C "$dir/repo" rev-parse "origin/$BRANCH")"
+git -C "$dir/repo" fetch -q origin "$BRANCH"
+sha="$(git -C "$dir/repo" rev-parse "origin/$BRANCH")"
 # Keep the checkout on the version being deployed, so the next run uses
 # this version's scripts (including this one).
-as_app git -C "$dir/repo" checkout -q -f --detach "$sha"
+git -C "$dir/repo" checkout -q -f --detach "$sha"
 current="$(readlink -f "$dir/current" 2>/dev/null || true)"
 if [ "$force" -eq 0 ] && [ -n "$current" ] && [ -f "$current/.release" ] && [ "$(cat "$current/.release")" = "$sha" ]; then
   log "Already running the latest version (${sha:0:7})."
@@ -76,10 +76,10 @@ fi
 release="$dir/releases/$(date +%Y%m%d%H%M%S)-${sha:0:7}"
 log "Preparing ${sha:0:7} in $release"
 as_app mkdir -p "$release"
-as_app git -C "$dir/repo" archive "$sha" | as_app tar -x -C "$release"
+git -C "$dir/repo" archive "$sha" | as_app tar -x -C "$release"
 echo "$sha" | as_app tee "$release/.release" >/dev/null
 as_app ln -s "$dir/shared/.env.local" "$release/.env.local"
-cleanup_failed() { log "Update failed; the running version was not changed."; rm -rf "$release"; mark_failed; }
+cleanup_failed() { log "Update failed; the live application was not changed."; rm -rf "$release"; mark_failed; }
 trap cleanup_failed ERR
 
 # Reuse the running version's packages when the lock file is unchanged.
@@ -90,15 +90,19 @@ else
   (cd "$release" && as_app npm ci --no-audit --no-fund --loglevel=error)
 fi
 
-log "Applying database updates"
-(cd "$release" && as_app env PIBASE_DIR="$PIBASE_DIR" PIBASE_USER="$PIBASE_USER" PIBASE_BIN="$PIBASE_BIN" node scripts/migrate.mjs "$dir/shared/.env.local")
-
 log "Building"
 (cd "$release" && as_app env NEXT_TELEMETRY_DISABLED=1 npm run build --silent >"$dir/shared/build.log" 2>&1) \
   || { tail -30 "$dir/shared/build.log" >&2; false; }
+
+# Build failures leave the database untouched. Once applied, migrations are
+# intentionally kept on an unhealthy-release rollback: restoring a backup at
+# this point could discard writes made by the still-running old application.
+# Every new migration must therefore remain compatible with the old release.
+log "Applying database updates"
+(cd "$release" && as_app env PIBASE_DIR="$PIBASE_DIR" PIBASE_USER="$PIBASE_USER" PIBASE_BIN="$PIBASE_BIN" node scripts/migrate.mjs "$dir/shared/.env.local")
 trap - ERR
 
-switch_to() { as_app ln -sfn "$1" "$dir/current.next" && as_app mv -T "$dir/current.next" "$dir/current"; }
+switch_to() { ln -sfn "$1" "$dir/current.next" && mv -T "$dir/current.next" "$dir/current"; }
 restart() {
   if [ "$SYSTEMD" = 1 ]; then systemctl restart "manager-$name"; return; fi
   # Without systemd (containers, test machines): keep the app as a background process.

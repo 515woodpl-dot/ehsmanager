@@ -14,7 +14,7 @@
 # and --domain; ports are picked automatically.
 #
 # What it does (safe to run again; finished steps are kept):
-#   1. installs Node.js 22 if needed, and a "manager" account that runs the apps
+#   1. installs Node.js 22 if needed, and a separate account for this company
 #   2. clones the app into /srv/manager/<name>
 #   3. creates the company's own PIBASE project and stores its keys
 #   4. writes the app's settings with fresh random secrets
@@ -75,7 +75,11 @@ case "$business_type" in photography|webdesign|creative) ;; *) die "--business-t
 
 base="${MANAGER_BASE:-/srv/manager}"
 dir="$base/$name"
-app_user="${MANAGER_USER:-manager}"; [ "$system" -eq 1 ] || app_user="$(id -un)"
+# Unix account names have a practical 32-character limit on Ubuntu. Keep the
+# readable name for short company ids and use a stable hash for longer ones.
+app_user="manager-$name"
+if [ "${#app_user}" -gt 31 ]; then app_user="manager-$(printf '%s' "$name" | sha256sum | cut -c1-16)"; fi
+[ "$system" -eq 1 ] || app_user="$(id -un)"
 url="https://$domain"; [ -n "$domain" ] || url=""
 
 # 1. Node.js and the account that runs the apps.
@@ -89,19 +93,32 @@ if [ "$system" -eq 1 ]; then
   fi
   command -v git >/dev/null || apt-get install -y -q git >/dev/null
   id "$app_user" >/dev/null 2>&1 || useradd --system --create-home --home-dir "/home/$app_user" --shell /usr/sbin/nologin "$app_user"
-  install -d -m 0755 -o "$app_user" -g "$app_user" "$base"
+  install -d -m 0755 -o root -g root "$base"
 fi
 as_app() { if [ "$(id -un)" = "$app_user" ]; then "$@"; else sudo -u "$app_user" -H "$@"; fi; }
-as_app mkdir -p "$dir/shared" "$dir/releases"
-chmod 0750 "$dir/shared"
+if [ "$system" -eq 1 ]; then
+  # Existing installs used one shared manager account. Move every file to this
+  # company's account before starting it under the new service identity.
+  if [ -d "$dir" ]; then
+    if [ -f "/etc/systemd/system/manager-$name.service" ]; then systemctl stop "manager-$name.service"; fi
+    chown -R "$app_user:$app_user" "$dir"
+  fi
+  install -d -m 0755 -o root -g root "$dir"
+  install -d -m 0700 -o "$app_user" -g "$app_user" "$dir/shared"
+  install -d -m 0750 -o "$app_user" -g "$app_user" "$dir/releases"
+else
+  as_app mkdir -p "$dir/shared" "$dir/releases"
+  chmod 0700 "$dir/shared"
+fi
 
 # 2. The app's code.
 if [ -d "$dir/repo/.git" ]; then
   say "Using the existing copy of the app"
-  as_app git -C "$dir/repo" remote set-url origin "$repo"
+  if [ "$system" -eq 1 ]; then chown -R root:root "$dir/repo"; fi
+  git -C "$dir/repo" remote set-url origin "$repo"
 else
   say "Getting the app from $repo"
-  as_app git clone -q --branch "$branch" "$repo" "$dir/repo"
+  git clone -q --branch "$branch" "$repo" "$dir/repo"
 fi
 
 # Settings for this install, read by update.sh.
@@ -129,7 +146,8 @@ if [ ! -s "$project_file" ]; then
     || die "PIBASE did not return the new project's keys"
   mv "$project_file.tmp" "$project_file"
 fi
-chmod 0600 "$project_file"; chown "$app_user" "$project_file" 2>/dev/null || true
+chmod 0600 "$project_file"
+[ "$system" -eq 0 ] || chown root:root "$project_file"
 field() { node -e 'console.log(JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"))[process.argv[2]])' "$project_file" "$1"; }
 project_id="$(field id)"
 
@@ -146,6 +164,8 @@ PIBASE_USER=$pibase_user
 PIBASE_BIN=${PIBASE_BIN:-}
 EOF
 mv "$dir/shared/instance.env.tmp" "$dir/shared/instance.env"
+chmod 0600 "$dir/shared/instance.env"
+[ "$system" -eq 0 ] || chown root:root "$dir/shared/instance.env"
 
 # 4. The app's settings. Secrets are made once and kept on later runs.
 env_file="$dir/shared/.env.local"
@@ -184,7 +204,10 @@ owner="$(cd "$dir/current" && as_app node --no-warnings scripts/provision.mjs --
   --password-file "$dir/shared/owner-login.txt")"
 owner_id="$(printf '%s' "$owner" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>console.log(JSON.parse(s).userId))')"
 setting STUDIO_OWNER_USER_ID "$owner_id"
-[ ! -f "$dir/shared/owner-login.txt" ] || chmod 0600 "$dir/shared/owner-login.txt"
+if [ -f "$dir/shared/owner-login.txt" ]; then
+  chmod 0600 "$dir/shared/owner-login.txt"
+  [ "$system" -eq 0 ] || chown root:root "$dir/shared/owner-login.txt"
+fi
 
 # 7. Run it.
 if [ "$system" -eq 1 ]; then

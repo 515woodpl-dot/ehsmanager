@@ -61,12 +61,17 @@ With `--auto-update`, every night between 04:30 and 05:15 the server runs
 
 1. stops at once if the company already runs the latest version;
 2. backs up the company's PIBASE project;
-3. builds the new version in its own folder (`releases/`), installs packages
-   and applies new database updates (`scripts/migrate.mjs`);
+3. builds the new version in its own folder (`releases/`), then applies new
+   database updates (`scripts/migrate.mjs`);
 4. switches to it, restarts, and checks `/api/heartbeat`;
-5. if the new version doesn't build or doesn't answer healthy, keeps or puts
-   back the previous version, and skips that version on later nights until a
-   newer one arrives.
+5. if the build fails, leaves the database and live application untouched; if
+   the new version doesn't answer healthy, puts back the previous application
+   version and skips that version on later nights until a newer one arrives.
+
+The database is **not** restored on an unhealthy-release rollback. Restoring a
+pre-update backup could discard writes made while the previous application
+continued running. Migrations must be compatible with both the previous and
+new application versions; remove old schema only in a later release.
 
 Run it by hand any time (`--force` to rebuild the same version, `--no-backup`
 to skip the backup). A health check every 10 minutes restarts the app if it stops
@@ -82,7 +87,8 @@ new number instead. A new project gets `pibase-schema.sql` first.
 |---|---|
 | App versions | `/srv/manager/<name>/releases/`, live one at `current` |
 | Settings and secrets | `/srv/manager/<name>/shared/.env.local` (mode 600) |
-| PIBASE project keys | `/srv/manager/<name>/shared/pibase-project.json` |
+| PIBASE project keys | `/srv/manager/<name>/shared/pibase-project.json` (root-owned, mode 600) |
+| First owner password | `/srv/manager/<name>/shared/owner-login.txt` (root-owned, mode 600) |
 | Install settings | `/srv/manager/<name>/shared/instance.env` |
 | Logs | `journalctl -u manager-<name>`, build log in `shared/build.log` |
 | HTTPS site | `/etc/caddy/pibase.d/manager-<name>.caddy` |

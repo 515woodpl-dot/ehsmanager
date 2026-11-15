@@ -70,35 +70,33 @@ apt-get update && apt-get -y upgrade && apt-get install -y git curl
 The server pulls both repositories, at install and at every update, so give it
 **read-only deploy keys**.
 
-PIBASE runs as the `pibase` account and the managers as the `manager` account.
-Create the accounts first, then a key for each:
+PIBASE runs as the `pibase` account. The manager installer creates a separate
+unprivileged account for each company. Root fetches the manager code at install
+and update time, so only root needs the manager repository's deploy key.
+Create the PIBASE account first, then a key for root and PIBASE:
 
 ```bash
 useradd --create-home --shell /bin/bash pibase
 ```
 
 ```bash
-useradd --system --create-home --home-dir /home/manager --shell /usr/sbin/nologin manager
+for u in root pibase; do h=$(eval echo ~$u); install -d -m 700 -o $u -g $u $h/.ssh; sudo -u $u ssh-keygen -q -t ed25519 -N "" -f $h/.ssh/id_ed25519 -C "$u@$(hostname)"; done
 ```
 
 ```bash
-for u in root pibase manager; do h=$(eval echo ~$u); install -d -m 700 -o $u -g $u $h/.ssh; sudo -u $u ssh-keygen -q -t ed25519 -N "" -f $h/.ssh/id_ed25519 -C "$u@$(hostname)"; done
-```
-
-```bash
-for u in root pibase manager; do echo "== $u"; cat $(eval echo ~$u)/.ssh/id_ed25519.pub; done
+for u in root pibase; do echo "== $u"; cat $(eval echo ~$u)/.ssh/id_ed25519.pub; done
 ```
 
 In GitHub, open each repository's **Settings → Deploy keys → Add deploy key**:
 
 - `515woodpl-dot/pibase`: add the **root** and **pibase** keys
-- `515woodpl-dot/ehsmanager`: add the **root** and **manager** keys
+- `515woodpl-dot/ehsmanager`: add the **root** key
 
 Leave "Allow write access" off. Then accept GitHub's host key for each
 account:
 
 ```bash
-for u in root pibase manager; do sudo -u $u ssh -o StrictHostKeyChecking=accept-new -T git@github.com; done
+for u in root pibase; do sudo -u $u ssh -o StrictHostKeyChecking=accept-new -T git@github.com; done
 ```
 
 Each line should say "successfully authenticated". From here on use the
@@ -179,7 +177,7 @@ The installer:
 5. builds the app and applies the database schema;
 6. creates the **owner's account, already confirmed**, with a random password,
    and fills in the business name, type, pipeline stages and lists;
-7. runs it as the service `manager-acme`, adds the HTTPS site to Caddy, and
+7. runs it as the service `manager-acme` under its own Unix account, adds the HTTPS site to Caddy, and
    checks it answers healthy.
 
 At the end it prints a summary. **The owner's first password** is in:
@@ -188,7 +186,9 @@ At the end it prints a summary. **The owner's first password** is in:
 cat /srv/manager/acme/shared/owner-login.txt
 ```
 
-Send it to the owner securely; they can change it later. Running the same
+The file is owned by root with mode 600. Each company's `.env.local` is readable
+only by its own runtime account and root; its project-key file is root-only.
+Send the password to the owner securely; they can change it later. Running the same
 install command again is safe: it keeps the project, the secrets and the owner.
 
 **Another company on the same server:** repeat step 1 (its DNS) and step 5
@@ -239,10 +239,17 @@ Under **Settings** (all optional, add them when ready):
 (04:30–05:15) for a new version of its branch. When there is one, it:
 
 1. backs up the company's PIBASE project;
-2. builds the new version in its own folder and applies new database updates;
+2. builds the new version in its own folder, then applies new database updates;
 3. switches over and checks it answers healthy;
-4. if the build fails or the new version isn't healthy, keeps or restores the
-   previous version, and skips that version until a newer one arrives.
+4. if the build fails, leaves the database and running version untouched; if
+   the new version isn't healthy, restores the previous application version
+   and skips that version until a newer one arrives.
+
+Database migrations are **not** rolled back after an unhealthy new version:
+restoring the pre-update database would lose writes made by the previous app
+while the update ran. Every new migration must work with both the previous and
+new app versions. Make breaking schema changes in a later release, after all
+companies have moved to code that no longer uses the old schema.
 
 To update now, or without `--auto-update`:
 
@@ -317,6 +324,12 @@ with pm2), keep its PIBASE project, secrets and owner:
    finds the existing owner and leaves their password and profile alone, and
    applies only the database updates the project is missing.
 4. Remove the old site from your web server configuration, if it had one.
+
+For companies already installed by an earlier version of `scripts/install.sh`,
+rerun the updated install command for **every** company during a maintenance
+window. The installer stops each old service, moves its files to a dedicated
+account, and restarts it. Do not leave any company on the old shared `manager`
+account. Verify each service and its ownership after the rerun.
 
 ---
 
