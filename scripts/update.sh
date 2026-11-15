@@ -99,7 +99,10 @@ log "Building"
 # this point could discard writes made by the still-running old application.
 # Every new migration must therefore remain compatible with the old release.
 log "Applying database updates"
-(cd "$release" && as_app env PIBASE_DIR="$PIBASE_DIR" PIBASE_USER="$PIBASE_USER" PIBASE_BIN="$PIBASE_BIN" node scripts/migrate.mjs "$dir/shared/.env.local")
+# PIBASE migrations need operator access. Use the root-owned checkout at the
+# target commit, not the app-writable release, so tenant code cannot replace
+# the script that runs with deployment privileges.
+(cd "$dir/repo" && env PIBASE_DIR="$PIBASE_DIR" PIBASE_USER="$PIBASE_USER" PIBASE_BIN="$PIBASE_BIN" node scripts/migrate.mjs "$dir/shared/.env.local")
 trap - ERR
 
 switch_to() { ln -sfn "$1" "$dir/current.next" && mv -T "$dir/current.next" "$dir/current"; }
