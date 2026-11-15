@@ -5,6 +5,63 @@ every round of changes, and keep the "Open / follow-ups" list current.
 
 ---
 
+## 2026-11-15 (round 16) — Digital creative studio and the modular Creative Services Agreement
+
+### ⚠️ Before using
+- [ ] No database migration needed.
+- [ ] To use it: Settings → Business profile → Type of business →
+      **Digital creative studio**. New accounts can pick it on sign-up.
+- [ ] Have a lawyer review the agreement, including the new branding and
+      video / social media sections, before relying on it.
+
+### Digital creative studio (new business type)
+- [x] Covers web design and development, photography, branding and graphic
+      design, and video and social media content.
+- [x] Wording: Services, Bookings, Project type, Start date. The tagline
+      reads "Creative Studio CRM".
+- [x] Starting lists: project types (Website, Photography, Branding & Logo,
+      Graphic Design, Video, Social Media Content, Website + Photography,
+      Full Brand Package), stages (Inquiry → Signed → Discovery → In
+      production → Client review → Delivered), contact form options, starter
+      questionnaire, quick replies, booking reminder text.
+- [x] Sample services for the booking page: Discovery Call, Starter /
+      Business Website, Brand Photo Shoot, Product Photography, Logo & Brand
+      Identity, Promo Video, Social Media Content (monthly), Website +
+      Photography Package. Booking page copy: "Web · Photo · Brand · Video".
+
+### Creative Services Agreement (one modular agreement)
+- [x] New default agreement for the creative studio, also offered to every
+      business type. At the top, **Services in this agreement**: tick web,
+      photography, branding, video & social.
+- [x] Only the ticked services appear: their own section, their fee line,
+      their timeline phases, revision rounds, ownership clauses, hosting and
+      maintenance (web), shoot cancellation and equipment clauses (photo or
+      video). Section numbers and "see Section N" references follow.
+- [x] Web and photography sections keep your web + photography agreement's
+      wording. New, in the same style: **Branding** (logo concepts → one
+      final logo, brand guide, other design items, files, client owns the
+      final logo after payment) and **Video & social media content** (videos
+      with length, filming hours, formats and delivery; and/or posts per
+      month, months, platforms, monthly content calendar approval, what's not
+      included such as ad spend).
+- [x] Fees add up per ticked service; deposit / first approval / final
+      payments are worked out in dollars.
+- [x] Services are pre-ticked from the client's project type (e.g. "Website +
+      Photography"). Saving is blocked with no service ticked, with required
+      details empty, or when a video & social section has neither videos nor
+      posts.
+- [x] The separate web + photography agreement is no longer offered for new
+      contracts. Contracts already written with it still open and edit.
+
+### Verified
+- [x] Switched the test business to Digital creative studio: wording and
+      stages changed.
+- [x] Wrote and saved four agreements: web + photo (13 sections), branding
+      only (11), social media only (11), all four services (15). Sections
+      numbered in order, nothing left as [blank], fees and payments correct.
+- [x] Saving blocked with no service ticked; the earlier web + photography
+      contract still opens with its values.
+
 ## 2026-11-15 (round 15) — Fixes from the bug-hunter agent
 
 ### ⚠️ Before using

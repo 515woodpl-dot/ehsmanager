@@ -49,7 +49,14 @@ lets you pick another. A saved contract remembers its agreement in
 The combined agreement lives in `lib/webPhotoContract.js`: the template, its
 field list (`WEB_PHOTO_SECTIONS`, rendered generically by the builder) and
 `webPhotoValues()` (fees, optional clauses, highlights, missing details). To
-change the wording or add a detail, edit that one file. The business name in the
+change the wording or add a detail, edit that one file.
+
+The Creative Services Agreement (`creative`, default for the Digital creative
+studio type) is generated, not a fixed template: `lib/creativeContract.js`
+builds the text from the ticked services (`fields.services`), numbering
+sections as it goes. Fields carry a `service` so the builder shows and
+requires only the ones that apply. `webphoto` is `retired`: not offered for
+new contracts, still editable. The business name in the
 agreement is the `{{businessName}}` field, filled from the business profile.
 
 Internal names stay as they were (`bookings`, `session_catalog`,
