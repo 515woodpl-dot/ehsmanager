@@ -236,7 +236,7 @@ export default function Settings({ toast = () => {}, data = null, setData = () =
   const applyBusinessProfile = saved => {
     const from = data?.businessType || 'photography'
     const to = saved.businessType
-    const profile = { businessName: saved.businessName || '', studioEmail: saved.studioEmail || '', address: saved.address || '', ownerName: saved.ownerName || '' }
+    const profile = { businessName: saved.businessName || '', studioEmail: saved.studioEmail || '', address: saved.address || '', phone: saved.phone || '', ownerName: saved.ownerName || '' }
     if (!data || from === to) { setData(d => ({ ...d, branding: profile, businessTypeSaved: true })); return }
     const before = businessDefaults(from), after = businessDefaults(to)
     const same = (a, b) => JSON.stringify(a) === JSON.stringify(b)

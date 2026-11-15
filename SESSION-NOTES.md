@@ -41,9 +41,15 @@ their API (`/api/public-booking`, `/api/public-form`). Don't hard-code
 "session", "photography" or a business name in new UI or emails. Add it to
 the presets instead.
 
-Contracts: `contractTemplateFor(type)` in `lib/contractTemplate.js` picks the
-photography or web design agreement. A saved contract remembers its template
-in `fields.template` and keeps it when reopened. The business name in the
+Contracts: `AGREEMENTS` in `lib/contractTemplate.js` lists the agreements
+(`photography`, `webdesign`, `webphoto`); `contractTemplateFor(key)` returns the
+text. A new contract starts with the one for the business type and the builder
+lets you pick another. A saved contract remembers its agreement in
+`fields.agreement` (older ones: `fields.template`) and keeps it when reopened.
+The combined agreement lives in `lib/webPhotoContract.js`: the template, its
+field list (`WEB_PHOTO_SECTIONS`, rendered generically by the builder) and
+`webPhotoValues()` (fees, optional clauses, highlights, missing details). To
+change the wording or add a detail, edit that one file. The business name in the
 agreement is the `{{businessName}}` field, filled from the business profile.
 
 Internal names stay as they were (`bookings`, `session_catalog`,

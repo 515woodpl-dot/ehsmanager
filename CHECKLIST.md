@@ -5,6 +5,59 @@ every round of changes, and keep the "Open / follow-ups" list current.
 
 ---
 
+## 2026-11-15 (round 12) — Web design + photography agreement
+
+### ⚠️ Before using
+- [ ] No database migration needed.
+- [ ] The agreement is your template as written. Have a lawyer review it
+      (liability, copyright, governing law) before relying on it.
+
+### What's new
+- [x] **Web Design, Development & Photography Services Agreement** is now a
+      third agreement in the contract builder. Pick it in the new
+      **Agreement** list when you create a contract (Photography, Website
+      design, or Web design + photography). Every business type can use it.
+- [x] Every [bracketed] item in your template is a field, grouped as Project,
+      Web design and development, Photography, Timeline, Fees and payment,
+      Responsibilities and revisions, Ownership/hosting/maintenance, and
+      Confidentiality/termination/law. Dates, counts, percentages and rates
+      you had in brackets start with your values (40/30/30 payments, 7 / 14 /
+      30 days, 72 hours, 50%, 1.5% interest…) and can be changed per client.
+- [x] **Fees are calculated**: web fee + photography fee = total, with the
+      deposit, design-approval and final payments worked out in dollars. The
+      final payment is the remainder, so the three always add up. The form
+      warns if the percentages go over 100%.
+- [x] **Optional clauses** appear only when filled in: copyright transfer fee,
+      credit-line removal fee, hosting by you, maintenance plan fee.
+- [x] **Required details** (marked *) must be filled in before saving: the
+      contract can't be saved with a [bracket] left in it. The preview shows
+      anything still missing as [Label].
+- [x] Filled-in details are highlighted for the client, like the other
+      agreements. Provider details come from Settings (name, email, address,
+      phone), client details from the client record, the first fee from the
+      client's invoice, the shoot location and date from their meeting.
+- [x] Saved agreements reopen as the same agreement with the same values.
+- [x] Business phone from Settings is now available to contracts.
+
+### How your template was adapted
+- [x] The dated heading line ("Nov 13, 2026") and the closing "template is a
+      starting point, not legal advice" note were left out of the contract
+      itself; the agreement shows the date it is made on.
+- [x] The phase and fee tables became bulleted lists, and numbered lists in
+      sections 3 and 8 became 3.1–3.9 and 8.1–8.6, because agreements are
+      stored as plain text.
+- [x] Section 13 is headed "Acceptance" with the sentence "By signing, both
+      parties agree…", followed by the app's signature block (draw or type,
+      both parties), which replaces the Name / Title / Signature / Date table.
+
+### Verified
+- [x] Created, saved, reopened and viewed as the client: all values, fee
+      math ($5,700 → $2,280 / $1,710 / $1,710), optional hosting clause shown
+      and unused optional clauses hidden, no leftover brackets, signing page
+      and signature block.
+- [x] Saving is blocked, with a list of what's missing, until required
+      details are filled in.
+
 ## 2026-11-15 (round 11) — No built-in studio domain
 
 ### ⚠️ Before deploying
@@ -776,7 +829,7 @@ every round of changes, and keep the "Open / follow-ups" list current.
 ---
 
 ## Open / follow-ups
-- [ ] Have a lawyer review the web design agreement template.
+- [ ] Have a lawyer review the web design agreements (both templates).
 - [ ] Existing session types / services stay as they are when the type of
       business changes (they may be on the public booking page). Unpublish or
       delete the ones that no longer apply.

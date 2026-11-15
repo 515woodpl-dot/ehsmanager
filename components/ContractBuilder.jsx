@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react'
 import { T, C } from '../lib/tokens'
-import { contractTemplateFor, fillContract, highlightValues } from '../lib/contractTemplate'
+import { AGREEMENTS, contractTemplateFor, fillContract, highlightValues } from '../lib/contractTemplate'
+import { WEB_PHOTO_SECTIONS, webPhotoDefaults, webPhotoValues } from '../lib/webPhotoContract'
 import { businessTerms, useTerms } from '../lib/businessTypes'
 import ContractDocument from './ContractDocument'
 
@@ -44,16 +45,19 @@ function pickInvoice(invoices = [], c) {
 }
 
 const isWeb = terms => terms.id === 'webdesign'
+// The wording (meeting / session…) for an agreement: the combined web design
+// and photography agreement reads as a web design project.
+const termsFor = agreement => businessTerms(agreement === 'photography' ? 'photography' : 'webdesign')
 
 // Build the full field set for a client (or blank defaults)
-function buildFields(c, data, terms) {
+function buildFields(c, data, terms, agreement) {
   const booking = c ? pickBooking(data?.bookings, c) : null
   const invoice = c ? pickInvoice(data?.invoices, c) : null
   const sessionType = booking ? (data?.sessionCatalog || []).find(item => item.id === booking.sessionTypeId || item.name === booking.type) : null
   const today = new Date().toISOString().slice(0, 10)
   return {
     fields: {
-      contractTitle: terms.contractTitle,
+      contractTitle: AGREEMENTS[agreement]?.title || terms.contractTitle,
       businessName: data?.branding?.businessName || '',
       effectiveDate: today,
       clientName: c?.name || '',
@@ -71,7 +75,9 @@ function buildFields(c, data, terms) {
       projectScope: '',
       websiteAddress: '',
       // Which agreement this is, so reopening it keeps the same wording.
-      template: terms.id,
+      template: agreement,
+      agreement,
+      ...(agreement === 'webphoto' ? webPhotoDefaults({ client: c, booking, invoice, branding: data?.branding }) : {}),
       headerImageUrl: sessionType?.imageUrl || '',
     },
     sources: { booking, invoice },
@@ -83,10 +89,12 @@ export default function ContractBuilder({ client, contract = null, data, onSave,
   // A saved contract keeps the agreement it was written with (contracts from
   // before business types are photography agreements).
   const currentTerms = useTerms()
-  const terms = contract?.fields ? businessTerms(contract.fields.template || 'photography') : currentTerms
+  const [agreement, setAgreement] = useState(contract?.fields ? (AGREEMENTS[contract.fields.agreement] ? contract.fields.agreement : AGREEMENTS[contract.fields.template] ? contract.fields.template : 'photography') : currentTerms.id)
+  const terms = termsFor(agreement)
   const web = isWeb(terms)
-  const built = buildFields(client, data, terms)
-  const initial = contract?.fields ? { fields: { ...built.fields, ...contract.fields, template: terms.id }, sources: built.sources } : built
+  const wp = agreement === 'webphoto'
+  const built = buildFields(client, data, terms, agreement)
+  const initial = contract?.fields ? { fields: { ...built.fields, ...contract.fields, template: agreement, agreement }, sources: built.sources } : built
   const [selectedClientId, setSelectedClientId] = useState(client?.id || '')
   const [fields, setFields] = useState(initial.fields)
   const [sources, setSources] = useState(initial.sources)
@@ -101,10 +109,18 @@ export default function ContractBuilder({ client, contract = null, data, onSave,
     if (touched && !confirm('Switching client will refill the form and overwrite your edits. Continue?')) return
     setSelectedClientId(id)
     const c = data?.clients?.find(x => x.id === id) || null
-    const next = buildFields(c, data, terms)
+    const next = buildFields(c, data, terms, agreement)
     setFields(next.fields)
     setSources(next.sources)
     setTouched(false)
+  }
+
+  const chooseAgreement = next => {
+    if (next === agreement) return
+    if (touched && !confirm('Switching the agreement will refill the form and overwrite your edits. Continue?')) return
+    const c = data?.clients?.find(x => x.id === selectedClientId) || null
+    const built = buildFields(c, data, termsFor(next), next)
+    setAgreement(next); setFields(built.fields); setSources(built.sources); setTouched(false)
   }
 
   // Human-readable summary of what auto-filled
@@ -136,7 +152,15 @@ export default function ContractBuilder({ client, contract = null, data, onSave,
     return `${hr % 12 || 12}:${m} ${hr < 12 ? 'AM' : 'PM'}`
   }
 
-  const contractFields = useMemo(() => ({
+  const wpResult = useMemo(() => wp ? webPhotoValues(fields) : null, [fields, wp])
+  const contractFields = useMemo(() => wp ? {
+    ...wpResult.values,
+    contractTitle: fields.contractTitle || '[Contract Title]',
+    effectiveDate: fmtD(fields.effectiveDate),
+    clientName: fields.clientName || '[Client Name]',
+    businessName: fields.businessName || '[Business Name]',
+    governingState: fields.governingState || '[Governing State]',
+  } : ({
     contractTitle: fields.contractTitle || '[Contract Title]',
     effectiveDate: fmtD(fields.effectiveDate),
     clientName: fields.clientName || '[Client Name]',
@@ -155,14 +179,36 @@ export default function ContractBuilder({ client, contract = null, data, onSave,
     photographerEmail: fields.photographerEmail || `[${terms.provider} Email]`,
     photographerCity: fields.photographerCity || `[${terms.provider} City]`,
     governingState: fields.governingState || '[Governing State]',
-  }), [fields, totalFee, retainerAmt, remainingAmt, terms])
+  }), [fields, totalFee, retainerAmt, remainingAmt, terms, wp, wpResult])
 
-  const previewText = useMemo(() => fillContract(contractTemplateFor(terms.id), contractFields), [contractFields, terms.id])
+  const previewText = useMemo(() => fillContract(contractTemplateFor(agreement), contractFields), [contractFields, agreement])
+  const highlights = wp ? [...wpResult.highlights, fmtD(fields.effectiveDate)] : highlightValues(contractFields)
 
   const save = () => {
     if (fields.headerImageUrl && !/^https:\/\//i.test(fields.headerImageUrl)) {
       alert('Contract header image must use a secure https:// URL, or be left blank.')
       setTab('fields')
+      return
+    }
+    if (wp) {
+      const total = (Number(fields.webFee) || 0) + (Number(fields.photoFee) || 0)
+      const issues = [
+        ...(!activeClient ? ['a client'] : []),
+        ...['clientName', 'clientEmail', 'businessName', 'photographerEmail', 'governingState'].filter(key => !(fields[key] || '').trim()).map(key => ({ clientName: 'the client name', clientEmail: 'the client email', businessName: 'your business name', photographerEmail: 'your business email', governingState: 'the governing state' })[key]),
+        ...wpResult.missing.map(label => label.toLowerCase()),
+        ...(total <= 0 && !wpResult.missing.some(label => /fee/.test(label)) ? ['the fees'] : []),
+      ]
+      if (issues.length || wpResult.problems.length) {
+        alert(`${issues.length ? `Please fill in: ${issues.slice(0, 6).join(', ')}${issues.length > 6 ? ` and ${issues.length - 6} more` : ''}.` : ''}${wpResult.problems.length ? `\n${wpResult.problems.join('. ')}.` : ''}`.trim())
+        setTab('fields')
+        return
+      }
+      onSave({
+        ...(contract || {}), id: contract?.id || uid(), client: fields.clientName || 'Unknown', clientId: activeClient?.id || null, type: fields.contractTitle,
+        sent: contract?.sent || new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+        status: contract?.status || 'pending', body: previewText,
+        fields: { ...(contract?.fields || {}), ...fields, highlights },
+      })
       return
     }
     // A photo session needs a time and place; a web project only a start date.
@@ -181,7 +227,7 @@ export default function ContractBuilder({ client, contract = null, data, onSave,
       sent: contract?.sent || new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
       status: contract?.status || 'pending',
       body: previewText,
-      fields: { ...(contract?.fields || {}), ...fields, highlights: highlightValues(contractFields) },
+      fields: { ...(contract?.fields || {}), ...fields, highlights },
     }
     onSave(k)
   }
@@ -230,6 +276,14 @@ export default function ContractBuilder({ client, contract = null, data, onSave,
             )}
           </div>
 
+          {!contract && (
+            <Field label="Agreement">
+              <select style={inp} value={agreement} onChange={e => chooseAgreement(e.target.value)}>
+                {Object.entries(AGREEMENTS).map(([key, item]) => <option key={key} value={key}>{item.label}</option>)}
+              </select>
+            </Field>
+          )}
+
           {/* Contract title */}
           <Field label="Contract title">
             <input style={inp} value={fields.contractTitle} onChange={e => set('contractTitle', e.target.value)} />
@@ -241,6 +295,7 @@ export default function ContractBuilder({ client, contract = null, data, onSave,
             </div>
           </Field>
 
+          {!wp && <>
           <Section title={web ? 'Project details' : 'Session details'}>
             <div style={row2} className="form-row-2">
               <Field label="Effective date">
@@ -281,6 +336,8 @@ export default function ContractBuilder({ client, contract = null, data, onSave,
             )}
           </Section>
 
+          </>}
+
           <Section title="Client information">
             <div style={row2} className="form-row-2">
               <Field label="Client full name">
@@ -292,6 +349,7 @@ export default function ContractBuilder({ client, contract = null, data, onSave,
             </div>
           </Section>
 
+          {!wp && (
           <Section title="Fees and payment">
             <div style={row2} className="form-row-2">
               <Field label="Total fee ($)">
@@ -314,6 +372,7 @@ export default function ContractBuilder({ client, contract = null, data, onSave,
               <input style={{ ...inp, maxWidth: 300 }} type="text" value={fields.remainingDueDate} onChange={e => set('remainingDueDate', e.target.value)} />
             </Field>
           </Section>
+          )}
 
           <Section title="Your business and terms">
             <div style={row2} className="form-row-2">
@@ -333,10 +392,30 @@ export default function ContractBuilder({ client, contract = null, data, onSave,
               </Field>
             </div>
           </Section>
+          {wp && WEB_PHOTO_SECTIONS.map(section => (
+            <Section key={section.title} title={section.title}>
+              <div style={row2} className="form-row-2">
+                {section.fields.map(field => {
+                  const value = fields[field.key] ?? ''
+                  const empty = !String(value).trim()
+                  return (
+                    <Field key={field.key} label={field.label + (field.required ? ' *' : '')}>
+                      {field.type === 'textarea'
+                        ? <textarea style={{ ...inp, resize: 'vertical' }} rows={3} value={value} placeholder={field.placeholder} onChange={e => set(field.key, e.target.value)} />
+                        : <input style={{ ...inp, ...(field.required && empty ? { borderColor: C.amber } : {}) }} type={field.type === 'number' ? 'number' : field.type === 'date' ? 'date' : 'text'} min={field.type === 'number' ? 0 : undefined} step={field.type === 'number' ? 'any' : undefined} value={value} placeholder={field.placeholder} onChange={e => set(field.key, e.target.value)} />}
+                      {field.hint && <div style={{ fontSize: 11, color: C.faint, marginTop: 4 }}>{field.hint}</div>}
+                    </Field>
+                  )
+                })}
+              </div>
+            </Section>
+          ))}
+          {wp && wpResult.problems.length > 0 && <div style={{ fontSize: 12.5, color: C.red, marginBottom: 12 }}>{wpResult.problems.join('. ')}.</div>}
+          {wp && <div style={{ fontSize: 12.5, color: C.muted, marginBottom: 8 }}>Fields marked * are needed before the agreement can be saved. Total {wpResult.values.totalFee} · deposit {wpResult.values.depositAmount} · design approval {wpResult.values.milestoneAmount} · final {wpResult.values.finalAmount}.</div>}
         </div>
       ) : (
         <div style={{ background: C.surface2, borderRadius: 10, padding: 12, border: `1px solid ${C.border}`, maxHeight: '65vh', overflowY: 'auto' }}>
-          <ContractDocument body={previewText} headerImageUrl={fields.headerImageUrl} highlights={highlightValues(contractFields)} />
+          <ContractDocument body={previewText} headerImageUrl={fields.headerImageUrl} highlights={highlights} />
         </div>
       )}
 
