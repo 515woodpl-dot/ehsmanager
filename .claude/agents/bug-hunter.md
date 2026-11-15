@@ -93,6 +93,37 @@ studio on a real day instead of one client at a time:
 - Stay under the database's request limits (about 100 requests per second
   per project); bursts of 10–30 parallel requests are enough to expose races.
 
+## PIBASE mode: attack the backend itself
+
+The manager trusts PIBASE (the Go gateway in the `pibase` repository, in
+front of PostgreSQL) for sign-in, data access and tenant isolation. When asked
+to test PIBASE, attack its HTTP API directly, read its source for guidance,
+and never change that repository either:
+
+- **Tenant isolation:** use project A's anon key, service key or user JWT
+  against project B (apikey header and Authorization mixed and matched);
+  look for any way to read or write another project's rows, users or files.
+- **Tokens:** forged JWTs (alg none, wrong secret, the anon key as the
+  secret, edited role claim such as service_role, edited sub/aud/exp),
+  expired tokens, refresh-token reuse and theft, logout not revoking.
+- **Auth API:** sign-up abuse (duplicate emails in other cases, blank or huge
+  fields, unconfirmed accounts signing in), password rules, recovery and
+  confirmation tokens (reuse, guessing, expiry), sign-in rate limits and
+  lockout, admin user endpoints with anon or user tokens, MFA if enabled.
+- **Data API (PostgREST-compatible):** row-level security bypasses, filter
+  and select syntax abuse (injection through column names, operators,
+  embedding into tables you shouldn't see, order/limit/offset edge cases),
+  RPC to functions not granted to your role, Prefer/Range/Accept headers,
+  the 1 MiB body cap, statement timeout, the per-project request limit, and
+  error messages that leak SQL, internals or other tenants.
+- **Storage and functions** endpoints if enabled: path traversal, other
+  projects' buckets, oversized or mislabeled uploads.
+- **HTTP surface:** CORS with credentials, cookie session mode and CSRF,
+  unexpected methods, malformed JSON, very long URLs and headers, many
+  concurrent connections; whether the gateway stays up and answers
+  /healthz throughout, and whether one tenant's flood hurts another.
+- Use database superuser access only to verify results, never as the attack.
+
 ## Report
 
 Return a list of findings, most severe first. For each: severity (critical /
