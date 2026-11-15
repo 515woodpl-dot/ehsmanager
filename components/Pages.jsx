@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { T, C } from '../lib/tokens'
 import { pibase } from '../lib/pibase'
 import { Modal, Badge, Avatar, SearchBar } from './UI'
+import { useTerms } from '../lib/businessTypes'
 import { InvoiceModal, RecordPaymentModal, SendInvoiceModal } from './InvoiceModals'
 import { invoiceLabel, nextInstallment, paymentSchedule } from '../lib/invoices'
 import { docTone } from '../lib/documents'
@@ -14,6 +15,7 @@ const todayLabel = () => new Date().toLocaleDateString('en-US', { weekday: 'long
 const fmt$ = n => '$' + Number(n || 0).toLocaleString()
 
 function MiniCalendar({ bookings, onOpen }) {
+  const terms = useTerms()
   const now = new Date(), year = now.getFullYear(), month = now.getMonth()
   const first = new Date(year, month, 1).getDay(), days = new Date(year, month + 1, 0).getDate()
   const dateFor = day => `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
@@ -24,12 +26,13 @@ function MiniCalendar({ bookings, onOpen }) {
       {Array(first).fill(null).map((_, index) => <span key={`blank-${index}`} />)}
       {Array.from({ length: days }, (_, index) => index + 1).map(day => { const count = bookings.filter(item => item.date === dateFor(day) && item.status !== 'canceled').length; return <button key={day} className={`${dateFor(day) === new Date().toLocaleDateString('en-CA') ? 'today' : ''} ${count ? 'booked' : ''}`} onClick={onOpen}>{day}{count > 0 && <i>{count}</i>}</button> })}
     </div>
-    <div className="mini-calendar-next">{next ? <><small>Next session</small><strong>{next.client}</strong><span>{fmtDate(next.date)} · {fmtTime(next.time)}</span></> : <span>No upcoming sessions</span>}</div>
+    <div className="mini-calendar-next">{next ? <><small>Next {terms.sessionLower}</small><strong>{next.client}</strong><span>{fmtDate(next.date)} · {fmtTime(next.time)}</span></> : <span>No upcoming {terms.sessionsLower}</span>}</div>
   </div>
 }
 
 // ── Dashboard ─────────────────────────────────────────────────────
 export function Dashboard({ data, setView, openClientCard }) {
+  const terms = useTerms()
   const totalRevenue = data.invoices.reduce((s, i) => s + i.paid, 0)
   const outstanding = data.invoices.reduce((s, i) => s + (i.amount - i.paid), 0)
   const active = data.clients.filter(c => !c.archived && c.status !== 'done').length
@@ -41,7 +44,7 @@ export function Dashboard({ data, setView, openClientCard }) {
           { label: 'Revenue collected', value: fmt$(totalRevenue), sub: 'all time' },
           { label: 'Outstanding', value: fmt$(outstanding), sub: `${data.invoices.filter(i => i.status !== 'paid').length} invoices` },
           { label: 'Active clients', value: active, sub: `of ${data.clients.filter(c => !c.archived).length} total` },
-          { label: 'Sessions confirmed', value: upcoming, sub: 'upcoming' },
+          { label: `${terms.sessions} confirmed`, value: upcoming, sub: 'upcoming' },
         ].map((m, i) => (
           <button key={m.label} className="dashboard-metric-card" onClick={() => setView(i === 0 || i === 1 ? 'invoices' : i === 2 ? 'clients' : 'sessions')}>
             <div style={T.metricLabel}>{m.label}</div>
@@ -71,7 +74,7 @@ export function Dashboard({ data, setView, openClientCard }) {
         </div>
         <div style={T.card}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
-            <div style={{ fontWeight: 500, fontSize: 14 }}>Upcoming sessions</div>
+            <div style={{ fontWeight: 500, fontSize: 14 }}>Upcoming {terms.sessionsLower}</div>
             <button style={{ ...T.btnGhost, color: C.muted, fontSize: 12 }} onClick={() => setView('calendar')}>Calendar</button>
           </div>
           {data.bookings.slice(0, 5).map((b, i, arr) => (
@@ -83,7 +86,7 @@ export function Dashboard({ data, setView, openClientCard }) {
               <Badge type={b.status} label={b.status} />
             </div>
           ))}
-          {data.bookings.length === 0 && <div style={{ textAlign: 'center', padding: '24px 0', color: C.faint, fontSize: 13 }}>No sessions yet</div>}
+          {data.bookings.length === 0 && <div style={{ textAlign: 'center', padding: '24px 0', color: C.faint, fontSize: 13 }}>No {terms.sessionsLower} yet</div>}
         </div>
         <MiniCalendar bookings={data.bookings} onOpen={() => setView('calendar')} />
       </div>
@@ -122,6 +125,7 @@ const sessionTypePastels = ['#E8D7CF', '#D8E7DD', '#E8E0C8', '#DCE2F3', '#E7DDF0
 
 // ── Analytics ─────────────────────────────────────────────────────
 export function Analytics({ data }) {
+  const terms = useTerms()
   const canvasRef = useRef(); const barRef = useRef(); const typeRef = useRef()
 
   // Compute real data outside effect so we can use it in deps
@@ -241,8 +245,8 @@ export function Analytics({ data }) {
         ))}
       </div>
       <div style={{ ...T.cardSm, marginBottom: 16, display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'center' }}>
-        <div><strong>{upcomingThirty}</strong> session{upcomingThirty === 1 ? '' : 's'} scheduled in the next 30 days</div>
-        <div style={{ color: C.muted, fontSize: 12 }}>{activeClients.length} active clients · {data.bookings.filter(b => b.status === 'canceled').length} canceled sessions</div>
+        <div><strong>{upcomingThirty}</strong> {upcomingThirty === 1 ? terms.sessionLower : terms.sessionsLower} scheduled in the next 30 days</div>
+        <div style={{ color: C.muted, fontSize: 12 }}>{activeClients.length} active clients · {data.bookings.filter(b => b.status === 'canceled').length} canceled {terms.sessionsLower}</div>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: 16, marginBottom: 16 }} className="two-col-grid">
         <div style={T.card}>
@@ -258,7 +262,7 @@ export function Analytics({ data }) {
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 16 }} className="two-col-grid">
         <div style={T.card}>
-          <div style={{ fontWeight: 500, fontSize: 14, marginBottom: 4 }}>Session types</div>
+          <div style={{ fontWeight: 500, fontSize: 14, marginBottom: 4 }}>{terms.typeLabel}s</div>
           <div style={{ fontSize: 12, color: C.muted, marginBottom: 18 }}>Active clients</div>
           <div style={{ height: 200 }}>
             {typeData.length > 0
@@ -291,6 +295,7 @@ export function Analytics({ data }) {
 
 // ── Calendar ──────────────────────────────────────────────────────
 export function Calendar({ data, setData, toast, openClientCard }) {
+  const terms = useTerms()
   const [cursor, setCursor] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1))
   const [modal, setModal] = useState(false)
   const [calView, setCalView] = useState('month')
@@ -299,7 +304,7 @@ export function Calendar({ data, setData, toast, openClientCard }) {
   const [blockStart, setBlockStart] = useState('')
   const [blockEnd, setBlockEnd] = useState('')
   const [filterType, setFilterType] = useState('all')
-  const blank = { client: '', type: data.sessionTypes?.[0] || 'Family', date: '', time: '', location: '', notes: '' }
+  const blank = { client: '', type: data.sessionTypes?.[0] || '', date: '', time: '', location: '', notes: '' }
   const [form, setForm] = useState(blank)
   const y = cursor.getFullYear(), mo = cursor.getMonth()
   const first = new Date(y, mo, 1).getDay(), days = new Date(y, mo + 1, 0).getDate()
@@ -314,11 +319,14 @@ export function Calendar({ data, setData, toast, openClientCard }) {
     if (!client) { toast('Select an existing client'); return }
     if (!form.date || !form.time) { toast('Choose a date and time'); return }
     const start = Number(form.time.slice(0,2)) * 60 + Number(form.time.slice(3,5))
-    if (data.bookings.some(b => { if (b.date !== form.date || !b.time || b.status === 'canceled') return false; const other = Number(b.time.slice(0,2)) * 60 + Number(b.time.slice(3,5)); return start < other + (b.durationMinutes || 60) && start + 60 > other })) { toast('That time overlaps another session'); return }
-    setData(d => ({ ...d, bookings: [...d.bookings, { id: uid(), ...form, clientId: client.id, status: 'pending' }] })); toast('Booking added'); setModal(false); setForm(blank)
+    if (data.bookings.some(b => { if (b.date !== form.date || !b.time || b.status === 'canceled') return false; const other = Number(b.time.slice(0,2)) * 60 + Number(b.time.slice(3,5)); return start < other + (b.durationMinutes || 60) && start + 60 > other })) { toast(`That time overlaps another ${terms.sessionLower}`); return }
+    setData(d => ({ ...d, bookings: [...d.bookings, { id: uid(), ...form, clientId: client.id, status: 'pending' }] })); toast(`${terms.session} added`); setModal(false); setForm(blank)
   }
-  const toggle = id => { setData(d => ({ ...d, bookings: d.bookings.map(b => b.id === id ? { ...b, status: b.status === 'confirmed' ? 'pending' : 'confirmed' } : b) })); toast('Status updated') }
-  const del = id => { if (!confirm('Delete booking?')) return; setData(d => ({ ...d, bookings: d.bookings.filter(b => b.id !== id) })); toast('Deleted') }
+  const toggle = id => {
+    if (data.bookings.find(b => b.id === id)?.status === 'canceled') { toast(`Canceled ${terms.sessionsLower} can't be reopened. Book a new one instead.`); return }
+    setData(d => ({ ...d, bookings: d.bookings.map(b => b.id === id ? { ...b, status: b.status === 'confirmed' ? 'pending' : 'confirmed' } : b) })); toast('Status updated')
+  }
+  const del = id => { if (!confirm(`Delete this ${terms.sessionLower}?`)) return; setData(d => ({ ...d, bookings: d.bookings.filter(b => b.id !== id) })); toast('Deleted') }
   const [sendingReminder, setSendingReminder] = useState(null)
   const sendReminder = async (b) => {
     const client = data.clients.find(c => c.id === b.clientId || c.name === b.client)
@@ -327,11 +335,11 @@ export function Calendar({ data, setData, toast, openClientCard }) {
     try {
       const { data: { session } } = await pibase.auth.getSession()
       const r = await fetch('/api/email-reminder', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token || ''}` }, body: JSON.stringify({ booking: b, clientEmail: client.email, clientName: client.name }) })
-      if (r.ok) { toast('Reminder sent to ' + client.email) } else { toast('Failed to send') }
+      if (r.ok) { toast('Reminder sent to ' + client.email) } else { toast((await r.json().catch(() => null))?.error || 'Failed to send') }
     } catch { toast('Failed to send') }
     setSendingReminder(null)
   }
-  const types = data.sessionTypes || ['Family', 'Maternity', 'Newborn', 'Portrait']
+  const types = [...new Set([...(data.sessionTypes || []), ...(data.sessionCatalog || []).map(item => item.name)])]
   const blocked = data.availability?.blockedDates || []
   const blockedTimes = data.availability?.blockedTimes || []
   const matchesFilter = booking => filterType === 'all' || booking.type === filterType
@@ -353,23 +361,23 @@ export function Calendar({ data, setData, toast, openClientCard }) {
       const end = new Date(start.getTime() + (b.durationMinutes || 60) * 60000)
       const pad = value => String(value).padStart(2, '0')
       const endDate = `${end.getFullYear()}${pad(end.getMonth()+1)}${pad(end.getDate())}T${pad(end.getHours())}${pad(end.getMinutes())}00`
-      return `BEGIN:VEVENT\r\nUID:${b.id}@elliesheartstrings.com\r\nDTSTART;TZID=${data.availability?.timezone || 'America/New_York'}:${dt(b.date,b.time)}\r\nDTEND;TZID=${data.availability?.timezone || 'America/New_York'}:${endDate}\r\nSUMMARY:${escape(`${b.type} - ${b.client}`)}\r\nLOCATION:${escape(b.location)}\r\nEND:VEVENT`
+      return `BEGIN:VEVENT\r\nUID:${b.id}@studio-manager\r\nDTSTART;TZID=${data.availability?.timezone || 'America/New_York'}:${dt(b.date,b.time)}\r\nDTEND;TZID=${data.availability?.timezone || 'America/New_York'}:${endDate}\r\nSUMMARY:${escape([b.type, b.client].filter(Boolean).join(' - '))}\r\nLOCATION:${escape(b.location)}\r\nEND:VEVENT`
     })
-    const file = `BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Ellies Heartstrings//Studio Manager//EN\r\n${events.join('\r\n')}\r\nEND:VCALENDAR\r\n`
+    const file = `BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Local Manager//EN\r\n${events.join('\r\n')}\r\nEND:VCALENDAR\r\n`
     const url = URL.createObjectURL(new Blob([file], { type: 'text/calendar;charset=utf-8' }))
-    const link = document.createElement('a'); link.href = url; link.download = 'ellies-heartstrings-sessions.ics'; link.click(); URL.revokeObjectURL(url)
+    const link = document.createElement('a'); link.href = url; link.download = `${(data.branding?.businessName || 'studio').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'studio'}-${terms.sessionsLower}.ics`; link.click(); URL.revokeObjectURL(url)
   }
   return (
     <div>
       <div style={T.pageHeader} className="page-header-wrap">
-        <div><div style={T.pageTitle}>Calendar</div><div style={T.pageSub}>{data.bookings.length} sessions</div></div>
+        <div><div style={T.pageTitle}>Calendar</div><div style={T.pageSub}>{data.bookings.length} {data.bookings.length === 1 ? terms.sessionLower : terms.sessionsLower}</div></div>
         <div style={{ display: 'flex', gap: 10 }}>
           <button style={T.btnSm} onClick={downloadCalendar}>Calendar Sync (.ics export)</button>
-          <select aria-label="Filter by session type" value={filterType} onChange={e => setFilterType(e.target.value)} style={{ ...T.formInput, width: 150 }}><option value="all">All types</option>{[...new Set(data.bookings.map(b => b.type).filter(Boolean))].map(type => <option key={type} value={type}>{type}</option>)}</select>
+          <select aria-label="Filter by type" value={filterType} onChange={e => setFilterType(e.target.value)} style={{ ...T.formInput, width: 150 }}><option value="all">All types</option>{[...new Set(data.bookings.map(b => b.type).filter(Boolean))].map(type => <option key={type} value={type}>{type}</option>)}</select>
           <div style={{ display: 'inline-flex', background: C.surface2, borderRadius: 8, padding: 3, gap: 2 }}>
             {[['day', 'Day'], ['week', 'Week'], ['month', 'Month'], ['list', 'List']].map(([v, l]) => <button key={v} style={{ padding: '5px 12px', borderRadius: 6, border: 'none', background: calView === v ? C.surface : 'transparent', color: C.text, fontWeight: calView === v ? 500 : 400, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }} onClick={() => setCalView(v)}>{l}</button>)}
           </div>
-          <button style={T.btnPrimary} onClick={() => setModal(true)}>+ New booking</button>
+          <button style={T.btnPrimary} onClick={() => setModal(true)}>+ New {terms.sessionLower}</button>
         </div>
       </div>
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 18, flexWrap: 'wrap' }}><label style={{ fontSize: 13, color: C.muted }}>Block Off Time</label><input aria-label="Block date" type="date" value={blockDate} onChange={e => setBlockDate(e.target.value)} style={{ ...T.formInput, width: 170 }} /><input aria-label="Block start time" type="time" value={blockStart} onChange={e => setBlockStart(e.target.value)} style={{ ...T.formInput, width: 110 }} /><span style={{ color: C.faint }}>to</span><input aria-label="Block end time" type="time" value={blockEnd} onChange={e => setBlockEnd(e.target.value)} style={{ ...T.formInput, width: 110 }} /><button style={T.btnSm} onClick={() => toggleBlock(blockDate)} disabled={!blockDate}>{blockStart || blockEnd ? 'Block time' : blocked.includes(blockDate) ? 'Unblock date' : 'Block date'}</button><span style={{ fontSize: 12, color: C.faint }}>{blocked.length} blocked date{blocked.length === 1 ? '' : 's'} · {blockedTimes.length} time block{blockedTimes.length === 1 ? '' : 's'}</span></div>
@@ -426,11 +434,11 @@ export function Calendar({ data, setData, toast, openClientCard }) {
               </div>
             </div>
           ))}
-          {!data.bookings.some(b => matchesFilter(b) && (calView === 'list' || (calView === 'day' ? b.date === selectedDate : b.date >= weekStart && b.date <= weekEnd))) && <div style={{ padding: 30, textAlign: 'center', color: C.faint }}>No sessions in this view</div>}
+          {!data.bookings.some(b => matchesFilter(b) && (calView === 'list' || (calView === 'day' ? b.date === selectedDate : b.date >= weekStart && b.date <= weekEnd))) && <div style={{ padding: 30, textAlign: 'center', color: C.faint }}>No {terms.sessionsLower} in this view</div>}
         </div>
       )}
       {modal && (
-        <Modal title="New booking" onClose={() => setModal(false)} footer={<><button style={T.btn} onClick={() => setModal(false)}>Cancel</button><button style={T.btnPrimary} onClick={add}>Add</button></>}>
+        <Modal title={`New ${terms.sessionLower}`} onClose={() => setModal(false)} footer={<><button style={T.btn} onClick={() => setModal(false)}>Cancel</button><button style={T.btnPrimary} onClick={add}>Add</button></>}>
           <div style={T.formRow}>
             <div style={T.formGroup}><label style={T.formLabel}>Client</label><input style={T.formInput} list="cl1" value={form.client} onChange={e => setForm({ ...form, client: e.target.value })} /><datalist id="cl1">{data.clients.map(c => <option key={c.id} value={c.name} />)}</datalist></div>
             <div style={T.formGroup}><label style={T.formLabel}>Type</label><select style={T.formInput} value={form.type} onChange={e => setForm({ ...form, type: e.target.value })}>{types.map(t => <option key={t}>{t}</option>)}</select></div>
@@ -557,15 +565,15 @@ export function Contracts({ data, setData, toast }) {
 // One conversation per client: emails you send, their email replies and
 // their chat messages. On phones the list and the conversation are two
 // screens, like a messaging app.
-const QUICK_REPLIES = [
+const quickReplies = terms => [
   'Thank you so much! I\'ll get back to you shortly.',
-  'Your gallery is ready! 🎉',
-  'Looking forward to your session!',
+  ...terms.quickReplies,
   'Could you share a few dates and times that work for you?',
 ]
 const initials = name => (name || '?').split(/\s+/).slice(0, 2).map(w => w[0]).join('').toUpperCase()
 
 export function Inbox({ data, setData, toast, openClientCard }) {
+  const QUICK_REPLIES = quickReplies(useTerms())
   const [activeId, setActiveId] = useState(null)
   const [mobileThread, setMobileThread] = useState(false)
   const [filter, setFilter] = useState('all') // all | unread

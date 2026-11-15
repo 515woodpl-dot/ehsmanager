@@ -1,6 +1,19 @@
-# EHS Studio Manager
+# Local Manager
 
-Photography CRM — v2.0
+A studio CRM for service businesses — v2.0. Clients, projects, bookings,
+quotes, invoices, contracts, questionnaires and messages in one place.
+
+It is set up for one of two kinds of business, chosen at sign-up or in
+**Settings → Business profile → Type of business**:
+
+- **Photography** — sessions, session types, the photography agreement.
+- **Web design** — meetings, services, project stages from Inquiry to
+  Launched, the website design agreement.
+
+The choice sets the wording across the app, emails and client pages, the
+starting lists and the contract template. It all lives in
+[`lib/businessTypes.js`](lib/businessTypes.js); add another kind of business
+there.
 
 The app stores its data in PIBASE. The only third-party database code is the
 `@supabase/supabase-js` package, used in `lib/pibase.js` as the client for
@@ -21,18 +34,19 @@ npm run dev
 ```
 
 The public booking page is at `/booking`; the production host is
-`booking.elliesheartstrings.com`. Email sending requires `RESEND_API_KEY`;
-without it, use the contract's copyable signing link.
+your own domain. Optionally set `BOOKING_HOST` to a separate host whose root
+shows the booking page. Email sending needs a Resend API key and a sending
+address on a domain verified in Resend (Settings → Email, or
+`RESEND_API_KEY` / `RESEND_FROM_EMAIL`); without them, use the contract's
+copyable signing link.
 
-## Deploy update to server
+Set `NEXT_PUBLIC_APP_URL` to the manager's public address in production. If it
+is empty, links in emails and webhook addresses use the address the signed-in
+owner opens the app on.
 
-```bash
-# From your local machine
-scp -r ehsmanager root@YOUR_IP:/var/www/
+## Deploy
 
-# On the server
-cd /var/www/ehsmanager
-npm install
-npm run build
-pm2 restart studio-manager
-```
+One command installs a company on a server running PIBASE, and updates then
+run on their own every night (backup, database updates, build, health check,
+automatic roll back). Step-by-step for both PIBASE and the app:
+[INSTALL.md](INSTALL.md); how updates work: [docs/DEPLOY.md](docs/DEPLOY.md).

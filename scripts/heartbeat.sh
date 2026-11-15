@@ -10,7 +10,10 @@
 #   # Add this line (fires at 08:00 every 3 days):
 #   0 8 */3 * * /var/www/ehsmanager/scripts/heartbeat.sh >> /var/log/ehs-heartbeat.log 2>&1
 
-ENDPOINT="https://manager.elliesheartstrings.com/api/heartbeat"
+# Public address of the manager, e.g. APP_URL=https://manager.yourdomain.com
+APP_URL="${APP_URL:-}"
+if [ -z "$APP_URL" ]; then echo "Set APP_URL to the manager's address" >&2; exit 1; fi
+ENDPOINT="${APP_URL%/}/api/heartbeat"
 SECRET="${HEARTBEAT_SECRET:-}"  # optional — set in environment or hardcode here
 LOG_DATE=$(date '+%Y-%m-%d %H:%M:%S')
 

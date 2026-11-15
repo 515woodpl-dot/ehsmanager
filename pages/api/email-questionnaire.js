@@ -17,14 +17,14 @@ export default async function handler(req, res) {
 
   const title = row.questions?.title || 'Questionnaire'
   let buttonUrl = null
-  try { buttonUrl = appUrl(`/questionnaire/${createQuestionnaireToken(row.id)}`) } catch { buttonUrl = null }
+  try { buttonUrl = appUrl(`/questionnaire/${createQuestionnaireToken(row.id)}`, auth.config) } catch { buttonUrl = null }
 
   const result = await sendDocumentEmail(res, auth, {
     client,
     subject: req.body?.subject,
     message: req.body?.message,
     heading: title,
-    fallbackHtml: `<p>Hi ${escapeHtml(client.name || 'there')},</p><p>Please take a few minutes to answer a few questions before your session.</p>`,
+    fallbackHtml: `<p>Hi ${escapeHtml(client.name || 'there')},</p><p>Please take a few minutes to answer ${escapeHtml(auth.config.terms.questionnaireIntro)}.</p>`,
     buttonUrl,
     buttonLabel: 'Answer questionnaire',
   })

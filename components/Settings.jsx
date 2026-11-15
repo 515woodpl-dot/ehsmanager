@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { T, C } from '../lib/tokens'
 import { pibase } from '../lib/pibase'
+import { announceBrandChange } from '../lib/brand'
+import { BUSINESS_TYPE_OPTIONS, businessDefaults, businessTerms, remapStage } from '../lib/businessTypes'
 import { canPromptInstall, currentSubscription, deviceName, isIOS, isStandalone, promptInstall, pushSupported, subscribe, subscribePush } from '../lib/pwa'
 
 async function api(path, options = {}) {
@@ -143,7 +145,7 @@ function NotificationsSection({ toast, integrations, setIntegrations, saveButton
       {!supported ? (
         <p className="settings-note">This browser can't receive notifications. Try Chrome, Edge, Firefox, or Safari on a Mac{isIOS() ? ', or install the app on your iPhone/iPad first' : ''}.</p>
       ) : iosNeedsInstall ? (
-        <p className="settings-note">On iPhone and iPad, notifications only work in the installed app: tap <strong>Share → Add to Home Screen</strong>, open EHS Studio from your home screen, and come back here.</p>
+        <p className="settings-note">On iPhone and iPad, notifications only work in the installed app: tap <strong>Share → Add to Home Screen</strong>, open the app from your home screen, and come back here.</p>
       ) : !hasWorker ? (
         <p className="settings-note">Notifications work in the live (deployed) app. They can't be turned on in this preview.</p>
       ) : info && (
@@ -185,11 +187,11 @@ function InstallSection({ toast }) {
   useEffect(() => { setInstalled(isStandalone()); return subscribe(() => rerender(n => n + 1)) }, [])
   const ios = typeof navigator !== 'undefined' && isIOS()
   return (
-    <Section title="App" subtitle="Install EHS Studio on your phone, tablet or computer to open it from your home screen, full-screen, like a regular app." status={installed ? true : undefined}>
+    <Section title="App" subtitle="Install the app on your phone, tablet or computer to open it from your home screen, full-screen, like a regular app." status={installed ? true : undefined}>
       {installed ? (
         <p style={{ fontSize: 13.5, color: C.muted, margin: 0 }}>You're using the installed app. 🎉</p>
       ) : canPromptInstall() ? (
-        <button style={T.btnPrimary} onClick={async () => { if (await promptInstall() === 'accepted') toast('Installing EHS Studio…') }}>Install app</button>
+        <button style={T.btnPrimary} onClick={async () => { if (await promptInstall() === 'accepted') toast('Installing the app…') }}>Install app</button>
       ) : ios ? (
         <p style={{ fontSize: 13.5, color: C.muted, margin: 0 }}>In Safari, tap <strong>Share</strong> and choose <strong>Add to Home Screen</strong>.</p>
       ) : (
@@ -199,7 +201,7 @@ function InstallSection({ toast }) {
   )
 }
 
-export default function Settings({ toast = () => {} }) {
+export default function Settings({ toast = () => {}, data = null, setData = () => {} }) {
   const [state, setState] = useState(null)
   const [error, setError] = useState('')
   const [branding, setBranding] = useState(null)
@@ -219,10 +221,46 @@ export default function Settings({ toast = () => {} }) {
   const save = async (section, payload) => {
     setBusy(section)
     try {
-      apply(await api('/api/settings', { method: 'POST', body: JSON.stringify(payload) }))
+      const body = await api('/api/settings', { method: 'POST', body: JSON.stringify(payload) })
+      apply(body)
+      if (payload.branding) { applyBusinessProfile(body.branding); announceBrandChange() }
       toast('Settings saved')
     } catch (err) { toast(err.message) }
     setBusy('')
+  }
+
+  // The rest of the app words itself from the business type and pre-fills
+  // contracts from the business details, so pass saved changes along. When
+  // the type changes, the starting lists (project types, stages, contact
+  // form options) switch too. Lists the owner has edited are only replaced
+  // if they agree.
+  const applyBusinessProfile = saved => {
+    const from = data?.businessType || 'photography'
+    const to = saved.businessType
+    const profile = { businessName: saved.businessName || '', studioEmail: saved.studioEmail || '', address: saved.address || '', phone: saved.phone || '', ownerName: saved.ownerName || '' }
+    if (!data || from === to) { setData(d => ({ ...d, branding: profile, businessTypeSaved: true })); return }
+    const before = businessDefaults(from), after = businessDefaults(to)
+    const same = (a, b) => JSON.stringify(a) === JSON.stringify(b)
+    const untouched = {
+      stages: same(data.stages, before.stages),
+      sessionTypes: same(data.sessionTypes, before.sessionTypes),
+      checkboxOptions: same(data.formSettings?.checkboxOptions, before.checkboxOptions),
+    }
+    const names = { sessionTypes: `${businessTerms(from).typeLabelLower}s`, stages: 'pipeline stages', checkboxOptions: 'contact form options' }
+    const edited = Object.keys(names).filter(key => !untouched[key]).map(key => names[key])
+    const replaceEdited = edited.length > 0 && confirm(`Switch your lists to the ${businessTerms(to).label} starting set?\n\nYou changed your ${edited.join(' and ')}. OK replaces ${edited.length > 1 ? 'them' : 'that list'} with the ${businessTerms(to).label} set; Cancel keeps ${edited.length > 1 ? 'them' : 'it'} as ${edited.length > 1 ? 'they are' : 'it is'}.`)
+    const swap = key => untouched[key] || replaceEdited
+    setData(d => {
+      const next = { ...d, businessType: to, businessTypeSaved: true, branding: profile }
+      if (swap('sessionTypes')) next.sessionTypes = after.sessionTypes
+      if (swap('checkboxOptions')) next.formSettings = { ...d.formSettings, checkboxOptions: after.checkboxOptions }
+      if (swap('stages')) {
+        next.stages = after.stages
+        // Everyone keeps their place: first stage stays first, finished stays finished.
+        next.clients = d.clients.map(client => ({ ...client, status: remapStage(client.status, d.stages || before.stages, after.stages) }))
+      }
+      return next
+    })
   }
 
   const test = async kind => {
@@ -256,6 +294,9 @@ export default function Settings({ toast = () => {} }) {
       {state.migrationNeeded && (
         <div className="settings-error">Your database needs one update before settings can be saved: apply <code>pibase-migration-003-settings-inbox.sql</code> in PIBASE.</div>
       )}
+      {state.appAddress && !state.appAddress.fixed && (
+        <div className="settings-note" style={{ marginBottom: 16 }}>Links in emails and client pages use <strong>{state.appAddress.address || 'this address'}</strong>, the address you open the app on. To make it permanent, set <code>NEXT_PUBLIC_APP_URL</code> on the server.</div>
+      )}
       {!state.canStoreSecrets && (
         <div className="settings-error">To save API keys here, the server needs a <code>SETTINGS_ENCRYPTION_KEY</code> (a long random value). Until then, keys come from the server environment.</div>
       )}
@@ -275,7 +316,7 @@ export default function Settings({ toast = () => {} }) {
           <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
             {[{ size: 64, radius: 14 }, { size: 40, radius: 10 }].map(({ size, radius }) => (
               <div key={size} aria-hidden="true" style={{ width: size, height: size, borderRadius: radius, background: branding.logo ? (branding.iconBackground || '#ffffff') : '#111110', border: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', flex: 'none' }}>
-                {branding.logo ? <img src={branding.logo} alt="" style={{ maxWidth: '74%', maxHeight: '74%' }} /> : <span style={{ color: '#fff', fontFamily: 'Georgia, serif', fontSize: size * 0.38 }}>EH</span>}
+                {branding.logo ? <img src={branding.logo} alt="" style={{ maxWidth: '74%', maxHeight: '74%' }} /> : <span style={{ color: '#fff', fontFamily: 'Georgia, serif', fontSize: size * 0.38 }}>LM</span>}
               </div>
             ))}
             <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: C.muted }}>
@@ -285,12 +326,17 @@ export default function Settings({ toast = () => {} }) {
             {!branding.logo && <span style={{ fontSize: 12, color: C.faint }}>Upload a logo above to use it as the icon.</span>}
           </div>
         </Field>
+        <Field label="Type of business" hint="Sets the wording across the app, your emails and client pages (for example “sessions” or “meetings”), the contract template, and the starting project types and stages.">
+          <select style={T.formInput} value={branding.businessType || 'photography'} onChange={e => setBranding({ ...branding, businessType: e.target.value })}>
+            {BUSINESS_TYPE_OPTIONS.map(option => <option key={option.id} value={option.id}>{option.label}</option>)}
+          </select>
+        </Field>
         <div style={T.formRow} className="form-row-2">
           <Field label="Business name">{b('businessName')}</Field>
           <Field label="Your name">{b('ownerName')}</Field>
         </div>
         <div style={T.formRow} className="form-row-2">
-          <Field label="Studio email" hint="Where client replies (copies) and notifications go.">{b('studioEmail', { type: 'email' })}</Field>
+          <Field label="Business email" hint="Where client replies (copies) and notifications go.">{b('studioEmail', { type: 'email' })}</Field>
           <Field label="Phone">{b('phone')}</Field>
         </div>
         <div style={T.formRow} className="form-row-2">
@@ -298,15 +344,15 @@ export default function Settings({ toast = () => {} }) {
           <Field label="Address">{b('address')}</Field>
         </div>
         <Field label="Email signature" hint="Ends every email. Leave blank for “Warmly, [your first name]”.">
-          <textarea style={{ ...T.formInput, resize: 'vertical' }} rows={3} value={branding.signature || ''} onChange={e => setBranding({ ...branding, signature: e.target.value })} placeholder={`Warmly,\n${branding.ownerName || 'Ellie'}`} />
+          <textarea style={{ ...T.formInput, resize: 'vertical' }} rows={3} value={branding.signature || ''} onChange={e => setBranding({ ...branding, signature: e.target.value })} placeholder={`Warmly,\n${branding.ownerName || 'Your name'}`} />
         </Field>
         <div style={{ display: 'flex', justifyContent: 'flex-end' }}>{saveButton('branding', { branding })}</div>
       </Section>
 
       <Section title="Email (Resend)" status={state.status.email} subtitle="Sends invoices, quotes, contracts, questionnaires, reminders and messages to your clients.">
         <KeyField label="Resend API key" field="resendApiKey" info={state.keys.resendApiKey} value={keys.resendApiKey} onChange={setKey} onRemove={removeKey} placeholder="re_…" hint="resend.com → API Keys → Create API key (Sending access is enough)." />
-        <Field label="Send emails from" hint="Must be on a domain you've verified in Resend → Domains. Leave blank to use the default address.">
-          <input style={T.formInput} type="email" placeholder="hello@yourstudio.com" value={integrations.fromEmail || ''} onChange={e => setIntegrations({ ...integrations, fromEmail: e.target.value })} />
+        <Field label="Send emails from" hint="Required to send email. Must be on a domain you've verified in Resend → Domains.">
+          <input style={T.formInput} type="email" placeholder="hello@yourdomain.com" value={integrations.fromEmail || ''} onChange={e => setIntegrations({ ...integrations, fromEmail: e.target.value })} />
         </Field>
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, flexWrap: 'wrap' }}>
           <button type="button" style={T.btn} disabled={!!busy} onClick={() => test('email')}>{busy === 'test-email' ? 'Sending…' : 'Send test email'}</button>
@@ -328,7 +374,7 @@ export default function Settings({ toast = () => {} }) {
         <KeyField label="Webhook signing secret" field="resendWebhookSecret" info={state.keys.resendWebhookSecret} value={keys.resendWebhookSecret} onChange={setKey} onRemove={removeKey} placeholder="whsec_…" />
         <label style={{ display: 'flex', gap: 10, alignItems: 'flex-start', fontSize: 13.5, margin: '4px 0 16px', cursor: 'pointer' }}>
           <input type="checkbox" checked={integrations.copyRepliesToStudio !== false} onChange={e => setIntegrations({ ...integrations, copyRepliesToStudio: e.target.checked })} style={{ marginTop: 3 }} />
-          <span>Also send client replies to my studio email{branding.studioEmail ? ` (${branding.studioEmail})` : ''}<br /><span style={{ color: C.faint, fontSize: 12 }}>Replies then appear in both places. New chat messages always notify your studio email.</span></span>
+          <span>Also send client replies to my business email{branding.studioEmail ? ` (${branding.studioEmail})` : ''}<br /><span style={{ color: C.faint, fontSize: 12 }}>Replies then appear in both places. New chat messages always notify your business email.</span></span>
         </label>
         <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
           {saveButton('replies', { keys: keysFor(['resendWebhookSecret']), integrations: { inboundDomain: integrations.inboundDomain || '', copyRepliesToStudio: integrations.copyRepliesToStudio !== false } })}

@@ -12,7 +12,8 @@ const nextConfig = {
     ]
   },
   async rewrites() {
-    const host = process.env.BOOKING_HOST || 'booking.elliesheartstrings.com'
+    // Optional: a separate host (booking.yourdomain.com) whose root shows the booking page.
+    const host = process.env.BOOKING_HOST
     return host ? { beforeFiles: [{ source: '/', has: [{ type: 'host', value: host }], destination: '/booking' }] } : []
   },
 }

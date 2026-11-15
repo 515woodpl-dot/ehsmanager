@@ -1,3 +1,4 @@
+import { BrandBadge } from './Brand'
 import { useEffect } from 'react'
 import { T, C } from '../lib/tokens'
 
@@ -34,7 +35,7 @@ export function ConfirmModal({ title, message, confirmLabel = 'Confirm', onConfi
     <button style={danger ? T.btnDanger : T.btnPrimary} onClick={onConfirm}>{confirmLabel}</button>
   </>}>
     <div className="brand-confirm">
-      <div className="brand-confirm-mark">EH</div>
+      <BrandBadge className="brand-confirm-mark" />
       <div><strong>{title}</strong><p>{message}</p></div>
     </div>
   </Modal>
@@ -94,3 +95,8 @@ export function SearchBar({ value, onChange, placeholder = 'Search...' }) {
 export function Divider({ margin = '20px 0' }) {
   return <div style={{ height: 1, background: C.border, margin }} />
 }
+
+// Options for a type picker. Keeps a value that's no longer in the list
+// (an older client, or one booked online) so editing doesn't silently show
+// a different type.
+export const withCurrent = (list = [], value) => value && !list.includes(value) ? [value, ...list] : list

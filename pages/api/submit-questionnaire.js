@@ -10,7 +10,8 @@ export default async function handler(req, res) {
   const db = createServiceClient()
   if (!db) return res.status(503).json({ error: 'Service is not configured' })
 
-  const { data: row } = await db.from('questionnaires').select('id, questions, status, user_id, client_name').eq('id', parsed.questionnaireId).single()
+  const { data: row, error: lookupError } = await db.from('questionnaires').select('id, questions, status, user_id, client_name').eq('id', parsed.questionnaireId).maybeSingle()
+  if (lookupError) return res.status(503).json({ error: 'Busy right now. Please try again in a moment.' })
   if (!row) return res.status(404).json({ error: 'Questionnaire not found' })
   if (row.status === 'completed') return res.status(409).json({ error: 'This questionnaire has already been submitted' })
 
@@ -24,10 +25,12 @@ export default async function handler(req, res) {
   }
   if (!Object.keys(answers).length) return res.status(400).json({ error: 'Please answer at least one question' })
 
-  const { error } = await db.from('questionnaires')
+  // Only the first submission counts, even when several arrive at once.
+  const { data: saved, error } = await db.from('questionnaires')
     .update({ answers: { ...answers, submittedAt: new Date().toISOString() }, status: 'completed' })
-    .eq('id', row.id).neq('status', 'completed')
+    .eq('id', row.id).neq('status', 'completed').select('id')
   if (error) return res.status(500).json({ error: 'Your answers could not be saved. Please try again.' })
+  if (!saved?.length) return res.status(409).json({ error: 'This questionnaire has already been submitted' })
   await notifyStudio(db, row.user_id, { type: 'documents', title: `📝 ${row.client_name || 'A client'} answered the questionnaire`, body: row.questions?.title || 'Questionnaire', url: '/?view=projects', tag: `questionnaire-${row.id}` })
   return res.status(200).json({ ok: true })
 }

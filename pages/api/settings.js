@@ -1,7 +1,8 @@
 import { requireUser } from '../../lib/api-auth'
-import { SECRET_FIELDS, DEFAULT_INTEGRATIONS, NOTIFY_TYPES, canStoreSecrets, saveStudioSecrets, loadStudioConfig, appUrl } from '../../lib/studioConfig'
+import { isBusinessType } from '../../lib/businessTypes'
+import { APP_URL, SECRET_FIELDS, DEFAULT_INTEGRATIONS, NOTIFY_TYPES, canStoreSecrets, saveStudioSecrets, loadStudioConfig, appUrl } from '../../lib/studioConfig'
 
-const BRANDING_FIELDS = ['businessName', 'ownerName', 'studioEmail', 'phone', 'website', 'address', 'signature', 'logo', 'iconBackground']
+const BRANDING_FIELDS = ['businessName', 'ownerName', 'studioEmail', 'phone', 'website', 'address', 'signature', 'logo', 'iconBackground', 'businessType']
 const EMAIL_RE = /^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/
 const MAX_LOGO = 400 * 1024
 
@@ -20,9 +21,11 @@ function describe(config) {
     keys,
     canStoreSecrets: canStoreSecrets(),
     migrationNeeded: config.migrationNeeded,
+    // Where links in emails point, and whether that's fixed on the server.
+    appAddress: { fixed: !!APP_URL, address: APP_URL || config.origin || config.integrations.appOrigin || '' },
     webhooks: {
-      stripe: appUrl(`/api/webhook?studio=${studio}`),
-      inbound: appUrl(`/api/inbound-email?studio=${studio}`),
+      stripe: appUrl(`/api/webhook?studio=${studio}`, config),
+      inbound: appUrl(`/api/inbound-email?studio=${studio}`, config),
     },
     status: {
       email: !!config.secrets.resendApiKey,
@@ -47,6 +50,7 @@ export default async function handler(req, res) {
       if (typeof branding[field] !== 'string') continue
       next[field] = field === 'logo' ? branding[field] : branding[field].trim().slice(0, field === 'signature' || field === 'address' ? 500 : 200)
     }
+    if (!isBusinessType(next.businessType)) return res.status(400).json({ error: 'Choose a type of business' })
     if (!next.businessName) return res.status(400).json({ error: 'Business name is required' })
     if (!/^#[0-9a-f]{6}$/i.test(next.iconBackground || '#ffffff')) return res.status(400).json({ error: 'Pick a colour for the app icon background' })
     if (next.studioEmail && !EMAIL_RE.test(next.studioEmail)) return res.status(400).json({ error: 'Enter a valid studio email' })

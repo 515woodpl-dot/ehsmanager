@@ -49,12 +49,12 @@ export default function App({ Component, pageProps }) {
     return () => subscription.unsubscribe()
   }, [router.pathname])
 
-  if (!ready) return <>{appPage && <AppHead />}<main style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', padding: 24, fontFamily: 'sans-serif', color: '#222' }}>Loading EHS Studio Manager…</main></>
+  if (!ready) return <>{appPage && <AppHead />}<main style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', padding: 24, fontFamily: 'sans-serif', color: '#222' }}>Loading…</main></>
 
   if (authError && !isPublicRoute()) {
     return (
       <main style={{ maxWidth: 520, margin: '12vh auto', padding: 24, fontFamily: 'sans-serif' }}>
-        <h1>EHS Studio Manager</h1>
+        <h1>Sign-in problem</h1>
         <p>We couldn’t verify your PiBase session.</p>
         <p style={{ color: '#666', fontSize: 14 }}>{authError}</p>
         <a href="/login">Return to sign in</a>

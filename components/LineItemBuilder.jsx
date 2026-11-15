@@ -1,10 +1,12 @@
 import { useId } from 'react'
 import { T, C } from '../lib/tokens'
+import { useTerms } from '../lib/businessTypes'
 
 const uid = () => Math.random().toString(36).slice(2, 8)
 const fmt$ = n => '$' + Number(n || 0).toFixed(2)
 
 export function LineItemBuilder({ value, onChange, catalog = [] }) {
+  const terms = useTerms()
   const { items = [], discount = '', discountType = '%', tax = '', notes = '' } = value
 
   const update = (patch) => onChange({ ...value, ...patch })
@@ -51,7 +53,7 @@ export function LineItemBuilder({ value, onChange, catalog = [] }) {
             <div className="line-item-grid">
               <label className="line-item-field line-item-name">
                 <span>Item {index + 1}</span>
-                <input style={{ ...T.formInput, fontSize: 14, fontWeight: 500 }} list={catalog.length ? listId : undefined} placeholder={catalog.length ? 'Type or pick a saved item' : 'e.g. Maternity Signature session'} value={item.name} onChange={e => changeName(item, e.target.value)} />
+                <input style={{ ...T.formInput, fontSize: 14, fontWeight: 500 }} list={catalog.length ? listId : undefined} placeholder={catalog.length ? 'Type or pick a saved item' : terms.lineItemExample} value={item.name} onChange={e => changeName(item, e.target.value)} />
               </label>
               <label className="line-item-field">
                 <span>Qty</span>
@@ -72,7 +74,7 @@ export function LineItemBuilder({ value, onChange, catalog = [] }) {
             </div>
             <label className="line-item-field" style={{ marginTop: 10 }}>
               <span>Description</span>
-              <textarea style={{ ...T.formInput, resize: 'vertical', fontSize: 13, minHeight: 60 }} rows={2} placeholder="What's included — hours of coverage, edited images, prints, travel…" value={item.description || ''} onChange={e => updateItem(item.id, { description: e.target.value })} />
+              <textarea style={{ ...T.formInput, resize: 'vertical', fontSize: 13, minHeight: 60 }} rows={2} placeholder={terms.lineItemDetails} value={item.description || ''} onChange={e => updateItem(item.id, { description: e.target.value })} />
             </label>
           </div>
         )

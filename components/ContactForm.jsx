@@ -1,7 +1,9 @@
 import { useState } from 'react'
 import { T, C } from '../lib/tokens'
+import { useTerms } from '../lib/businessTypes'
 
 export default function ContactFormSettings({ data, setData, toast }) {
+  const terms = useTerms()
   const settings = data.formSettings || {}
   const [form, setForm] = useState({ ...settings })
   const [newOption, setNewOption] = useState('')
@@ -31,7 +33,7 @@ export default function ContactFormSettings({ data, setData, toast }) {
     setForm({ ...form, checkboxOptions: form.checkboxOptions.filter((_, i) => i !== idx) })
   }
 
-  const publicUrl = typeof window !== 'undefined' ? window.location.origin + '/contact' : 'https://manager.elliesheartstrings.com/contact'
+  const publicUrl = typeof window !== 'undefined' ? window.location.origin + '/contact' : '/contact'
 
   return (
     <div>
@@ -113,7 +115,7 @@ export default function ContactFormSettings({ data, setData, toast }) {
 
           {/* Checkbox options */}
           <div style={T.formGroup}>
-            <label style={T.formLabel}>Session type checkboxes</label>
+            <label style={T.formLabel}>{terms.contactOptionsLabel}</label>
             <div style={{ marginBottom: 10 }}>
               {(form.checkboxOptions || []).map((opt, i) => (
                 <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0', borderBottom: `1px solid ${C.border}` }}>
@@ -157,6 +159,7 @@ export default function ContactFormSettings({ data, setData, toast }) {
 }
 
 function FormPreview({ settings }) {
+  const terms = useTerms()
   return (
     <div style={{ background: C.surface2, borderRadius: 10, padding: '24px 20px' }}>
       {settings.formTitle && <div style={{ fontFamily: "'DM Serif Display', Georgia, serif", fontSize: 20, marginBottom: 18, textAlign: 'center' }}>{settings.formTitle}</div>}
@@ -173,7 +176,7 @@ function FormPreview({ settings }) {
         <div style={{ ...T.formInput, background: C.surface, color: C.faint, pointerEvents: 'none' }}>(555) 000-0000</div>
       </div>
       <div style={{ marginBottom: 14 }}>
-        <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: C.muted, marginBottom: 8 }}>What memories would you like captured? <span style={{ color: C.red }}>*</span></div>
+        <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: C.muted, marginBottom: 8 }}>{terms.contactQuestion} <span style={{ color: C.red }}>*</span></div>
         {(settings.checkboxOptions || []).slice(0, 4).map((opt, i) => (
           <label key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, fontSize: 13, cursor: 'default' }}>
             <input type="checkbox" disabled /> {opt}

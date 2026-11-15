@@ -10,10 +10,12 @@ const escapeHtml = value => String(value ?? '').replace(/&/g, '&amp;').replace(/
   .replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;')
 
 async function loadChat(db, clientId) {
-  const { data: client } = await db.from('clients').select('id, user_id, name').eq('id', clientId).maybeSingle()
+  const { data: client, error } = await db.from('clients').select('id, user_id, name').eq('id', clientId).maybeSingle()
+  if (error) throw error
   if (!client) return null
-  const { data: rows } = await db.from('messages').select('id, thread')
+  const { data: rows, error: threadError } = await db.from('messages').select('id, thread')
     .eq('user_id', client.user_id).eq('client_id', client.id).order('updated_at', { ascending: false }).limit(1)
+  if (threadError) throw threadError
   return { client, thread: Array.isArray(rows?.[0]?.thread) ? rows[0].thread : [] }
 }
 
@@ -25,7 +27,11 @@ export default async function handler(req, res) {
   if (!parsed) return res.status(404).json({ error: 'This chat link is not valid' })
   const db = createServiceClient()
   if (!db) return res.status(503).json({ error: 'Service is not configured' })
-  const chat = await loadChat(db, parsed.chatClientId)
+  let chat
+  try { chat = await loadChat(db, parsed.chatClientId) } catch (error) {
+    console.error('[chat] load', error.message)
+    return res.status(503).json({ error: 'Messages are busy right now. Please try again in a moment.' })
+  }
   if (!chat) return res.status(404).json({ error: 'Chat not found' })
   const config = await loadStudioConfig(db, chat.client.user_id)
   res.setHeader('Cache-Control', 'private, no-store')
@@ -56,10 +62,12 @@ export default async function handler(req, res) {
     const last = [...chat.thread].reverse().find(m => !m.out && m.via === 'chat')
     const recent = last?.at && now - new Date(last.at) < 10 * 60 * 1000
     if (!recent && config.branding.studioEmail) {
+      let inboxLink = ''
+      try { inboxLink = appUrl('/?view=inbox', config) } catch {}
       const html = emailWrap(`
         <h1>New message from ${escapeHtml(chat.client.name)}</h1>
         <div class="box" style="white-space:pre-wrap;font-family:Arial,sans-serif;font-size:14px;line-height:1.7;color:#444;">${escapeHtml(text)}</div>
-        <a href="${escapeHtml(appUrl('/?view=inbox'))}" class="btn" style="color:#ffffff;">Reply in Studio Manager</a>
+        ${inboxLink ? `<a href="${escapeHtml(inboxLink)}" class="btn" style="color:#ffffff;">Reply in the app</a>` : ''}
       `, config)
       const result = await sendStudioEmail(config, { to: config.branding.studioEmail, subject: `New chat message from ${chat.client.name}`, html, replyToStudio: false })
       if (result.error) console.error('[chat] notify failed', result.error)

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { T, C } from '../lib/tokens'
 import { pibase } from '../lib/pibase'
 import { Modal } from './UI'
+import { useTerms } from '../lib/businessTypes'
 import { LineItemBuilder, calcTotal } from './LineItemBuilder'
 import ContractBuilder from './ContractBuilder'
 import ContractDocument from './ContractDocument'
@@ -87,8 +88,17 @@ export function QuoteModal({ client: clientProp, quote, data, setData, toast, on
   }
 
   // Accepting a quote turns it into an unpaid invoice with the same items.
-  const accept = () => {
+  const accept = async () => {
     if (!confirm(`Mark quote ${quoteLabel(quote)} as accepted and create an invoice for ${fmt$(total)}?`)) return
+    // The client may have accepted from their link while this was open: then
+    // their invoice already exists and a second one must not be made.
+    if (pibase && quote?.id) {
+      const { data: server } = await pibase.from('quotes').select('status').eq('id', quote.id).maybeSingle()
+      if (server?.status === 'accepted') {
+        toast('The client has already accepted this quote, and its invoice was created. It will show here in a moment.')
+        onClose(); return
+      }
+    }
     const number = nextInvoiceNumber(data.invoices)
     const invoice = { id: uid(), number, client: clientName, clientId: client?.id || quote.clientId || null, amount: total, due: '', status: 'unpaid', paid: 0, note: lineData.notes || `From accepted quote ${quoteLabel(quote)}`, paymentIntentId: null, lineData, createdAt: new Date().toISOString() }
     setData(d => ({
@@ -205,6 +215,7 @@ export function ContractSignPanel({ contract, role = 'studio', clientName = '', 
 // Without `contract`: build a new one, then offer to email it.
 // With `contract`: view it, email it, copy the signing link, edit or delete.
 export function ContractModal({ client: clientProp, contract, startMode = 'view', data, setData, toast, onClose, onSaved }) {
+  const terms = useTerms()
   const [mode, setMode] = useState(contract ? startMode : 'build') // build | view | send
   const [current, setCurrent] = useState(contract || null)
   const [link, setLink] = useState('')
@@ -248,8 +259,8 @@ export function ContractModal({ client: clientProp, contract, startMode = 'view'
     return <SendEmailModal endpoint="/api/email-contract" payload={{ contract: { id: live.id } }} client={client} clientName={clientName} toast={toast}
       onClose={result => (result?.sent || !contract || startMode === 'send' ? onClose() : setMode('view'))} justCreated={!contract}
       title={!contract ? `Contract saved — email it to ${clientName} to sign?` : `Email contract to ${clientName}`} sentToast="Contract emailed"
-      initialSubject={`Your ${live.type || 'photography agreement'} is ready to sign`}
-      initialMessage={`Hi ${firstName(clientName)},\n\nYour ${live.type || 'photography agreement'} is ready. Please review it and sign securely using the button below.\n\nIf you have any questions about the terms, just reply to this email before signing.`}
+      initialSubject={`Your ${live.type || terms.agreementLower} is ready to sign`}
+      initialMessage={`Hi ${firstName(clientName)},\n\nYour ${live.type || terms.agreementLower} is ready. Please review it and sign securely using the button below.\n\nIf you have any questions about the terms, just reply to this email before signing.`}
       buttonLabel="Review and sign contract"
       extraActions={<button style={T.btn} disabled={busy} onClick={copyLink}>{busy ? 'Preparing…' : 'Copy signing link'}</button>} />
   }
@@ -298,19 +309,16 @@ export function ContractModal({ client: clientProp, contract, startMode = 'view'
 }
 
 // ── Questionnaire ─────────────────────────────────────────────────
-const defaultQuestions = () => [
-  { id: uid(), text: 'How did you hear about us?', type: 'text' },
-  { id: uid(), text: 'Do you have any specific shots in mind?', type: 'textarea' },
-  { id: uid(), text: 'Are there any props or outfits you plan to bring?', type: 'text' },
-]
+const defaultQuestions = terms => terms.questions.map(([text, type]) => ({ id: uid(), text, type }))
 
 export function QuestionnaireModal({ client: clientProp, questionnaire, data, setData, toast, onClose, onSaved }) {
+  const terms = useTerms()
   const isEdit = !!questionnaire
   const live = isEdit ? (data.questionnaires || []).find(q => q.id === questionnaire.id) || questionnaire : null
   const client = clientFor(data, live, clientProp)
   const clientName = client?.name || live?.client || ''
-  const [title, setTitle] = useState(live?.title || `${client?.type || 'Session'} Questionnaire`)
-  const [questions, setQuestions] = useState(live?.questions?.length ? live.questions : defaultQuestions())
+  const [title, setTitle] = useState(live?.title || (client?.type ? `${client.type} Questionnaire` : 'Questionnaire'))
+  const [questions, setQuestions] = useState(live?.questions?.length ? live.questions : defaultQuestions(terms))
   const [newQ, setNewQ] = useState('')
   const [sendFor, setSendFor] = useState(null)
 
@@ -350,8 +358,8 @@ export function QuestionnaireModal({ client: clientProp, questionnaire, data, se
         onClose()
       }}
       justCreated title={`Send "${sendFor.title}" to ${clientName}`} sentToast="Questionnaire sent"
-      initialSubject="A few questions before your session"
-      initialMessage={`Hi ${firstName(clientName)},\n\nTo help us plan your session, please take a few minutes to answer a few quick questions.\n\nClick the button below to open the questionnaire. Thank you!`}
+      initialSubject={`${terms.questionnaireIntro[0].toUpperCase()}${terms.questionnaireIntro.slice(1)}`}
+      initialMessage={`Hi ${firstName(clientName)},\n\nTo help us plan, please take a few minutes to answer a few quick questions.\n\nClick the button below to open the questionnaire. Thank you!`}
       buttonLabel="Answer questionnaire" />
   }
 
@@ -412,50 +420,52 @@ export function QuestionnaireModal({ client: clientProp, questionnaire, data, se
 
 // ── Session ───────────────────────────────────────────────────────
 export function SessionModal({ client: clientProp, session, data, setData, toast, onClose, onSaved }) {
+  const terms = useTerms()
   const isEdit = !!session
   const client = clientFor(data, session, clientProp)
   const clientName = client?.name || session?.client || ''
   const [form, setForm] = useState({
-    type: session?.type || client?.type || data.sessionTypes?.[0] || 'Family',
+    type: session?.type || client?.type || data.sessionTypes?.[0] || '',
     date: session?.date || client?.date || '',
     time: session?.time || '',
     location: session?.location || '',
     notes: session?.notes || '',
     status: session?.status || 'pending',
   })
-  const types = data.sessionTypes || ['Family', 'Maternity', 'Newborn', 'Portrait']
+  // The project types, then the services on the booking page.
+  const types = [...new Set([...(data.sessionTypes || []), ...(data.sessionCatalog || []).map(item => item.name)])]
   const when = form.date ? new Date(form.date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }) : ''
 
   const save = () => {
-    if (!form.date) { toast('Please set a session date'); return }
+    if (!form.date) { toast('Please set a date'); return }
     if (isEdit) {
       setData(d => ({ ...d, bookings: d.bookings.map(b => b.id === session.id ? { ...b, ...form } : b) }))
-      toast('Session updated')
+      toast(`${terms.session} updated`)
     } else {
       const b = { id: uid(), client: clientName, clientId: client?.id || null, ...form }
       setData(d => ({ ...d, bookings: [...d.bookings, b] }))
-      toast(`Session scheduled · ${when}${form.time ? ` at ${form.time}` : ''}`)
+      toast(`${terms.session} scheduled · ${when}${form.time ? ` at ${form.time}` : ''}`)
     }
     onSaved?.(); onClose()
   }
 
   const remove = () => {
-    if (!confirm('Delete this session? This cannot be undone.')) return
+    if (!confirm(`Delete this ${terms.sessionLower}? This cannot be undone.`)) return
     setData(d => ({ ...d, bookings: d.bookings.filter(b => b.id !== session.id) }))
-    toast('Session deleted'); onClose()
+    toast(`${terms.session} deleted`); onClose()
   }
 
   return (
-    <Modal title={`${isEdit ? 'Session' : 'Schedule session'} — ${clientName}`} onClose={onClose}
+    <Modal title={`${isEdit ? terms.session : `Schedule ${terms.sessionLower}`} — ${clientName}`} onClose={onClose}
       footer={<>
         {isEdit && <button style={{ ...T.btn, color: C.red, borderColor: C.red }} onClick={remove}>Delete</button>}
         <div style={{ flex: 1 }} />
         <button style={T.btn} onClick={onClose}>Cancel</button>
-        <button style={T.btnPrimary} onClick={save}>{isEdit ? 'Save changes' : 'Schedule session'}</button>
+        <button style={T.btnPrimary} onClick={save}>{isEdit ? 'Save changes' : `Schedule ${terms.sessionLower}`}</button>
       </>}>
       <div style={T.formRow} className="form-row-2">
         <div style={T.formGroup}>
-          <label style={T.formLabel}>Session type</label>
+          <label style={T.formLabel}>{terms.session} type</label>
           <select style={T.formInput} value={form.type} onChange={e => setForm({ ...form, type: e.target.value })}>
             {!types.includes(form.type) && form.type && <option>{form.type}</option>}
             {types.map(t => <option key={t}>{t}</option>)}
@@ -479,16 +489,17 @@ export function SessionModal({ client: clientProp, session, data, setData, toast
       {isEdit && (
         <div style={T.formGroup}>
           <label style={T.formLabel}>Status</label>
-          <select style={T.formInput} value={form.status} onChange={e => setForm({ ...form, status: e.target.value })}>
+          <select style={T.formInput} value={form.status} disabled={session?.status === 'canceled'} onChange={e => setForm({ ...form, status: e.target.value })}>
             <option value="pending">Pending</option>
             <option value="confirmed">Confirmed</option>
             <option value="canceled">Canceled</option>
           </select>
+          {session?.status === 'canceled' && <div style={{ fontSize: 11.5, color: C.faint, marginTop: 5 }}>Canceled {terms.sessionsLower} can't be reopened: the time and any discount were released. Schedule a new one instead.</div>}
         </div>
       )}
       <div style={T.formGroup}>
         <label style={T.formLabel}>Notes for client</label>
-        <textarea style={{ ...T.formInput, resize: 'none' }} rows={3} placeholder="Outfit suggestions, what to bring, parking info..." value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} />
+        <textarea style={{ ...T.formInput, resize: 'none' }} rows={3} placeholder={terms.sessionNotes} value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} />
       </div>
 
       {form.date && (

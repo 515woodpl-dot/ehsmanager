@@ -60,7 +60,7 @@ export default function ChatPage({ token }) {
     setSending(false)
   }
 
-  const business = chat?.businessName || 'Your photographer'
+  const business = chat?.businessName || 'Your messages'
   return (
     <PublicDocument pageTitle={`Messages · ${business}`} eyebrow={business} title={chat ? `Hi ${chat.clientName || 'there'}` : 'Messages'} logo={chat?.logo}>
       <div className="chat-thread">

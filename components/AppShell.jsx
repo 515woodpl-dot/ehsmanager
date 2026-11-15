@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import Head from 'next/head'
+import { useBrand } from '../lib/brand'
 import { canPromptInstall, initInstallPrompt, isIOS, isStandalone, promptInstall, subscribe } from '../lib/pwa'
 
 const DISMISS_KEY = 'ehs-install-dismissed-at'
@@ -7,14 +8,15 @@ const DISMISS_DAYS = 30
 
 // Tags that make the manager installable ("Add to Home Screen").
 export function AppHead() {
+  const { title } = useBrand()
   return (
     <Head>
       <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
       <meta name="theme-color" content="#ffffff" />
-      <meta name="application-name" content="EHS Studio" />
+      <meta name="application-name" content={title} />
       <meta name="mobile-web-app-capable" content="yes" />
       <meta name="apple-mobile-web-app-capable" content="yes" />
-      <meta name="apple-mobile-web-app-title" content="EHS Studio" />
+      <meta name="apple-mobile-web-app-title" content={title} />
       <meta name="apple-mobile-web-app-status-bar-style" content="default" />
       <link rel="manifest" href="/api/manifest" />
       <link rel="icon" type="image/png" sizes="32x32" href="/api/app-icon/favicon-32.png" />
@@ -26,6 +28,7 @@ export function AppHead() {
 // Registers the service worker and shows the small bars the app needs:
 // install offer, "new version" reload, and offline notice.
 export function PwaManager() {
+  const { title } = useBrand()
   const [installable, setInstallable] = useState(false)
   const [iosHint, setIosHint] = useState(false)
   const [waiting, setWaiting] = useState(null)
@@ -74,14 +77,14 @@ export function PwaManager() {
       {offline && <div className="pwa-offline" role="status">You're offline. Changes will save when you reconnect.</div>}
       {waiting && (
         <div className="pwa-bar" role="status">
-          <span>A new version of EHS Studio is ready.</span>
+          <span>A new version of {title} is ready.</span>
           <button className="pwa-primary" onClick={() => waiting.postMessage('SKIP_WAITING')}>Reload</button>
         </div>
       )}
       {!waiting && installable && (
         <div className="pwa-bar" role="dialog" aria-label="Install app">
           <img src="/api/app-icon/icon-192.png" alt="" />
-          <span><strong>Install EHS Studio</strong><br />Open it from your home screen like an app.</span>
+          <span><strong>Install {title}</strong><br />Open it from your home screen like an app.</span>
           <button onClick={dismiss}>Not now</button>
           <button className="pwa-primary" onClick={async () => { const outcome = await promptInstall(); if (outcome !== 'accepted') dismiss() }}>Install</button>
         </div>
@@ -89,7 +92,7 @@ export function PwaManager() {
       {!waiting && !installable && iosHint && (
         <div className="pwa-bar" role="dialog" aria-label="Install app">
           <img src="/api/app-icon/icon-192.png" alt="" />
-          <span><strong>Install EHS Studio</strong><br />Tap <b>Share</b> <span aria-hidden="true">⎋</span> then <b>Add to Home Screen</b>.</span>
+          <span><strong>Install {title}</strong><br />Tap <b>Share</b> <span aria-hidden="true">⎋</span> then <b>Add to Home Screen</b>.</span>
           <button onClick={dismiss}>Got it</button>
         </div>
       )}

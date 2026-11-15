@@ -2,8 +2,11 @@ import { useState, useEffect, useMemo, useRef } from 'react'
 import Head from 'next/head'
 import { T, C } from '../lib/tokens'
 import { seed } from '../lib/data'
+import { BrandMark } from '../components/Brand'
+import { useBrand } from '../lib/brand'
+import { TermsContext, businessTerms, businessDefaults, isBusinessType, useTerms } from '../lib/businessTypes'
 import { pibase } from '../lib/pibase'
-import { loadUserData, syncCollections } from '../lib/db'
+import { loadUserData, saveSettings, syncCollections } from '../lib/db'
 import { assignInvoiceNumbers, hasInvoiceNumber, invoiceLabel } from '../lib/invoices'
 import { Toast } from '../components/UI'
 import Projects, { CardModalExport as CardModal } from '../components/Projects'
@@ -26,8 +29,30 @@ function getInitialView() {
   return VALID_VIEWS.has(fromStorage) ? fromStorage : 'dashboard'
 }
 
+// A new account chooses its kind of business when signing up. The first
+// time it loads, save that choice and start it with the matching project
+// types, stages and contact form options. Accounts created before the choice
+// existed have nothing to apply and stay as they are.
+async function applySignupBusinessType(session, dbData) {
+  const chosen = session.user.user_metadata?.business_type
+  if (dbData.businessTypeSaved || !isBusinessType(chosen)) return dbData
+  try {
+    const response = await fetch('/api/settings', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` }, body: JSON.stringify({ branding: { businessType: chosen } }) })
+    if (!response.ok) return dbData
+    if (chosen === dbData.businessType) return { ...dbData, businessTypeSaved: true }
+    const defaults = businessDefaults(chosen)
+    const next = { ...dbData, businessType: chosen, businessTypeSaved: true, stages: defaults.stages, sessionTypes: defaults.sessionTypes, formSettings: { ...dbData.formSettings, checkboxOptions: defaults.checkboxOptions } }
+    await saveSettings(session.user.id, next)
+    return next
+  } catch (error) {
+    console.error('[settings] business type', error)
+    return dbData
+  }
+}
+
 // ── Global search ─────────────────────────────────────────────────
 function GlobalSearch({ data, setView }) {
+  const terms = useTerms()
   const [q, setQ] = useState('')
   const [open, setOpen] = useState(false)
   const ref = useRef()
@@ -38,9 +63,9 @@ function GlobalSearch({ data, setView }) {
   const results = useMemo(() => {
     if (!q.trim()) return []
     const lo = q.toLowerCase(); const r = []
-    data.clients.filter(c => !c.archived).forEach(c => { if (c.name.toLowerCase().includes(lo) || (c.email || '').toLowerCase().includes(lo)) r.push({ cat: 'Client', label: c.name, sub: `${c.type} · ${c.email || ''}`, view: 'clients' }) })
+    data.clients.filter(c => !c.archived).forEach(c => { if (c.name.toLowerCase().includes(lo) || (c.email || '').toLowerCase().includes(lo)) r.push({ cat: 'Client', label: c.name, sub: [c.type, c.email].filter(Boolean).join(' · '), view: 'clients' }) })
     data.invoices.forEach(i => { if (i.client.toLowerCase().includes(lo) || (i.number || '').toLowerCase().includes(lo)) r.push({ cat: 'Invoice', label: `${invoiceLabel(i)} · ${i.client}`, sub: '$' + i.amount.toLocaleString(), view: 'invoices' }) })
-    data.bookings.forEach(b => { if (b.client.toLowerCase().includes(lo)) r.push({ cat: 'Booking', label: b.client, sub: b.date + ' · ' + b.location, view: 'calendar' }) })
+    data.bookings.forEach(b => { if (b.client.toLowerCase().includes(lo)) r.push({ cat: terms.session, label: b.client, sub: [b.date, b.location].filter(Boolean).join(' · '), view: 'calendar' }) })
     return r.slice(0, 7)
   }, [q, data])
   return (
@@ -48,7 +73,7 @@ function GlobalSearch({ data, setView }) {
       <span style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', color: C.faint, fontSize: 14, pointerEvents: 'none' }}>⌕</span>
       <input
         style={{ ...T.formInput, paddingLeft: 32, paddingRight: q ? 32 : 12, background: C.surface2, fontSize: 13.5 }}
-        placeholder="Search clients, invoices, bookings..."
+        placeholder={`Search clients, invoices, ${terms.sessionsLower}...`}
         value={q} onChange={e => { setQ(e.target.value); setOpen(true) }} onFocus={() => setOpen(true)}
       />
       {q && (
@@ -78,6 +103,7 @@ function GlobalSearch({ data, setView }) {
 
 // ── Sidebar ───────────────────────────────────────────────────────
 function Sidebar({ active, setActive, unread, open, onClose, user, onSignOut }) {
+  const terms = useTerms()
   const nav1 = [
     { id: 'dashboard', label: 'Dashboard' },
     { id: 'analytics', label: 'Analytics' },
@@ -85,8 +111,8 @@ function Sidebar({ active, setActive, unread, open, onClose, user, onSignOut }) 
     { id: 'clients', label: 'Clients' },
   ]
   const nav2 = [
-    { id: 'sessiontypes', label: 'Session Types' },
-    { id: 'sessions', label: 'Sessions' },
+    { id: 'sessiontypes', label: terms.services },
+    { id: 'sessions', label: terms.sessions },
     { id: 'calendar', label: 'Calendar' },
     { id: 'discounts', label: 'Discounts' },
     { id: 'invoices', label: 'Invoices' },
@@ -118,9 +144,8 @@ function Sidebar({ active, setActive, unread, open, onClose, user, onSignOut }) 
         {/* Logo */}
         <div style={{ padding: '24px 22px 18px', borderBottom: `1px solid ${C.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <div>
-            <div style={{ fontFamily: "'DM Serif Display', Georgia, serif", fontSize: 17, color: C.text, letterSpacing: '-0.2px', lineHeight: 1.2 }}>EHS Studio</div>
-            <div style={{ fontFamily: "'DM Serif Display', Georgia, serif", fontSize: 17, color: C.text, letterSpacing: '-0.2px' }}>Manager</div>
-            <div style={{ fontSize: 10, color: C.faint, marginTop: 3, letterSpacing: '0.06em', textTransform: 'uppercase' }}>Photography CRM</div>
+            <BrandMark size="md" />
+            <div style={{ fontSize: 10, color: C.faint, marginTop: 3, letterSpacing: '0.06em', textTransform: 'uppercase' }}>{terms.tagline}</div>
           </div>
           {/* Mobile close button */}
           <button onClick={onClose} className="mobile-close-btn" style={{ display: 'none', background: 'none', border: 'none', fontSize: 20, color: C.muted, cursor: 'pointer', padding: 4 }}>×</button>
@@ -149,10 +174,10 @@ function Sidebar({ active, setActive, unread, open, onClose, user, onSignOut }) 
         <div style={{ padding: '14px 16px', borderTop: `1px solid ${C.border}` }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 6px', borderRadius: 8 }}>
             <div style={{ width: 30, height: 30, borderRadius: '50%', background: C.text, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 500, flexShrink: 0 }}>
-              {user ? user.email.slice(0,2).toUpperCase() : 'EH'}
+              {user ? user.email.slice(0,2).toUpperCase() : 'LM'}
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 12, fontWeight: 500, color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user ? user.email : 'Ellie Heartstrings'}</div>
+              <div style={{ fontSize: 12, fontWeight: 500, color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user ? user.email : ''}</div>
               <button onClick={onSignOut} style={{ background: 'none', border: 'none', padding: 0, fontSize: 11, color: C.faint, cursor: 'pointer', fontFamily: 'inherit' }}>Sign out</button>
             </div>
           </div>
@@ -198,6 +223,7 @@ function Sidebar({ active, setActive, unread, open, onClose, user, onSignOut }) 
 
 // ── Root ──────────────────────────────────────────────────────────
 export default function Home() {
+  const brand = useBrand()
   const [view, setView] = useState('dashboard')
   const viewRef = useRef(view)
   viewRef.current = view
@@ -256,7 +282,7 @@ export default function Home() {
       if (!session) { setUser(null); setDbReady(false); setData(seed); setAuthChecked(true); return }
       setUser(session.user)
       try {
-        const dbData = await loadUserData(session.user.id)
+        const dbData = await applySignupBusinessType(session, await loadUserData(session.user.id))
         if (generation !== loadGeneration) return
         setData(dbData)
         setLoadError('')
@@ -394,12 +420,13 @@ export default function Home() {
 
   if (!dbReady) {
     return <main style={{ maxWidth: 520, margin: '12vh auto', padding: 24, fontFamily: 'sans-serif' }}>
-      <h1>EHS Studio Manager</h1>
+      <h1>{brand.title}</h1>
       <p>{typeof navigator !== 'undefined' && !navigator.onLine ? 'You\'re offline. Connect to the internet to load your studio.' : loadError || (authChecked ? 'Sign in to access your studio data.' : 'Loading studio data...')}</p>
       {authChecked && <a href="/login">Go to sign in</a>}
     </main>
   }
 
+  const terms = businessTerms(data.businessType)
   const props = { data, setData, toast, setView: setActiveView }
   const unread = data.messages.filter(m => m.unread).length
 
@@ -425,15 +452,15 @@ export default function Home() {
   }
 
   return (
-    <>
+    <TermsContext.Provider value={terms}>
       <Head>
-        <title>EHS Studio Manager</title>
+        <title>{brand.title}</title>
       </Head>
 
       <div style={{ display: 'flex', minHeight: '100vh', background: C.bg }}>
         <Sidebar active={view} setActive={setActiveView} unread={unread} open={sidebarOpen} onClose={() => setSidebarOpen(false)} user={user} onSignOut={handleSignOut} />
 
-        <div className="layout-main" style={{ marginLeft: 220, flex: 1, padding: '36px 44px', minHeight: '100vh' }}>
+        <div className="layout-main" style={{ marginLeft: 220, flex: 1, minWidth: 0, padding: '36px 44px', minHeight: '100vh' }}>
           {/* Topbar */}
           <div className="topbar-wrap" style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 32 }}>
             {/* Hamburger — mobile only */}
@@ -486,6 +513,6 @@ export default function Home() {
           }
         }
       `}</style>
-    </>
+    </TermsContext.Provider>
   )
 }

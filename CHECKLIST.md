@@ -5,6 +5,504 @@ every round of changes, and keep the "Open / follow-ups" list current.
 
 ---
 
+## 2026-11-15 (round 20) — Production review blocker fixes
+
+- [x] Each system-mode company now has its own unprivileged Unix account. The
+      code checkout and deployment metadata are root-controlled; the owner
+      password and PIBASE project keys are root-owned mode 600. The app can read
+      only its own `.env.local`. Rerunning the installer migrates an older
+      shared-`manager` installation to the company account.
+- [x] Updates build before applying migrations. A failed build leaves the
+      running release and database untouched. An unhealthy new release rolls
+      back application code, while migrations remain applied; new migrations
+      must stay compatible with the previous application version. The install
+      and deploy guides now say this explicitly.
+- [x] System-mode verification in a disposable Ubuntu 24.04 **container** with
+      systemd, Caddy and a disposable PostgreSQL 16 database: creative,
+      photography and web-design companies installed on distinct ports and
+      projects; services and health/update timers were active; Caddy validated
+      and local HTTPS returned 200. Cross-company file reads failed, owner
+      password sign-ins succeeded, and an old shared-account installation was
+      migrated successfully. A synthetic update with migration 007 and a
+      broken build left the prior release live and migration count at seven.
+- [ ] Still required before production: repeat the full `INSTALL.md` procedure
+      on a fresh Ubuntu 24.04 **VM/server** with real test DNS, reboot, nightly
+      timer execution, backup/restore, and the remaining checks in
+      `docs/PRODUCTION-READINESS-REVIEW.md`. The container drill does not prove
+      the full production path.
+
+## 2026-11-15 (round 19) — Production readiness review brief
+
+- [x] **[docs/PRODUCTION-READINESS-REVIEW.md](docs/PRODUCTION-READINESS-REVIEW.md)**:
+      instructions for an independent AI reviewer to decide GO / NO-GO for
+      PIBASE and Local Manager. It covers ground rules (no production data,
+      evidence tags, severity and verdict rules), how to set up a test server,
+      and a checklist for build, install, updates and rollback, migrations,
+      security, concurrency, every workflow per business type, real
+      Resend/Stripe test accounts, operations (backup restore drill,
+      monitoring, memory on 2 GB), front end, and legal review of the contract
+      templates. It ends with the report format.
+- [ ] Run the review before launch. Its first priority is the systemd, timer
+      and Caddy steps of the installer, which haven't been run on a real server.
+
+## 2026-11-15 (round 18) — Fixes from the hard-mode run (many clients at once), install guide
+
+### ⚠️ Before using
+- [ ] Database update **`pibase-migration-006-concurrency.sql`**: applied
+      automatically by `scripts/update.sh` / `scripts/migrate.mjs`. For a
+      server still updated by hand, apply it with PIBASE's `migration-apply`.
+      It renumbers any duplicate invoice numbers (newest copies get new
+      numbers) before making numbers unique.
+- [ ] Deploy the PIBASE fix from round 17 too (the app was tested against it).
+
+### Install guide
+- [x] **[INSTALL.md](INSTALL.md)**: one step-by-step guide for both systems:
+      DNS, server, private-repository deploy keys, PIBASE setup, installing
+      each company, checks, what the owner sets up in the app, updates,
+      backups and the keys to keep safe, moving an existing installation,
+      removing a company, troubleshooting.
+
+### Fixed (found by the bug-hunter with 24 clients acting at once)
+- [x] **Critical: a forged Stripe event could mark another studio's invoice
+      paid.** The webhook now re-reads the payment from Stripe with the
+      studio's own key (made-up events are refused) and only credits invoices
+      of the studio whose keys verified it.
+- [x] **Duplicate invoice numbers** when several quotes were accepted at once
+      (12 invoices all #1003). The database now hands out the next number
+      and keeps numbers unique per business. A client clicking accept at the
+      same moment as another now also gets their invoice link.
+- [x] **Chat messages lost** when sent at the same moment (5 of 6 lost) and
+      several conversations created for one client. Messages are now added
+      in one database step.
+- [x] **Studio signature lost** when the client signed at the same moment.
+      Both signatures are now merged in the database.
+- [x] **An open tab overwrote newer changes** (accepted quotes reverted and
+      invoiced twice, questionnaire answers wiped, payments from another tab
+      erased, stage changes reverted, a business-type switch undone, a
+      deleted booking written back): the app now saves only the fields this
+      tab changed, keeps what clients, Stripe and other tabs saved (payments,
+      signatures, accepted quotes, answers, messages), never re-creates a
+      record deleted elsewhere, and saves only the setting that changed.
+- [x] **Gift card refunded twice** through a deleted-then-restored booking:
+      only the real booking transaction can take a discount now.
+- [x] **Rescheduling an online booking** left its time reserved at the old
+      slot: the reservation now moves with it.
+- [x] **Payment on an invoice whose client was just deleted** kept the app
+      on "Save failed · retrying" and blocked other saves: such documents are
+      saved without the client link, and one failing collection no longer
+      holds back the others.
+- [x] **Busy moments** (many clients at once) failed with "not found" or
+      errors: requests PIBASE turns away for being too many are retried
+      briefly, and real lookup failures say "busy, try again" instead of
+      "not found".
+- [x] **Rate limit bypass** with a made-up X-Forwarded-For header: only the
+      address added by this server's own proxy is used.
+- [x] **Duplicate clients** from simultaneous contact-form submissions.
+- [x] Owner's "Accepted → create invoice" no longer makes a second invoice
+      when the client accepted first.
+- [x] Questionnaires: only the first submission counts.
+- [x] Signing link: name capped at 120 characters, email must be text and
+      valid.
+- [x] A document can only be linked to the business's own clients.
+- [x] Creative agreement ticks Photography for photo project types (Family,
+      Maternity, Newborn, Portrait…).
+- [x] Inbox rows no longer slightly wider than a phone screen.
+
+### Verified (re-running the agent's own reproduction scripts)
+- [x] Forged webhook → refused. 12 quotes + 8 repeat clicks at once → 12
+      invoices, all numbers unique. 6 simultaneous chat messages → all kept;
+      two clients streaming 29 messages each → 29 of 29. 32 sign +
+      countersign races → 0 signatures lost. Two tabs paying $300 + $200 →
+      both kept, $500. Stage change + note in two tabs → both kept. Stale
+      quote save / accept → still accepted, one invoice. Questionnaire →
+      answers kept, title change saved, later submissions refused.
+      Reschedule → reserved slots moved 10:00 → 14:00. Deleted-and-restored
+      booking → gift card refunded once.
+- [ ] Not re-run: the deleted-client payment and stale business-type cases
+      (the agent's scripts no longer matched the changed test data); the
+      inbox width fix wasn't checked on a phone screenshot.
+
+## 2026-11-15 (round 17) — Hands-off deployment, and a PIBASE fix
+
+### ⚠️ Before using
+- [ ] Read [docs/DEPLOY.md](docs/DEPLOY.md). Existing servers keep working
+      as they are; new companies are installed with `scripts/install.sh`.
+- [ ] PIBASE: deploy the fix on branch `claude/bold-johnson-ajedtz` of
+      `515woodpl-dot/pibase` (merge it, then PIBASE's `scripts/update.sh`).
+
+### One-command install per company (`scripts/install.sh`)
+- [x] Creates the company's own PIBASE project, writes settings with fresh
+      secrets, applies the database, creates the owner already confirmed
+      (random password saved root-only), fills in business name, type,
+      stages and lists, runs the app as a systemd service, adds HTTPS in
+      Caddy, checks it's healthy. Several companies per server; ports picked
+      automatically. Safe to run again.
+- [x] No email confirmation, sign-up or Settings clicks are needed before
+      the owner can sign in.
+
+### Automatic updates (`scripts/update.sh`, nightly with `--auto-update`)
+- [x] Backs up the PIBASE project, builds the new version in its own folder,
+      applies new database updates, switches over, health-checks, and puts
+      the previous version back if the new one doesn't build or isn't
+      healthy. A failed version is skipped until a newer one arrives.
+- [x] Database updates apply automatically (`scripts/migrate.mjs`): a new
+      project gets the full schema, then every numbered migration once;
+      PIBASE records each by name. Older projects set up by hand are fine.
+- [x] Health check every 10 minutes restarts an app that stops answering.
+- [x] `deploy.sh` now just runs the updater (the old one reset to `main` and
+      restarted with pm2, with no database updates or checks).
+
+### PIBASE fix (found by the bug-hunter in PIBASE mode)
+- [x] A raw `;` in a data-API query string made PIBASE silently drop that
+      filter, so a read, update or delete could touch more rows than asked
+      (all of a user's rows, or every user's rows with the service key). The
+      gateway now refuses such query strings with a 400. Encoded values
+      (`%3B`), which is what the app sends, work as before.
+- [ ] Also reported, not changed: `/metrics` answers without a key (counts
+      only, no data), and database error details reach the client (same as
+      Supabase).
+
+### Verified
+- [x] Full install of a new company against a real local PIBASE (no
+      systemd): project created, schema applied, owner signed in to a
+      dashboard showing the company's name and creative studio stages.
+      Re-running the installer kept the project and the owner.
+- [x] Updates: nothing new → nothing done; good version → live and
+      healthy; broken build → old version kept; unhealthy version → rolled
+      back; same broken version next night → skipped.
+- [x] Database updates run twice: second run changes nothing.
+- [x] PIBASE: the attack's read and delete now get 400 and no rows change;
+      normal reads work; gateway unit tests pass.
+- [ ] systemd units, timers and the Caddy site were written but not run here
+      (no systemd/Caddy in the test machine). First real install should be
+      watched once.
+
+## 2026-11-15 (round 16) — Digital creative studio and the modular Creative Services Agreement
+
+### ⚠️ Before using
+- [ ] No database migration needed.
+- [ ] To use it: Settings → Business profile → Type of business →
+      **Digital creative studio**. New accounts can pick it on sign-up.
+- [ ] Have a lawyer review the agreement, including the new branding and
+      video / social media sections, before relying on it.
+
+### Digital creative studio (new business type)
+- [x] Covers web design and development, photography, branding and graphic
+      design, and video and social media content.
+- [x] Wording: Services, Bookings, Project type, Start date. The tagline
+      reads "Creative Studio CRM".
+- [x] Starting lists: project types (Website, Photography, Branding & Logo,
+      Graphic Design, Video, Social Media Content, Website + Photography,
+      Full Brand Package), stages (Inquiry → Signed → Discovery → In
+      production → Client review → Delivered), contact form options, starter
+      questionnaire, quick replies, booking reminder text.
+- [x] Sample services for the booking page: Discovery Call, Starter /
+      Business Website, Brand Photo Shoot, Product Photography, Logo & Brand
+      Identity, Promo Video, Social Media Content (monthly), Website +
+      Photography Package. Booking page copy: "Web · Photo · Brand · Video".
+
+### Creative Services Agreement (one modular agreement)
+- [x] New default agreement for the creative studio, also offered to every
+      business type. At the top, **Services in this agreement**: tick web,
+      photography, branding, video & social.
+- [x] Only the ticked services appear: their own section, their fee line,
+      their timeline phases, revision rounds, ownership clauses, hosting and
+      maintenance (web), shoot cancellation and equipment clauses (photo or
+      video). Section numbers and "see Section N" references follow.
+- [x] Web and photography sections keep your web + photography agreement's
+      wording. New, in the same style: **Branding** (logo concepts → one
+      final logo, brand guide, other design items, files, client owns the
+      final logo after payment) and **Video & social media content** (videos
+      with length, filming hours, formats and delivery; and/or posts per
+      month, months, platforms, monthly content calendar approval, what's not
+      included such as ad spend).
+- [x] Fees add up per ticked service; deposit / first approval / final
+      payments are worked out in dollars.
+- [x] Services are pre-ticked from the client's project type (e.g. "Website +
+      Photography"). Saving is blocked with no service ticked, with required
+      details empty, or when a video & social section has neither videos nor
+      posts.
+- [x] The separate web + photography agreement is no longer offered for new
+      contracts. Contracts already written with it still open and edit.
+
+### Verified
+- [x] Switched the test business to Digital creative studio: wording and
+      stages changed.
+- [x] Wrote and saved four agreements: web + photo (13 sections), branding
+      only (11), social media only (11), all four services (15). Sections
+      numbered in order, nothing left as [blank], fees and payments correct.
+- [x] Saving blocked with no service ticked; the earlier web + photography
+      contract still opens with its values.
+
+## 2026-11-15 (round 15) — Fixes from the bug-hunter agent
+
+### ⚠️ Before using
+- [ ] Apply **`pibase-migration-005-canceled-bookings.sql`** in PIBASE
+      (existing projects). New projects get it from `pibase-schema.sql`.
+
+### Found by the agent and fixed
+- [x] **Reopening a canceled booking reused its discount and lost its time
+      slot.** Canceling gives back the slot and the coupon / gift-card value;
+      switching the booking back to Confirmed kept the discount on the
+      booking but left the coupon reusable and the gift card refilled.
+      Canceled bookings now stay canceled: the database keeps them canceled,
+      and the Sessions status list, the meeting window and the calendar no
+      longer offer to reopen them (they say to book a new one).
+- [x] **The contact form could add leads to any account** by naming another
+      account's id. It now always files leads under this deployment's own
+      business (`STUDIO_OWNER_USER_ID`).
+- [x] **No limit on public forms.** The contact form takes 5 messages and the
+      booking page 6 requests per connection per 10 minutes, then asks the
+      visitor to try again later.
+- [x] **Links in emails could follow a forged address** when
+      `NEXT_PUBLIC_APP_URL` isn't set (from round 11). Links now use
+      `NEXT_PUBLIC_APP_URL`, or else the address the signed-in owner opens
+      the app on (remembered automatically). A visitor's request never sets
+      it. Settings shows which address links use when it isn't fixed.
+
+### Verified
+- [x] Agent run: no cross-account access, no token tampering, no price
+      manipulation, no script injection, quote acceptance creates one
+      invoice even when sent 6 times at once, all pages clean at phone width.
+- [x] After the fixes: a lead aimed at another account lands in the owner's;
+      the 6th contact message in 10 minutes gets "try again later"; a
+      reopened canceled booking stays canceled with its slot released; with
+      no app URL set, the owner's address is remembered and a forged host on
+      a client's request doesn't change the links.
+
+### Not covered yet
+- [ ] Stripe payments, emails and the inbound-email webhook against real
+      accounts (no keys in the test setup).
+- [ ] CSV import doesn't check email addresses or skip duplicates.
+
+## 2026-11-15 (round 14) — The business's own logo and name everywhere
+
+- [x] **"Local Manager" / "LM" is only the starting default.** Once a logo or
+      business name is saved in Settings → Business profile, the app shows
+      it instead: sign-in page, sidebar, browser tab title, install banner,
+      "new version" bar, the installed app's name, and the mark in
+      confirmation dialogs (logo, or the business's initials).
+- [x] Logo saved → the logo is shown. Name only → the name is shown. Neither
+      → "Local Manager". The sign-in page drops the "Clients · Projects ·
+      Invoices" line once a business has its own brand.
+- [x] Changes show straight away after saving, without reloading. The last
+      known brand is remembered on each device so the default doesn't flash
+      first.
+- [x] New public endpoint `/api/brand` (name and logo link only; the same
+      details clients already see on the booking and contact pages). It
+      reads the owner set by `STUDIO_OWNER_USER_ID`, so each deployment
+      shows its own company.
+- [x] Verified in the browser: default, logo + name, and name-only, on the
+      sign-in page (fresh browser) and in the app.
+
+## 2026-11-15 (round 13) — Renamed to Local Manager
+
+- [x] The app is now **Local Manager** everywhere people see it: sidebar,
+      login page, browser tab, loading and error screens, install banner and
+      Settings → App, offline page, notifications, calendar export and the
+      default installed-app name (when no business name is set).
+- [x] New default **"LM" icons** (home screen, favicon, Apple icon, Android
+      badge) replace the "EH" ones. A logo uploaded in Settings still wins.
+- [x] Package name is `local-manager`. Service worker cache bumped (`ehs-v4`)
+      so installed apps pick up the new name and icons.
+- [x] Kept on purpose: internal storage keys, event names and the encryption
+      and reply-address salts still start with `ehs`. Changing them would
+      sign people out of saved views and make saved API keys and reply
+      addresses stop working.
+- [x] Verified: build passes; login, dashboard and tab title show "Local
+      Manager"; no console errors.
+- [ ] iPhones keep the old icon and name until the app is removed and added
+      to the Home Screen again.
+- [ ] The repository and server folder are still named `ehsmanager`; rename
+      them on GitHub and the server when convenient (update `deploy.sh` and
+      the pm2 name with them).
+
+## 2026-11-15 (round 12) — Web design + photography agreement
+
+### ⚠️ Before using
+- [ ] No database migration needed.
+- [ ] The agreement is your template as written. Have a lawyer review it
+      (liability, copyright, governing law) before relying on it.
+
+### What's new
+- [x] **Web Design, Development & Photography Services Agreement** is now a
+      third agreement in the contract builder. Pick it in the new
+      **Agreement** list when you create a contract (Photography, Website
+      design, or Web design + photography). Every business type can use it.
+- [x] Every [bracketed] item in your template is a field, grouped as Project,
+      Web design and development, Photography, Timeline, Fees and payment,
+      Responsibilities and revisions, Ownership/hosting/maintenance, and
+      Confidentiality/termination/law. Dates, counts, percentages and rates
+      you had in brackets start with your values (40/30/30 payments, 7 / 14 /
+      30 days, 72 hours, 50%, 1.5% interest…) and can be changed per client.
+- [x] **Fees are calculated**: web fee + photography fee = total, with the
+      deposit, design-approval and final payments worked out in dollars. The
+      final payment is the remainder, so the three always add up. The form
+      warns if the percentages go over 100%.
+- [x] **Optional clauses** appear only when filled in: copyright transfer fee,
+      credit-line removal fee, hosting by you, maintenance plan fee.
+- [x] **Required details** (marked *) must be filled in before saving: the
+      contract can't be saved with a [bracket] left in it. The preview shows
+      anything still missing as [Label].
+- [x] Filled-in details are highlighted for the client, like the other
+      agreements. Provider details come from Settings (name, email, address,
+      phone), client details from the client record, the first fee from the
+      client's invoice, the shoot location and date from their meeting.
+- [x] Saved agreements reopen as the same agreement with the same values.
+- [x] Business phone from Settings is now available to contracts.
+
+### How your template was adapted
+- [x] The dated heading line ("Nov 13, 2026") and the closing "template is a
+      starting point, not legal advice" note were left out of the contract
+      itself; the agreement shows the date it is made on.
+- [x] The phase and fee tables became bulleted lists, and numbered lists in
+      sections 3 and 8 became 3.1–3.9 and 8.1–8.6, because agreements are
+      stored as plain text.
+- [x] Section 13 is headed "Acceptance" with the sentence "By signing, both
+      parties agree…", followed by the app's signature block (draw or type,
+      both parties), which replaces the Name / Title / Signature / Date table.
+
+### Verified
+- [x] Created, saved, reopened and viewed as the client: all values, fee
+      math ($5,700 → $2,280 / $1,710 / $1,710), optional hosting clause shown
+      and unused optional clauses hidden, no leftover brackets, signing page
+      and signature block.
+- [x] Saving is blocked, with a list of what's missing, until required
+      details are filled in.
+
+## 2026-11-15 (round 11) — No built-in studio domain
+
+### ⚠️ Before deploying
+- [ ] **Set the sending address**: Settings → Email → "Send emails from", or
+      `RESEND_FROM_EMAIL` on the server. Email no longer has a built-in
+      address, so without one it stops with a message saying so.
+- [ ] Keep `NEXT_PUBLIC_APP_URL` set in production (recommended). `BOOKING_HOST`
+      no longer defaults to a booking.elliesheartstrings.com host: set it if
+      you use a separate booking host.
+- [ ] `scripts/heartbeat.sh` now reads `APP_URL` from its environment.
+
+### What changed
+- [x] Links in emails, the signing link, chat link, Stripe return address and
+      webhook addresses use `NEXT_PUBLIC_APP_URL` if set, otherwise the
+      address the request came in on (also behind a proxy).
+- [x] The sending address comes from Settings or `RESEND_FROM_EMAIL` only.
+- [x] No fixed booking host, deploy message, heartbeat address or push contact
+      address any more.
+
+## 2026-11-15 (round 10) — Works for web design businesses too, review fixes
+
+### ⚠️ Before using
+- [ ] No database migration needed. The type of business is saved with the
+      business profile.
+- [ ] Deploy as usual (`npm install`, `npm run build`, restart). Next.js moved
+      from 16.4.0 to 16.4.6, see "Security" below.
+- [ ] Nothing changes for the current photography setup until you switch the
+      type in Settings.
+
+### Type of business: Photography or Web design
+- [x] **Settings → Business profile → Type of business.** New accounts pick
+      it on the sign-up form.
+- [x] **Wording follows the type** everywhere: the menu (*Session Types /
+      Sessions* become *Services / Meetings*), dashboard, analytics,
+      calendar, project cards, client forms (*Session type / Session date*
+      become *Project type / Kickoff date*), toasts, search, the calendar
+      export file name and the tagline under the app name.
+- [x] **Starting lists switch with the type**: project types (New Website,
+      Website Redesign, Online Store…), pipeline stages (Inquiry → Signed →
+      Design → Development → Review → Launched) and contact form options.
+      Lists you edited yourself are only replaced if you say OK. Clients keep
+      their place in the pipeline (first stage stays first, finished stays
+      finished).
+- [x] **Sample services** for web design (Discovery Call, Website Audit,
+      Landing Page, Starter / Business Website, Online Store, Care Plan).
+      "Load sample packages" adds the set for your type.
+- [x] **Public booking page** uses your business name and the type's wording
+      and copy instead of the fixed "Ellie's Heartstrings · Photography". A
+      free service shows "Free" and hides the discount and total lines.
+- [x] **Contact form** asks "What can we help you with?" for web design, and
+      the page title includes the business name.
+- [x] **Emails and client pages**: the reminder, questionnaire and contract
+      emails, the email header, the signing page and chat page use the
+      business name and type. The signing page no longer says "Ellie's
+      Heartstrings Photography" for every business.
+- [x] **Questionnaires** start with web design questions (goal of the site,
+      customers, sites you like, domain / hosting / content).
+- [x] Quick replies, line-item hints and meeting-notes hints match the type.
+
+### Contracts
+- [x] **Website Design Services Agreement** template for web design: scope,
+      revisions, deposit, third-party costs, client content and approvals,
+      delays, ownership on payment, hosting and maintenance after launch,
+      liability. Fields: project type, start date, website address, scope of
+      work, fee, deposit %, balance due date or milestone.
+- [x] The **business name** in both agreements comes from your business
+      profile and can be edited per contract. It was fixed text before.
+- [x] Business email and city are filled from your profile instead of fixed
+      values.
+- [x] A saved contract keeps the agreement it was written with, even after
+      the type of business changes.
+- [ ] The web design agreement is a starting template. Have a lawyer review
+      it before relying on it.
+
+### Fixes found in the review
+- [x] **Projects board** with more than four stages made the whole page wider
+      than the screen and pushed "+ New project" off the edge. The board now
+      scrolls inside the page.
+- [x] **CSV import**: names with commas inside quotes were split, dates like
+      `7/4/2026` were stored as typed and then blocked saving ("Save failed ·
+      retrying"), and unknown stages hid the client from the board. Import now
+      uses a real CSV reader, converts dates, matches stages by name, and
+      understands "First name / Last name", "Project type", "Stage" columns.
+- [x] **Type pickers** showed the first type when a client's type wasn't in
+      the list (booked online, or after renaming types). They now show the
+      client's actual type.
+- [x] **Calendar → New**: the type shown in the picker and the type saved
+      could differ. Fixed, and services from the booking catalog can be
+      picked too.
+- [x] **New clients** from "Add client" and the contact form start in your
+      first pipeline stage instead of a fixed "inquiry".
+- [x] **Contact form**: when an email already belonged to more than one
+      client, each new submission added another copy. The form could not be sent when all checkbox
+      options were removed. Other businesses' default options no longer flash
+      while the form loads.
+- [x] **Reminder email** no longer shows the internal note "Public booking
+      request" to the client, and a failed reminder now says why.
+- [x] **Sign-in page** showed `{}` when the server had a problem. It now
+      shows a readable message.
+- [x] A questionnaire for a client without a type is titled "Questionnaire"
+      instead of "Session Questionnaire".
+- [x] Search results and the calendar export no longer show a stray "·" or
+      "-" when a type, email or location is missing.
+
+### Security
+- [x] **Next.js 16.4.0 → 16.4.6.** 16.4.0 has a published critical
+      vulnerability; the build stopped once with a warning because of it.
+      `npm audit` now reports 0 vulnerabilities.
+
+### Verified
+- [x] Ran the app against a real local PIBASE (PostgreSQL 16 + the PIBASE
+      gateway) with a fresh project and `pibase-schema.sql`.
+- [x] `next build` passes.
+- [x] All 13 screens load with no console or network errors, in both types,
+      at 1400px, 1100px and 390px wide, with nothing wider than the screen.
+- [x] CSV import with a quoted comma, `7/4/2026`, `July 9, 2026`, an invalid
+      date and stage names: all saved correctly.
+- [x] Switching Web design → Photography moves clients back onto the
+      photography stages.
+- [x] Photography: new project, sample session types, publish, invoice,
+      contract with the business name filled in.
+- [x] Switch to Web design in Settings: wording, stages and lists change and
+      survive a reload. New sign-up as Web design starts with the web lists.
+- [x] Web design, end to end: sample services → public booking page → a
+      client books a Discovery Call → contact form lead → both appear as
+      clients. Quote → client accepts → invoice created. Questionnaire →
+      client answers. Contract → client signs on the signing page. Client
+      chat message appears in the Inbox.
+- [ ] Email sending (Resend), online payments (Stripe) and push were not
+      exercised: no keys in the test setup.
+
+---
+
 ## 2026-10-16 (round 9) — Payment plans, studio countersigning, contract highlights, live chat
 
 ### ⚠️ Before using
@@ -643,6 +1141,14 @@ every round of changes, and keep the "Open / follow-ups" list current.
 ---
 
 ## Open / follow-ups
+- [ ] Have a lawyer review the web design agreements (both templates).
+- [ ] Existing session types / services stay as they are when the type of
+      business changes (they may be on the public booking page). Unpublish or
+      delete the ones that no longer apply.
+- [ ] The app itself is still named "EHS Studio" (install banner, login,
+      browser title). Client-facing pages use the business name.
+- [ ] Only two business types exist. Others can be added in
+      `lib/businessTypes.js`.
 - [ ] Online payments were tested against a stand-in for Stripe (signed
       webhook events), not a real Stripe account. Make one test payment in
       Stripe test mode before going live.

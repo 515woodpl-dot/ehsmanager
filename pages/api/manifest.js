@@ -12,7 +12,7 @@ export default async function handler(req, res) {
     const { data } = await db.from('studio_settings').select('branding').eq('user_id', studioId).maybeSingle()
     branding = data?.branding || {}
   }
-  const name = (branding.businessName || 'EHS Studio Manager').trim()
+  const name = (branding.businessName || 'Local Manager').trim()
   const shortName = name.length > 14 ? name.split(/\s+/).slice(0, 2).join(' ').slice(0, 14) : name
   const v = iconVersion(branding)
   const icon = (file, size, purpose) => ({ src: `/api/app-icon/${file}?v=${v}`, sizes: `${size}x${size}`, type: 'image/png', purpose })
@@ -24,14 +24,14 @@ export default async function handler(req, res) {
     id: '/',
     name,
     short_name: shortName,
-    description: `Clients, sessions, invoices, contracts and messages for ${name}.`,
+    description: `Clients, projects, invoices, contracts and messages for ${name}.`,
     start_url: '/?source=pwa',
     scope: '/',
     display: 'standalone',
     orientation: 'any',
     background_color: cleanColor(branding.iconBackground),
     theme_color: '#ffffff',
-    categories: ['business', 'productivity', 'photo'],
+    categories: ['business', 'productivity'],
     icons: [icon('icon-192.png', 192, 'any'), icon('icon-512.png', 512, 'any'), icon('icon-maskable-512.png', 512, 'maskable')],
     shortcuts: [shortcut('Inbox', 'inbox'), shortcut('Clients', 'clients'), shortcut('Invoices', 'invoices'), shortcut('Calendar', 'calendar')],
   }))

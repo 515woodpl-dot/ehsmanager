@@ -1,27 +1,24 @@
 import { useState, useEffect } from 'react'
 import Head from 'next/head'
-import { STORAGE_KEY, DEFAULT_FORM_SETTINGS } from '../lib/data'
+import { DEFAULT_FORM_SETTINGS } from '../lib/data'
+import { businessTerms } from '../lib/businessTypes'
 
 const uid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => { const r = Math.random() * 16 | 0; return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16) })
 
-// Form settings now come from the server (per-studio); localStorage kept
-// only as an instant-render fallback while the fetch is in flight.
-function loadSettingsFallback() {
-  if (typeof window === 'undefined') return DEFAULT_FORM_SETTINGS
-  try {
-    const s = localStorage.getItem(STORAGE_KEY)
-    if (s) return JSON.parse(s).formSettings || DEFAULT_FORM_SETTINGS
-  } catch (e) {}
-  return DEFAULT_FORM_SETTINGS
-}
+// Form settings come from the server (per business). Until they arrive the
+// form shows without the checkbox options, so a visitor never sees another
+// kind of business's choices.
+const loadSettingsFallback = () => ({ ...DEFAULT_FORM_SETTINGS, checkboxOptions: [] })
 
 export default function ContactPage() {
   const [settings, setSettings] = useState(loadSettingsFallback)
   const [configError, setConfigError] = useState('')
+  const [terms, setTerms] = useState(() => businessTerms())
+  const [businessName, setBusinessName] = useState('')
   useEffect(() => {
     fetch('/api/public-form')
       .then(r => { if (!r.ok) throw new Error('Contact form is temporarily unavailable.'); return r.json() })
-      .then(j => { if (j?.settings) setSettings(j.settings); else throw new Error('Contact form is temporarily unavailable.') })
+      .then(j => { if (j?.settings) { setSettings({ ...DEFAULT_FORM_SETTINGS, ...j.settings }); setTerms(businessTerms(j.businessType)); setBusinessName(j.businessName || '') } else throw new Error('Contact form is temporarily unavailable.') })
       .catch(e => setConfigError(e.message))
   }, [])
   const [form, setForm] = useState({ name: '', email: '', phone: '', services: [], message: '', website: '' })
@@ -46,7 +43,7 @@ export default function ContactPage() {
     if (!form.email.trim()) e.email = 'Email is required'
     else if (!/\S+@\S+\.\S+/.test(form.email)) e.email = 'Enter a valid email'
     if (!form.phone.trim()) e.phone = 'Phone number is required'
-    if (form.services.length === 0) e.services = 'Please select at least one option'
+    if ((settings.checkboxOptions || []).length > 0 && form.services.length === 0) e.services = 'Please select at least one option'
     return e
   }
 
@@ -110,7 +107,7 @@ export default function ContactPage() {
   return (
     <>
       <Head>
-        <title>{settings.formTitle || 'Contact Us'}</title>
+        <title>{[settings.formTitle || 'Contact Us', businessName].filter(Boolean).join(' | ')}</title>
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="true" />
@@ -220,9 +217,9 @@ export default function ContactPage() {
             </div>
 
             {/* Services checkboxes */}
-            <div style={{ marginBottom: 20 }}>
+            {(settings.checkboxOptions || []).length > 0 && <div style={{ marginBottom: 20 }}>
               <label style={{ display: 'block', fontSize: 12, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#7F7E7C', marginBottom: 4 }}>
-                What kind of memories would you like captured? <span style={{ color: '#991F1F' }}>*</span>
+                {terms.contactQuestion} <span style={{ color: '#991F1F' }}>*</span>
               </label>
               <div style={{ fontSize: 12, color: '#B0AFAD', marginBottom: 10 }}>Select up to {maxChecked}</div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }} className="contact-checkbox-grid">
@@ -238,7 +235,7 @@ export default function ContactPage() {
                 })}
               </div>
               {errors.services && <div style={{ fontSize: 12, color: '#991F1F', marginTop: 8 }}>{errors.services}</div>}
-            </div>
+            </div>}
 
             {/* Message */}
             <div style={{ marginBottom: 28 }}>
