@@ -1,10 +1,11 @@
+import { loadStudioConfig } from '../../lib/studioConfig'
 import { createServiceClient } from '../../lib/pibase'
 import { notifyStudio } from '../../lib/push'
 import { createInvoiceToken, verifyQuoteToken } from '../../lib/signingTokens'
 import { nextInvoiceNumber } from '../../lib/invoices'
 import { appUrl } from '../../lib/documentEmail'
 
-const invoiceLink = (id, req) => { try { return appUrl(`/invoice/${createInvoiceToken(id)}`, req) } catch { return null } }
+const invoiceLink = (id, config) => { try { return appUrl(`/invoice/${createInvoiceToken(id)}`, config) } catch { return null } }
 
 // Public endpoint: the client accepts a quote from its emailed link. The
 // quote is marked accepted and an unpaid invoice is created from its items.
@@ -20,7 +21,7 @@ export default async function handler(req, res) {
   const details = quote.line_items && !Array.isArray(quote.line_items) ? quote.line_items : { items: quote.line_items || [] }
 
   if (quote.status === 'accepted') {
-    return res.status(200).json({ alreadyAccepted: true, invoiceUrl: details.invoiceId ? invoiceLink(details.invoiceId, req) : null })
+    return res.status(200).json({ alreadyAccepted: true, invoiceUrl: details.invoiceId ? invoiceLink(details.invoiceId, await loadStudioConfig(db, quote.user_id)) : null })
   }
   if (quote.note && quote.note < new Date().toLocaleDateString('en-CA')) {
     return res.status(409).json({ error: 'This quote has expired. Please contact the studio for an updated quote.' })
@@ -52,5 +53,5 @@ export default async function handler(req, res) {
 
   await db.from('quotes').update({ line_items: { ...details, invoiceId: invoice.id, acceptedAt } }).eq('id', quote.id)
   await notifyStudio(db, quote.user_id, { type: 'documents', title: `✅ ${quote.client_name || 'A client'} accepted quote ${quoteNumber || ''}`.trim(), body: `Invoice ${invoice.number} for $${Number(quote.amount || 0).toLocaleString('en-US')} was created`, url: '/?view=invoices', tag: `quote-${quote.id}` })
-  return res.status(200).json({ accepted: true, invoiceNumber: invoice.number, invoiceUrl: invoiceLink(invoice.id, req) })
+  return res.status(200).json({ accepted: true, invoiceNumber: invoice.number, invoiceUrl: invoiceLink(invoice.id, await loadStudioConfig(db, quote.user_id)) })
 }

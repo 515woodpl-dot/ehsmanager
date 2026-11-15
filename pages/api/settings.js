@@ -1,6 +1,6 @@
 import { requireUser } from '../../lib/api-auth'
 import { isBusinessType } from '../../lib/businessTypes'
-import { SECRET_FIELDS, DEFAULT_INTEGRATIONS, NOTIFY_TYPES, canStoreSecrets, saveStudioSecrets, loadStudioConfig, appUrl } from '../../lib/studioConfig'
+import { APP_URL, SECRET_FIELDS, DEFAULT_INTEGRATIONS, NOTIFY_TYPES, canStoreSecrets, saveStudioSecrets, loadStudioConfig, appUrl } from '../../lib/studioConfig'
 
 const BRANDING_FIELDS = ['businessName', 'ownerName', 'studioEmail', 'phone', 'website', 'address', 'signature', 'logo', 'iconBackground', 'businessType']
 const EMAIL_RE = /^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/
@@ -21,6 +21,8 @@ function describe(config) {
     keys,
     canStoreSecrets: canStoreSecrets(),
     migrationNeeded: config.migrationNeeded,
+    // Where links in emails point, and whether that's fixed on the server.
+    appAddress: { fixed: !!APP_URL, address: APP_URL || config.origin || config.integrations.appOrigin || '' },
     webhooks: {
       stripe: appUrl(`/api/webhook?studio=${studio}`, config),
       inbound: appUrl(`/api/inbound-email?studio=${studio}`, config),

@@ -480,11 +480,12 @@ export function SessionModal({ client: clientProp, session, data, setData, toast
       {isEdit && (
         <div style={T.formGroup}>
           <label style={T.formLabel}>Status</label>
-          <select style={T.formInput} value={form.status} onChange={e => setForm({ ...form, status: e.target.value })}>
+          <select style={T.formInput} value={form.status} disabled={session?.status === 'canceled'} onChange={e => setForm({ ...form, status: e.target.value })}>
             <option value="pending">Pending</option>
             <option value="confirmed">Confirmed</option>
             <option value="canceled">Canceled</option>
           </select>
+          {session?.status === 'canceled' && <div style={{ fontSize: 11.5, color: C.faint, marginTop: 5 }}>Canceled {terms.sessionsLower} can't be reopened: the time and any discount were released. Schedule a new one instead.</div>}
         </div>
       )}
       <div style={T.formGroup}>

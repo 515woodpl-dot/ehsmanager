@@ -16,7 +16,7 @@ export default async function handler(req, res) {
   if (!contract.client_id) return res.status(400).json({ error: 'Link a client before sharing the contract' })
 
   try {
-    const url = appUrl(`/sign/${createContractToken(contract.id)}`, req)
+    const url = appUrl(`/sign/${createContractToken(contract.id)}`, auth.config)
     return res.status(200).json({ url })
   } catch {
     return res.status(503).json({ error: 'Contract signing is not configured' })

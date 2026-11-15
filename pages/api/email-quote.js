@@ -17,7 +17,7 @@ export default async function handler(req, res) {
 
   const number = row.line_items?.number || 'Quote'
   let buttonUrl = null
-  try { buttonUrl = appUrl(`/quote/${createQuoteToken(row.id)}`, req) } catch { buttonUrl = null }
+  try { buttonUrl = appUrl(`/quote/${createQuoteToken(row.id)}`, auth.config) } catch { buttonUrl = null }
   const amount = '$' + Number(row.amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })
 
   return sendDocumentEmail(res, auth, {

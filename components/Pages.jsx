@@ -322,7 +322,10 @@ export function Calendar({ data, setData, toast, openClientCard }) {
     if (data.bookings.some(b => { if (b.date !== form.date || !b.time || b.status === 'canceled') return false; const other = Number(b.time.slice(0,2)) * 60 + Number(b.time.slice(3,5)); return start < other + (b.durationMinutes || 60) && start + 60 > other })) { toast(`That time overlaps another ${terms.sessionLower}`); return }
     setData(d => ({ ...d, bookings: [...d.bookings, { id: uid(), ...form, clientId: client.id, status: 'pending' }] })); toast(`${terms.session} added`); setModal(false); setForm(blank)
   }
-  const toggle = id => { setData(d => ({ ...d, bookings: d.bookings.map(b => b.id === id ? { ...b, status: b.status === 'confirmed' ? 'pending' : 'confirmed' } : b) })); toast('Status updated') }
+  const toggle = id => {
+    if (data.bookings.find(b => b.id === id)?.status === 'canceled') { toast(`Canceled ${terms.sessionsLower} can't be reopened. Book a new one instead.`); return }
+    setData(d => ({ ...d, bookings: d.bookings.map(b => b.id === id ? { ...b, status: b.status === 'confirmed' ? 'pending' : 'confirmed' } : b) })); toast('Status updated')
+  }
   const del = id => { if (!confirm(`Delete this ${terms.sessionLower}?`)) return; setData(d => ({ ...d, bookings: d.bookings.filter(b => b.id !== id) })); toast('Deleted') }
   const [sendingReminder, setSendingReminder] = useState(null)
   const sendReminder = async (b) => {

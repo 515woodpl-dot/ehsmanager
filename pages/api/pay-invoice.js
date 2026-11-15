@@ -30,7 +30,8 @@ export default async function handler(req, res) {
     const { data: client } = await db.from('clients').select('email').eq('id', row.client_id).eq('user_id', row.user_id).maybeSingle()
     email = client?.email || undefined
   }
-  const back = appUrl(`/invoice/${req.body.token}`, req)
+  let back
+  try { back = appUrl(`/invoice/${req.body.token}`, config) } catch { return res.status(503).json({ error: 'Online payment is not available yet. Please contact us to pay.' }) }
   const label = row.number || 'Invoice'
   try {
     const session = await stripe.checkout.sessions.create({

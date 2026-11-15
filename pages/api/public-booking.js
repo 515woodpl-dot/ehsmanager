@@ -1,4 +1,5 @@
 import { createServiceClient } from '../../lib/pibase'
+import { tooMany } from '../../lib/rateLimit'
 import { notifyStudio } from '../../lib/push'
 import { availableSlots, discountAmount, safeImageUrl, validDate } from '../../lib/booking'
 import { DEFAULT_BUSINESS_TYPE, isBusinessType, businessTerms } from '../../lib/businessTypes'
@@ -53,6 +54,7 @@ export default async function handler(req, res) {
       return res.status(200).json({ sessionType: sessionTypes[0], business, slots: availableSlots(date, sessionTypes[0], availability, (bookings || []).map(row => ({ ...row, durationMinutes: row.duration_minutes }))), timezone: availability?.timezone || 'America/New_York', bookingWindow })
     }
 
+    if (tooMany(req, 'booking', 6, 10 * 60 * 1000)) return res.status(429).json({ error: 'Too many booking requests from this connection. Please try again in a few minutes.' })
     const { slug, date, time, name, email, phone, code } = req.body || {}
     const safeSlug = clean(slug, 120), safeDate = clean(date, 10), safeTime = clean(time, 5)
     const safeName = clean(name, 120), safeEmail = clean(email, 254).toLowerCase(), safePhone = clean(phone, 40)

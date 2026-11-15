@@ -36,7 +36,7 @@ export default async function handler(req, res) {
   const clientEmail = client.email
   const clientName = client.name
   const signUrl = contract.id
-    ? appUrl(`/sign/${createContractToken(contract.id)}`, req)
+    ? appUrl(`/sign/${createContractToken(contract.id)}`, auth.config)
     : null
   const preview = escapeHtml(contract.body || '').substring(0, 2000)
 

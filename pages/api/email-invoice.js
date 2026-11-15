@@ -47,7 +47,7 @@ export default async function handler(req, res) {
   const label = invoice.number || 'Invoice'
   let viewUrl = null
   try {
-    const baseUrl = appBase(req)
+    const baseUrl = appBase(auth.config)
     viewUrl = new URL(`/invoice/${createInvoiceToken(invoice.id)}`, baseUrl).toString()
   } catch {
     viewUrl = null

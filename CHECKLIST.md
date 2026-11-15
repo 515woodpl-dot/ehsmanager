@@ -5,6 +5,47 @@ every round of changes, and keep the "Open / follow-ups" list current.
 
 ---
 
+## 2026-11-15 (round 15) — Fixes from the bug-hunter agent
+
+### ⚠️ Before using
+- [ ] Apply **`pibase-migration-005-canceled-bookings.sql`** in PIBASE
+      (existing projects). New projects get it from `pibase-schema.sql`.
+
+### Found by the agent and fixed
+- [x] **Reopening a canceled booking reused its discount and lost its time
+      slot.** Canceling gives back the slot and the coupon / gift-card value;
+      switching the booking back to Confirmed kept the discount on the
+      booking but left the coupon reusable and the gift card refilled.
+      Canceled bookings now stay canceled: the database keeps them canceled,
+      and the Sessions status list, the meeting window and the calendar no
+      longer offer to reopen them (they say to book a new one).
+- [x] **The contact form could add leads to any account** by naming another
+      account's id. It now always files leads under this deployment's own
+      business (`STUDIO_OWNER_USER_ID`).
+- [x] **No limit on public forms.** The contact form takes 5 messages and the
+      booking page 6 requests per connection per 10 minutes, then asks the
+      visitor to try again later.
+- [x] **Links in emails could follow a forged address** when
+      `NEXT_PUBLIC_APP_URL` isn't set (from round 11). Links now use
+      `NEXT_PUBLIC_APP_URL`, or else the address the signed-in owner opens
+      the app on (remembered automatically). A visitor's request never sets
+      it. Settings shows which address links use when it isn't fixed.
+
+### Verified
+- [x] Agent run: no cross-account access, no token tampering, no price
+      manipulation, no script injection, quote acceptance creates one
+      invoice even when sent 6 times at once, all pages clean at phone width.
+- [x] After the fixes: a lead aimed at another account lands in the owner's;
+      the 6th contact message in 10 minutes gets "try again later"; a
+      reopened canceled booking stays canceled with its slot released; with
+      no app URL set, the owner's address is remembered and a forged host on
+      a client's request doesn't change the links.
+
+### Not covered yet
+- [ ] Stripe payments, emails and the inbound-email webhook against real
+      accounts (no keys in the test setup).
+- [ ] CSV import doesn't check email addresses or skip duplicates.
+
 ## 2026-11-15 (round 14) — The business's own logo and name everywhere
 
 - [x] **"Local Manager" / "LM" is only the starting default.** Once a logo or

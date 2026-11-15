@@ -56,10 +56,12 @@ export default async function handler(req, res) {
     const last = [...chat.thread].reverse().find(m => !m.out && m.via === 'chat')
     const recent = last?.at && now - new Date(last.at) < 10 * 60 * 1000
     if (!recent && config.branding.studioEmail) {
+      let inboxLink = ''
+      try { inboxLink = appUrl('/?view=inbox', config) } catch {}
       const html = emailWrap(`
         <h1>New message from ${escapeHtml(chat.client.name)}</h1>
         <div class="box" style="white-space:pre-wrap;font-family:Arial,sans-serif;font-size:14px;line-height:1.7;color:#444;">${escapeHtml(text)}</div>
-        <a href="${escapeHtml(appUrl('/?view=inbox', req))}" class="btn" style="color:#ffffff;">Reply in Studio Manager</a>
+        ${inboxLink ? `<a href="${escapeHtml(inboxLink)}" class="btn" style="color:#ffffff;">Reply in the app</a>` : ''}
       `, config)
       const result = await sendStudioEmail(config, { to: config.branding.studioEmail, subject: `New chat message from ${chat.client.name}`, html, replyToStudio: false })
       if (result.error) console.error('[chat] notify failed', result.error)

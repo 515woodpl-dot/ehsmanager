@@ -373,6 +373,13 @@ begin
     end if;
     return old;
   end if;
+  -- A canceled booking stays canceled. Its time slot and discount were
+  -- given back when it was canceled, so reopening it would let them be used
+  -- twice. Book again instead.
+  if tg_op='UPDATE' and old.status='canceled' and new.status<>'canceled' then
+    new.status := 'canceled';
+    return new;
+  end if;
   if new.status='canceled' and old.status<>'canceled' then
     delete from booking_slot_claims where booking_id=old.id;
     if old.discount_code is not null and not old.discount_reversed then

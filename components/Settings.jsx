@@ -294,6 +294,9 @@ export default function Settings({ toast = () => {}, data = null, setData = () =
       {state.migrationNeeded && (
         <div className="settings-error">Your database needs one update before settings can be saved: apply <code>pibase-migration-003-settings-inbox.sql</code> in PIBASE.</div>
       )}
+      {state.appAddress && !state.appAddress.fixed && (
+        <div className="settings-note" style={{ marginBottom: 16 }}>Links in emails and client pages use <strong>{state.appAddress.address || 'this address'}</strong>, the address you open the app on. To make it permanent, set <code>NEXT_PUBLIC_APP_URL</code> on the server.</div>
+      )}
       {!state.canStoreSecrets && (
         <div className="settings-error">To save API keys here, the server needs a <code>SETTINGS_ENCRYPTION_KEY</code> (a long random value). Until then, keys come from the server environment.</div>
       )}
