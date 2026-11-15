@@ -88,8 +88,17 @@ export function QuoteModal({ client: clientProp, quote, data, setData, toast, on
   }
 
   // Accepting a quote turns it into an unpaid invoice with the same items.
-  const accept = () => {
+  const accept = async () => {
     if (!confirm(`Mark quote ${quoteLabel(quote)} as accepted and create an invoice for ${fmt$(total)}?`)) return
+    // The client may have accepted from their link while this was open: then
+    // their invoice already exists and a second one must not be made.
+    if (pibase && quote?.id) {
+      const { data: server } = await pibase.from('quotes').select('status').eq('id', quote.id).maybeSingle()
+      if (server?.status === 'accepted') {
+        toast('The client has already accepted this quote, and its invoice was created. It will show here in a moment.')
+        onClose(); return
+      }
+    }
     const number = nextInvoiceNumber(data.invoices)
     const invoice = { id: uid(), number, client: clientName, clientId: client?.id || quote.clientId || null, amount: total, due: '', status: 'unpaid', paid: 0, note: lineData.notes || `From accepted quote ${quoteLabel(quote)}`, paymentIntentId: null, lineData, createdAt: new Date().toISOString() }
     setData(d => ({

@@ -82,20 +82,14 @@ export default async function handler(req, res) {
 
       // 2. Create client in inquiry stage. Lead is already captured, so this is best-effort.
       // New leads start in the first stage of this business's pipeline.
-      const { data: existing } = await db.from('clients').select('id').eq('user_id', studioId).eq('email', safeLead.email).limit(1)
+      // One client per email even when several submissions arrive at once
+      // (find_or_create_client, migration 006).
       const { data: pipeline } = await db.from('studio_settings').select('stages').eq('user_id', studioId).maybeSingle()
-      if (!existing?.length) {
-        const { error: clientErr } = await db.from('clients').insert({
-          user_id: studioId,
-          name: safeLead.name,
-          email: safeLead.email,
-          phone: safeLead.phone,
-          type: safeLead.interest.split(', ')[0] || null,
-          status: pipeline?.stages?.[0]?.id || 'inquiry',
-          notes: safeLead.message || null,
-        })
-        if (clientErr) console.error('[public-form] client insert failed', clientErr)
-      }
+      const { error: clientErr } = await db.rpc('find_or_create_client', {
+        p_user_id: studioId, p_name: safeLead.name, p_email: safeLead.email, p_phone: safeLead.phone,
+        p_type: safeLead.interest.split(', ')[0] || '', p_status: pipeline?.stages?.[0]?.id || 'inquiry', p_notes: safeLead.message || '',
+      })
+      if (clientErr) console.error('[public-form] client insert failed', clientErr)
 
       // 3. Notify the studio owner by email (best-effort)
       try {

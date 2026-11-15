@@ -10,10 +10,12 @@ const escapeHtml = value => String(value ?? '').replace(/&/g, '&amp;').replace(/
   .replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;')
 
 async function loadChat(db, clientId) {
-  const { data: client } = await db.from('clients').select('id, user_id, name').eq('id', clientId).maybeSingle()
+  const { data: client, error } = await db.from('clients').select('id, user_id, name').eq('id', clientId).maybeSingle()
+  if (error) throw error
   if (!client) return null
-  const { data: rows } = await db.from('messages').select('id, thread')
+  const { data: rows, error: threadError } = await db.from('messages').select('id, thread')
     .eq('user_id', client.user_id).eq('client_id', client.id).order('updated_at', { ascending: false }).limit(1)
+  if (threadError) throw threadError
   return { client, thread: Array.isArray(rows?.[0]?.thread) ? rows[0].thread : [] }
 }
 
@@ -25,7 +27,11 @@ export default async function handler(req, res) {
   if (!parsed) return res.status(404).json({ error: 'This chat link is not valid' })
   const db = createServiceClient()
   if (!db) return res.status(503).json({ error: 'Service is not configured' })
-  const chat = await loadChat(db, parsed.chatClientId)
+  let chat
+  try { chat = await loadChat(db, parsed.chatClientId) } catch (error) {
+    console.error('[chat] load', error.message)
+    return res.status(503).json({ error: 'Messages are busy right now. Please try again in a moment.' })
+  }
   if (!chat) return res.status(404).json({ error: 'Chat not found' })
   const config = await loadStudioConfig(db, chat.client.user_id)
   res.setHeader('Cache-Control', 'private, no-store')

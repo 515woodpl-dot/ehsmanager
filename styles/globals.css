@@ -682,7 +682,9 @@ textarea:focus-visible,
 .inbox-row { display: flex; align-items: center; gap: 11px; width: 100%; padding: 12px 14px; border: 0; border-bottom: 1px solid var(--border); background: #fff; text-align: left; font: inherit; color: var(--text); cursor: pointer; }
 .inbox-row:hover { background: var(--surface2); }
 .inbox-row.active { background: var(--surface3); }
-.inbox-row-body { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.inbox-row-body { flex: 1; min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 2px; }
+.inbox-row-top { min-width: 0; }
+.inbox-row-top strong { min-width: 0; }
 .inbox-row-top { display: flex; justify-content: space-between; gap: 8px; }
 .inbox-row-top strong { font-weight: 500; font-size: 13.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .inbox-row.unread .inbox-row-top strong { font-weight: 700; }

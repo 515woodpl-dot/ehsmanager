@@ -5,6 +5,83 @@ every round of changes, and keep the "Open / follow-ups" list current.
 
 ---
 
+## 2026-11-15 (round 18) — Fixes from the hard-mode run (many clients at once), install guide
+
+### ⚠️ Before using
+- [ ] Database update **`pibase-migration-006-concurrency.sql`**: applied
+      automatically by `scripts/update.sh` / `scripts/migrate.mjs`. For a
+      server still updated by hand, apply it with PIBASE's `migration-apply`.
+      It renumbers any duplicate invoice numbers (newest copies get new
+      numbers) before making numbers unique.
+- [ ] Deploy the PIBASE fix from round 17 too (the app was tested against it).
+
+### Install guide
+- [x] **[INSTALL.md](INSTALL.md)**: one step-by-step guide for both systems:
+      DNS, server, private-repository deploy keys, PIBASE setup, installing
+      each company, checks, what the owner sets up in the app, updates,
+      backups and the keys to keep safe, moving an existing installation,
+      removing a company, troubleshooting.
+
+### Fixed (found by the bug-hunter with 24 clients acting at once)
+- [x] **Critical: a forged Stripe event could mark another studio's invoice
+      paid.** The webhook now re-reads the payment from Stripe with the
+      studio's own key (made-up events are refused) and only credits invoices
+      of the studio whose keys verified it.
+- [x] **Duplicate invoice numbers** when several quotes were accepted at once
+      (12 invoices all #1003). The database now hands out the next number
+      and keeps numbers unique per business. A client clicking accept at the
+      same moment as another now also gets their invoice link.
+- [x] **Chat messages lost** when sent at the same moment (5 of 6 lost) and
+      several conversations created for one client. Messages are now added
+      in one database step.
+- [x] **Studio signature lost** when the client signed at the same moment.
+      Both signatures are now merged in the database.
+- [x] **An open tab overwrote newer changes** (accepted quotes reverted and
+      invoiced twice, questionnaire answers wiped, payments from another tab
+      erased, stage changes reverted, a business-type switch undone, a
+      deleted booking written back): the app now saves only the fields this
+      tab changed, keeps what clients, Stripe and other tabs saved (payments,
+      signatures, accepted quotes, answers, messages), never re-creates a
+      record deleted elsewhere, and saves only the setting that changed.
+- [x] **Gift card refunded twice** through a deleted-then-restored booking:
+      only the real booking transaction can take a discount now.
+- [x] **Rescheduling an online booking** left its time reserved at the old
+      slot: the reservation now moves with it.
+- [x] **Payment on an invoice whose client was just deleted** kept the app
+      on "Save failed · retrying" and blocked other saves: such documents are
+      saved without the client link, and one failing collection no longer
+      holds back the others.
+- [x] **Busy moments** (many clients at once) failed with "not found" or
+      errors: requests PIBASE turns away for being too many are retried
+      briefly, and real lookup failures say "busy, try again" instead of
+      "not found".
+- [x] **Rate limit bypass** with a made-up X-Forwarded-For header: only the
+      address added by this server's own proxy is used.
+- [x] **Duplicate clients** from simultaneous contact-form submissions.
+- [x] Owner's "Accepted → create invoice" no longer makes a second invoice
+      when the client accepted first.
+- [x] Questionnaires: only the first submission counts.
+- [x] Signing link: name capped at 120 characters, email must be text and
+      valid.
+- [x] A document can only be linked to the business's own clients.
+- [x] Creative agreement ticks Photography for photo project types (Family,
+      Maternity, Newborn, Portrait…).
+- [x] Inbox rows no longer slightly wider than a phone screen.
+
+### Verified (re-running the agent's own reproduction scripts)
+- [x] Forged webhook → refused. 12 quotes + 8 repeat clicks at once → 12
+      invoices, all numbers unique. 6 simultaneous chat messages → all kept;
+      two clients streaming 29 messages each → 29 of 29. 32 sign +
+      countersign races → 0 signatures lost. Two tabs paying $300 + $200 →
+      both kept, $500. Stage change + note in two tabs → both kept. Stale
+      quote save / accept → still accepted, one invoice. Questionnaire →
+      answers kept, title change saved, later submissions refused.
+      Reschedule → reserved slots moved 10:00 → 14:00. Deleted-and-restored
+      booking → gift card refunded once.
+- [ ] Not re-run: the deleted-client payment and stale business-type cases
+      (the agent's scripts no longer matched the changed test data); the
+      inbox width fix wasn't checked on a phone screenshot.
+
 ## 2026-11-15 (round 17) — Hands-off deployment, and a PIBASE fix
 
 ### ⚠️ Before using

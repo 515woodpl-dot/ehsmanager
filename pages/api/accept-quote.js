@@ -2,7 +2,6 @@ import { loadStudioConfig } from '../../lib/studioConfig'
 import { createServiceClient } from '../../lib/pibase'
 import { notifyStudio } from '../../lib/push'
 import { createInvoiceToken, verifyQuoteToken } from '../../lib/signingTokens'
-import { nextInvoiceNumber } from '../../lib/invoices'
 import { appUrl } from '../../lib/documentEmail'
 
 const invoiceLink = (id, config) => { try { return appUrl(`/invoice/${createInvoiceToken(id)}`, config) } catch { return null } }
@@ -16,7 +15,8 @@ export default async function handler(req, res) {
   const db = createServiceClient()
   if (!db) return res.status(503).json({ error: 'Service is not configured' })
 
-  const { data: quote } = await db.from('quotes').select('*').eq('id', parsed.quoteId).single()
+  const { data: quote, error: lookupError } = await db.from('quotes').select('*').eq('id', parsed.quoteId).maybeSingle()
+  if (lookupError) return res.status(503).json({ error: 'Busy right now. Please try again in a moment.' })
   if (!quote) return res.status(404).json({ error: 'Quote not found' })
   const details = quote.line_items && !Array.isArray(quote.line_items) ? quote.line_items : { items: quote.line_items || [] }
 
@@ -31,15 +31,24 @@ export default async function handler(req, res) {
   const acceptedAt = new Date().toISOString()
   const { data: claimed } = await db.from('quotes').update({ status: 'accepted' })
     .eq('id', quote.id).neq('status', 'accepted').select('id')
-  if (!claimed?.length) return res.status(200).json({ alreadyAccepted: true })
+  if (!claimed?.length) {
+    // Accepted a moment ago by another click: wait briefly for its invoice so
+    // this client also gets the link.
+    let invoiceId = null
+    for (let i = 0; i < 10 && !invoiceId; i++) {
+      await new Promise(resolve => setTimeout(resolve, 300))
+      const { data: again } = await db.from('quotes').select('line_items').eq('id', quote.id).maybeSingle()
+      invoiceId = again?.line_items?.invoiceId || null
+    }
+    return res.status(200).json({ alreadyAccepted: true, invoiceUrl: invoiceId ? invoiceLink(invoiceId, await loadStudioConfig(db, quote.user_id)) : null })
+  }
 
-  const { data: existing } = await db.from('invoices').select('number').eq('user_id', quote.user_id)
   const { number: quoteNumber, invoiceId: _ignored, acceptedAt: _a, ...lineData } = details
   const { data: invoice, error } = await db.from('invoices').insert({
     user_id: quote.user_id,
     client_id: quote.client_id,
     client_name: quote.client_name,
-    number: nextInvoiceNumber(existing || []),
+    number: null,  // the database gives the next free number (migration 006)
     amount: Number(quote.amount) || 0,
     paid: 0,
     status: 'unpaid',

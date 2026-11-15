@@ -31,19 +31,35 @@ export default async function handler(req, res) {
   }
   switch (event.type) {
     case 'payment_intent.succeeded': {
-      const intent = event.data.object
       const db = createServiceClient()
       if (!db) return res.status(503).json({ error: 'Database not configured' })
-      const { invoiceId, userId, label } = intent.metadata || {}
-      if (!invoiceId || !userId) break
+      // Trust only what Stripe itself says about this payment, fetched with
+      // the studio's own secret key: an event signed with a made-up webhook
+      // secret names a payment that doesn't exist in that Stripe account.
+      let intent
+      try {
+        intent = await stripe.paymentIntents.retrieve(event.data.object.id)
+      } catch (err) {
+        console.error('[webhook] payment not found in Stripe', err.message)
+        return res.status(400).json({ error: 'Payment not found in this Stripe account' })
+      }
+      if (intent.status !== 'succeeded') break
+      const { invoiceId, label } = intent.metadata || {}
+      // The invoice must belong to the studio whose keys verified the event.
+      const userId = config.userId
+      if (!invoiceId || !userId || (intent.metadata?.userId && intent.metadata.userId !== userId)) {
+        console.error('[webhook] payment for another studio ignored', { invoiceId, studio: userId })
+        break
+      }
       // Payments can be one installment or the whole balance. Each Stripe
       // payment is logged once (by its id), so a retried webhook is a no-op.
       // The update only applies if nobody changed `paid` in between.
       let credited = false
       for (let attempt = 0; attempt < 3 && !credited; attempt++) {
         const { data: row, error: lookupError } = await db.from('invoices')
-          .select('id, amount, paid, status, due, line_items').eq('id', invoiceId).eq('user_id', userId).single()
-        if (lookupError || !row) return res.status(500).json({ error: 'Linked invoice not found' })
+          .select('id, amount, paid, status, due, line_items').eq('id', invoiceId).eq('user_id', userId).maybeSingle()
+        if (lookupError) return res.status(500).json({ error: 'Unable to read the invoice, retry' })
+        if (!row) { console.error('[webhook] invoice not found for this studio', invoiceId); credited = true; break }
         const invoice = invoiceFromRow(row)
         if ((invoice.lineData.payments || []).some(p => p.intentId === intent.id)) { credited = true; break }
         const updated = applyPayment(invoice, { id: `stripe-${intent.id}`, amount: intent.amount_received / 100, method: 'Stripe', intentId: intent.id })

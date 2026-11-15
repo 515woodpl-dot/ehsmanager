@@ -48,4 +48,5 @@ owner opens the app on.
 
 One command installs a company on a server running PIBASE, and updates then
 run on their own every night (backup, database updates, build, health check,
-automatic roll back). See [docs/DEPLOY.md](docs/DEPLOY.md).
+automatic roll back). Step-by-step for both PIBASE and the app:
+[INSTALL.md](INSTALL.md); how updates work: [docs/DEPLOY.md](docs/DEPLOY.md).

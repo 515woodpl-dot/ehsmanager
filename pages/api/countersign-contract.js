@@ -11,33 +11,36 @@ export default async function handler(req, res) {
 
   const { contractId, role = 'studio', resend = false } = req.body || {}
   if (!contractId) return res.status(400).json({ error: 'Missing contract' })
-  const { data: row } = await auth.db.from('contracts').select('id, status, signed_by, signed_at, fields')
-    .eq('id', contractId).eq('user_id', auth.user.id).single()
+  const { data: row, error: lookupError } = await auth.db.from('contracts').select('id, status, signed_by, signed_at, fields')
+    .eq('id', contractId).eq('user_id', auth.user.id).maybeSingle()
+  if (lookupError) return res.status(503).json({ error: 'Busy right now. Please try again in a moment.' })
   if (!row) return res.status(404).json({ error: 'Contract not found' })
   let fields = row.fields || {}
   let status = row.status
 
   if (resend) {
     // Send the signed copy again on request.
-    fields = { ...fields, copySentAt: null }
-    await auth.db.from('contracts').update({ fields }).eq('id', row.id).eq('user_id', auth.user.id)
+    const { data: merged, error } = await auth.db.rpc('merge_contract_fields', { p_contract_id: row.id, p_user_id: auth.user.id, p_patch: { copySentAt: null } })
+    if (error) return res.status(503).json({ error: 'Busy right now. Please try again in a moment.' })
+    fields = merged || fields
   } else {
     const signature = cleanSignature({ ...req.body, name: req.body?.name || (role === 'studio' ? auth.config.branding.ownerName : '') })
     if (signature.error) return res.status(400).json({ error: signature.error })
     const at = signedDate()
     if (role === 'client') {
       if (row.status !== 'pending') return res.status(409).json({ error: 'The client has already signed' })
-      fields = { ...fields, signedVia: 'in_person', signatureMethod: signature.method, signatureData: signature.data }
-      const { data: saved, error } = await auth.db.from('contracts').update({ status: 'signed', signed_by: signature.name, signed_at: at, fields })
-        .eq('id', row.id).eq('user_id', auth.user.id).eq('status', 'pending').select('id')
+      const { data: saved, error } = await auth.db.rpc('sign_contract', { p_contract_id: row.id, p_signed_by: signature.name, p_signed_at: at, p_fields: { signedVia: 'in_person', signatureMethod: signature.method, signatureData: signature.data } })
       if (error) return res.status(500).json({ error: 'Unable to save the signature' })
-      if (!saved?.length) return res.status(409).json({ error: 'The client has already signed' })
+      if (!saved) return res.status(409).json({ error: 'The client has already signed' })
+      fields = saved
       status = 'signed'; row.signed_by = signature.name; row.signed_at = at
     } else {
-      if (fields.studioSignature?.name) return res.status(409).json({ error: 'You have already signed this contract' })
-      fields = { ...fields, studioSignature: { name: signature.name, method: signature.method, data: signature.data, at } }
-      const { error } = await auth.db.from('contracts').update({ fields }).eq('id', row.id).eq('user_id', auth.user.id)
+      // Merged in the database, so the client signing at the same moment
+      // doesn't remove it (countersign_contract, migration 006).
+      const { data: saved, error } = await auth.db.rpc('countersign_contract', { p_contract_id: row.id, p_user_id: auth.user.id, p_signature: { name: signature.name, method: signature.method, data: signature.data, at } })
       if (error) return res.status(500).json({ error: 'Unable to save your signature' })
+      if (!saved) return res.status(409).json({ error: 'You have already signed this contract' })
+      fields = saved
     }
   }
 
