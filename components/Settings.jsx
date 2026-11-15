@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { T, C } from '../lib/tokens'
 import { pibase } from '../lib/pibase'
+import { announceBrandChange } from '../lib/brand'
 import { BUSINESS_TYPE_OPTIONS, businessDefaults, businessTerms, remapStage } from '../lib/businessTypes'
 import { canPromptInstall, currentSubscription, deviceName, isIOS, isStandalone, promptInstall, pushSupported, subscribe, subscribePush } from '../lib/pwa'
 
@@ -144,7 +145,7 @@ function NotificationsSection({ toast, integrations, setIntegrations, saveButton
       {!supported ? (
         <p className="settings-note">This browser can't receive notifications. Try Chrome, Edge, Firefox, or Safari on a Mac{isIOS() ? ', or install the app on your iPhone/iPad first' : ''}.</p>
       ) : iosNeedsInstall ? (
-        <p className="settings-note">On iPhone and iPad, notifications only work in the installed app: tap <strong>Share → Add to Home Screen</strong>, open Local Manager from your home screen, and come back here.</p>
+        <p className="settings-note">On iPhone and iPad, notifications only work in the installed app: tap <strong>Share → Add to Home Screen</strong>, open the app from your home screen, and come back here.</p>
       ) : !hasWorker ? (
         <p className="settings-note">Notifications work in the live (deployed) app. They can't be turned on in this preview.</p>
       ) : info && (
@@ -186,11 +187,11 @@ function InstallSection({ toast }) {
   useEffect(() => { setInstalled(isStandalone()); return subscribe(() => rerender(n => n + 1)) }, [])
   const ios = typeof navigator !== 'undefined' && isIOS()
   return (
-    <Section title="App" subtitle="Install Local Manager on your phone, tablet or computer to open it from your home screen, full-screen, like a regular app." status={installed ? true : undefined}>
+    <Section title="App" subtitle="Install the app on your phone, tablet or computer to open it from your home screen, full-screen, like a regular app." status={installed ? true : undefined}>
       {installed ? (
         <p style={{ fontSize: 13.5, color: C.muted, margin: 0 }}>You're using the installed app. 🎉</p>
       ) : canPromptInstall() ? (
-        <button style={T.btnPrimary} onClick={async () => { if (await promptInstall() === 'accepted') toast('Installing Local Manager…') }}>Install app</button>
+        <button style={T.btnPrimary} onClick={async () => { if (await promptInstall() === 'accepted') toast('Installing the app…') }}>Install app</button>
       ) : ios ? (
         <p style={{ fontSize: 13.5, color: C.muted, margin: 0 }}>In Safari, tap <strong>Share</strong> and choose <strong>Add to Home Screen</strong>.</p>
       ) : (
@@ -222,7 +223,7 @@ export default function Settings({ toast = () => {}, data = null, setData = () =
     try {
       const body = await api('/api/settings', { method: 'POST', body: JSON.stringify(payload) })
       apply(body)
-      if (payload.branding) applyBusinessProfile(body.branding)
+      if (payload.branding) { applyBusinessProfile(body.branding); announceBrandChange() }
       toast('Settings saved')
     } catch (err) { toast(err.message) }
     setBusy('')

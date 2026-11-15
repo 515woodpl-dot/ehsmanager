@@ -3,12 +3,15 @@ import Head from 'next/head'
 import { useRouter } from 'next/router'
 import { pibase } from '../lib/pibase'
 import { T, C } from '../lib/tokens'
+import { BrandMark } from '../components/Brand'
+import { useBrand } from '../lib/brand'
 import { BUSINESS_TYPE_OPTIONS, DEFAULT_BUSINESS_TYPE } from '../lib/businessTypes'
 
 // A server problem can come back with no readable message.
 const errorText = error => (typeof error?.message === 'string' && error.message.trim() && error.message !== '{}') ? error.message : 'Something went wrong on the server. Please try again in a moment.'
 
 export default function Login() {
+  const brand = useBrand()
   const router = useRouter()
   const [tab, setTab]       = useState('login')  // login | signup
   const [email, setEmail]   = useState('')
@@ -49,7 +52,7 @@ export default function Login() {
   return (
     <>
       <Head>
-        <title>Local Manager</title>
+        <title>{brand.title}</title>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Serif+Display&display=swap" rel="stylesheet" />
@@ -59,9 +62,8 @@ export default function Login() {
 
           {/* Logo */}
           <div style={{ textAlign: 'center', marginBottom: 40 }}>
-            <div style={{ fontFamily: "'DM Serif Display', Georgia, serif", fontSize: 28, color: C.text, letterSpacing: '-0.5px' }}>Local</div>
-            <div style={{ fontFamily: "'DM Serif Display', Georgia, serif", fontSize: 28, color: C.text, letterSpacing: '-0.5px', marginTop: -4 }}>Manager</div>
-            <div style={{ fontSize: 12, color: C.faint, marginTop: 6, letterSpacing: '0.08em', textTransform: 'uppercase' }}>Clients · Projects · Invoices</div>
+            <BrandMark size="lg" align="center" />
+            {brand.ready && !brand.custom && <div style={{ fontSize: 12, color: C.faint, marginTop: 6, letterSpacing: '0.08em', textTransform: 'uppercase' }}>Clients · Projects · Invoices</div>}
           </div>
 
           {/* Card */}

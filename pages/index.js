@@ -2,6 +2,8 @@ import { useState, useEffect, useMemo, useRef } from 'react'
 import Head from 'next/head'
 import { T, C } from '../lib/tokens'
 import { seed } from '../lib/data'
+import { BrandMark } from '../components/Brand'
+import { useBrand } from '../lib/brand'
 import { TermsContext, businessTerms, businessDefaults, isBusinessType, useTerms } from '../lib/businessTypes'
 import { pibase } from '../lib/pibase'
 import { loadUserData, saveSettings, syncCollections } from '../lib/db'
@@ -142,8 +144,7 @@ function Sidebar({ active, setActive, unread, open, onClose, user, onSignOut }) 
         {/* Logo */}
         <div style={{ padding: '24px 22px 18px', borderBottom: `1px solid ${C.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <div>
-            <div style={{ fontFamily: "'DM Serif Display', Georgia, serif", fontSize: 17, color: C.text, letterSpacing: '-0.2px', lineHeight: 1.2 }}>Local</div>
-            <div style={{ fontFamily: "'DM Serif Display', Georgia, serif", fontSize: 17, color: C.text, letterSpacing: '-0.2px' }}>Manager</div>
+            <BrandMark size="md" />
             <div style={{ fontSize: 10, color: C.faint, marginTop: 3, letterSpacing: '0.06em', textTransform: 'uppercase' }}>{terms.tagline}</div>
           </div>
           {/* Mobile close button */}
@@ -222,6 +223,7 @@ function Sidebar({ active, setActive, unread, open, onClose, user, onSignOut }) 
 
 // ── Root ──────────────────────────────────────────────────────────
 export default function Home() {
+  const brand = useBrand()
   const [view, setView] = useState('dashboard')
   const viewRef = useRef(view)
   viewRef.current = view
@@ -418,7 +420,7 @@ export default function Home() {
 
   if (!dbReady) {
     return <main style={{ maxWidth: 520, margin: '12vh auto', padding: 24, fontFamily: 'sans-serif' }}>
-      <h1>Local Manager</h1>
+      <h1>{brand.title}</h1>
       <p>{typeof navigator !== 'undefined' && !navigator.onLine ? 'You\'re offline. Connect to the internet to load your studio.' : loadError || (authChecked ? 'Sign in to access your studio data.' : 'Loading studio data...')}</p>
       {authChecked && <a href="/login">Go to sign in</a>}
     </main>
@@ -452,7 +454,7 @@ export default function Home() {
   return (
     <TermsContext.Provider value={terms}>
       <Head>
-        <title>Local Manager</title>
+        <title>{brand.title}</title>
       </Head>
 
       <div style={{ display: 'flex', minHeight: '100vh', background: C.bg }}>

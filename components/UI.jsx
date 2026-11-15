@@ -1,3 +1,4 @@
+import { BrandBadge } from './Brand'
 import { useEffect } from 'react'
 import { T, C } from '../lib/tokens'
 
@@ -34,7 +35,7 @@ export function ConfirmModal({ title, message, confirmLabel = 'Confirm', onConfi
     <button style={danger ? T.btnDanger : T.btnPrimary} onClick={onConfirm}>{confirmLabel}</button>
   </>}>
     <div className="brand-confirm">
-      <div className="brand-confirm-mark">LM</div>
+      <BrandBadge className="brand-confirm-mark" />
       <div><strong>{title}</strong><p>{message}</p></div>
     </div>
   </Modal>

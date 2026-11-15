@@ -5,6 +5,26 @@ every round of changes, and keep the "Open / follow-ups" list current.
 
 ---
 
+## 2026-11-15 (round 14) — The business's own logo and name everywhere
+
+- [x] **"Local Manager" / "LM" is only the starting default.** Once a logo or
+      business name is saved in Settings → Business profile, the app shows
+      it instead: sign-in page, sidebar, browser tab title, install banner,
+      "new version" bar, the installed app's name, and the mark in
+      confirmation dialogs (logo, or the business's initials).
+- [x] Logo saved → the logo is shown. Name only → the name is shown. Neither
+      → "Local Manager". The sign-in page drops the "Clients · Projects ·
+      Invoices" line once a business has its own brand.
+- [x] Changes show straight away after saving, without reloading. The last
+      known brand is remembered on each device so the default doesn't flash
+      first.
+- [x] New public endpoint `/api/brand` (name and logo link only; the same
+      details clients already see on the booking and contact pages). It
+      reads the owner set by `STUDIO_OWNER_USER_ID`, so each deployment
+      shows its own company.
+- [x] Verified in the browser: default, logo + name, and name-only, on the
+      sign-in page (fresh browser) and in the app.
+
 ## 2026-11-15 (round 13) — Renamed to Local Manager
 
 - [x] The app is now **Local Manager** everywhere people see it: sidebar,
