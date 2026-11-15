@@ -169,7 +169,7 @@ chmod 0600 "$dir/shared/instance.env"
 
 # 4. The app's settings. Secrets are made once and kept on later runs.
 env_file="$dir/shared/.env.local"
-touch "$env_file"; chmod 0600 "$env_file"; chown "$app_user" "$env_file" 2>/dev/null || true
+touch "$env_file"; chmod 0600 "$env_file"; chown "$app_user:$app_user" "$env_file" 2>/dev/null || true
 secret() { node -e 'console.log(require("crypto").randomBytes(32).toString("base64url"))'; }
 setting() {  # setting KEY VALUE [keep]  — "keep" leaves an existing value alone
   if grep -q "^$1=" "$env_file"; then
