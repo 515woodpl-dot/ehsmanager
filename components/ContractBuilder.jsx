@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react'
 import { T, C } from '../lib/tokens'
 import { CONTRACT_TEMPLATE, fillContract, highlightValues } from '../lib/contractTemplate'
 import ContractDocument from './ContractDocument'
+import { askConfirm, notify } from './UI'
 
 const uid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => { const r = Math.random() * 16 | 0; return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16) })
 
@@ -84,8 +85,8 @@ export default function ContractBuilder({ client, contract = null, data, onSave,
 
   const activeClient = data?.clients?.find(c => c.id === selectedClientId) || client || null
 
-  const selectClient = (id) => {
-    if (touched && !confirm('Switching client will refill the form and overwrite your edits. Continue?')) return
+  const selectClient = async (id) => {
+    if (touched && !(await askConfirm('Switching client will refill the form and overwrite your edits. Continue?'))) return
     setSelectedClientId(id)
     const c = data?.clients?.find(x => x.id === id) || null
     const next = buildFields(c, data)
@@ -145,12 +146,12 @@ export default function ContractBuilder({ client, contract = null, data, onSave,
 
   const save = () => {
     if (fields.headerImageUrl && !/^https:\/\//i.test(fields.headerImageUrl)) {
-      alert('Contract header image must use a secure https:// URL, or be left blank.')
+      notify('Contract header image must use a secure https:// URL, or be left blank.')
       setTab('fields')
       return
     }
     if (!activeClient || !fields.clientName.trim() || !fields.clientEmail.trim() || !fields.sessionDate || !fields.sessionTime || !fields.location.trim() || !fields.remainingDueDate || !Number.isFinite(totalFee) || totalFee <= 0 || !Number.isFinite(retainerPct) || retainerPct < 0 || retainerPct > 100) {
-      alert('Select a client and complete the client, session, and payment details before saving.')
+      notify('Select a client and complete the client, session, and payment details before saving.')
       setTab('fields')
       return
     }
@@ -189,7 +190,7 @@ export default function ContractBuilder({ client, contract = null, data, onSave,
       {tab === 'fields' ? (
         <div>
           {/* Client picker — auto-fills everything below */}
-          <div style={{ background: C.surface2, border: `1px solid ${C.border}`, borderRadius: 10, padding: '14px 16px', marginBottom: 20 }}>
+          <div style={{ background: C.surface2, border: `1px solid ${C.border}`, borderRadius: 12, padding: '14px 16px', marginBottom: 20 }}>
             <label style={{ display: 'block', fontSize: 11, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: C.muted, marginBottom: 6 }}>Client</label>
             <select
               style={{ ...T.formInput, fontSize: 13.5, background: C.surface }}
@@ -294,7 +295,7 @@ export default function ContractBuilder({ client, contract = null, data, onSave,
           </Section>
         </div>
       ) : (
-        <div style={{ background: C.surface2, borderRadius: 10, padding: 12, border: `1px solid ${C.border}`, maxHeight: '65vh', overflowY: 'auto' }}>
+        <div style={{ background: C.surface2, borderRadius: 12, padding: 12, border: `1px solid ${C.border}`, maxHeight: '65vh', overflowY: 'auto' }}>
           <ContractDocument body={previewText} headerImageUrl={fields.headerImageUrl} highlights={highlightValues(contractFields)} />
         </div>
       )}

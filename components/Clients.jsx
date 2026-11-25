@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react'
 import { T, C } from '../lib/tokens'
-import { Modal, Badge, Avatar, SearchBar } from './UI'
+import { Modal, Badge, Avatar, SearchBar, askConfirm } from './UI'
 import { removeClient } from '../lib/data'
 import { CardModalExport as CardModal } from './Projects'
 
@@ -63,8 +63,8 @@ export default function Clients({ data, setData, toast, sessionTypes }) {
     toast('Client updated'); setEditModal(null)
   }
 
-  const del = id => {
-    if (!confirm('Delete this client?')) return
+  const del = async id => {
+    if (!(await askConfirm('Delete this client? Their invoices, sessions, contracts and messages are deleted too (paid invoices are kept).'))) return
     setData(d => removeClient(d, id))
     toast('Client deleted')
   }

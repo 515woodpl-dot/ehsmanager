@@ -1,12 +1,12 @@
 import { useMemo, useState } from 'react'
 import { T, C } from '../lib/tokens'
-import { Modal, Badge } from './UI'
+import { Modal, Badge, askConfirm } from './UI'
 import { DEMO_SESSION_CATALOG, DEFAULT_AVAILABILITY } from '../lib/data'
 import { availabilitySettings, durationLabel, money, publicBookingBase, safeImageUrl, slugify } from '../lib/booking'
 import s from '../styles/BookingAdmin.module.css'
 
 const uid = () => crypto.randomUUID()
-const blankType = { name: '', slug: '', category: 'Portrait', description: '', imageUrl: '', durationMinutes: 60, price: 0, location: '', color: '#5db8be', public: false }
+const blankType = { name: '', slug: '', category: 'Portrait', description: '', imageUrl: '', durationMinutes: 60, price: 0, location: '', color: '#E8D7CF', public: false }
 const blankDiscount = { name: '', code: '', kind: 'coupon', mode: 'percent', amount: 10, balance: null, uses: 0, maxUses: null, startsOn: '', endsOn: '', active: true }
 // "Sat, Jul 4, 2026 · 7:00 PM" — either part may be missing.
 const fmtWhen = (date, time) => {
@@ -36,8 +36,8 @@ export function SessionTypes({ data, setData, toast, setView }) {
     setData(current => ({ ...current, sessionCatalog: editing.id ? current.sessionCatalog.map(item => item.id === editing.id ? row : item) : [...current.sessionCatalog, row], sessionTypes: current.sessionTypes.includes(name) ? current.sessionTypes : [...current.sessionTypes, name] }))
     setEditing(null); toast('Session type saved')
   }
-  const remove = item => {
-    if (!confirm(`Delete “${item.name}”? Existing bookings will keep their session name.`)) return
+  const remove = async item => {
+    if (!(await askConfirm(`Delete “${item.name}”? Existing bookings will keep their session name.`))) return
     setData(current => ({ ...current, sessionCatalog: current.sessionCatalog.filter(row => row.id !== item.id) }))
     toast('Session type deleted')
   }
@@ -116,7 +116,7 @@ export function Sessions({ data, setData, toast, setView }) {
       <div className={s.formGrid}>{field('Date', input(form.date, date => setForm(v => ({ ...v, date })), { type: 'date' }))}{field('Time', input(form.time, time => setForm(v => ({ ...v, time })), { type: 'time', step: 1800 }))}</div>
       {field('Notes', <textarea className={s.input} rows={3} value={form.notes} onChange={e => setForm(v => ({ ...v, notes: e.target.value }))} />)}
     </Modal>}
-    {selected && <Modal title={`${selected.client} · ${selected.type}`} onClose={() => setSelected(null)} footer={<><button style={T.btn} onClick={() => setSelected(null)}>Close</button><button style={T.btnDanger} onClick={() => { if (confirm(`Delete session for ${selected.client}?`)) { setData(v => ({ ...v, bookings: v.bookings.filter(item => item.id !== selected.id) })); setSelected(null); toast('Session deleted') } }}>Delete session</button></>}>
+    {selected && <Modal title={`${selected.client} · ${selected.type}`} onClose={() => setSelected(null)} footer={<><button style={T.btn} onClick={() => setSelected(null)}>Close</button><button style={T.btnDanger} onClick={async () => { if (await askConfirm(`Delete session for ${selected.client}?`)) { setData(v => ({ ...v, bookings: v.bookings.filter(item => item.id !== selected.id) })); setSelected(null); toast('Session deleted') } }}>Delete session</button></>}>
       <div className={s.sessionDetail}><div><span>Date</span><strong>{fmtWhen(selected.date)}</strong></div><div><span>Time</span><strong>{fmtWhen('', selected.time) || 'TBD'}</strong></div><div><span>Location</span><strong>{selected.location || 'TBD'}</strong></div><div><span>Price</span><strong>{money(selected.finalPrice ?? selected.price)}</strong></div></div>
       {field('Status', <select className={s.input} value={selected.status} onChange={e => { const next={...selected,status:e.target.value}; setSelected(next); setData(v => ({ ...v, bookings: v.bookings.map(item => item.id === selected.id ? next : item) })); toast('Session updated') }}><option value="inquiry">Inquiry</option><option value="pending">Awaiting Client</option><option value="confirmed">Confirmed</option><option value="canceled">Canceled</option></select>)}
       {selected.notes && <p className={s.hint}>{selected.notes}</p>}
@@ -141,7 +141,7 @@ export function Discounts({ data, setData, toast }) {
   }
   return <div><div className={s.heading}><div><h1>Discounts</h1><p>Coupon codes and gift card balances for online booking requests.</p></div><button className={s.primaryButton} onClick={() => setEditing({ ...blankDiscount, kind: tab })}>+ New {tab === 'coupon' ? 'coupon' : 'gift card'}</button></div>
     <div className={s.tabLine}><div className={s.tabs}>{[['coupon','Coupons'],['gift_card','Gift Cards']].map(([value,label]) => <button key={value} className={tab === value ? s.activeTab : ''} onClick={() => setTab(value)}>{label}</button>)}</div><select value={filter} onChange={e => setFilter(e.target.value)}><option>All</option><option>Active</option><option>Inactive</option></select></div>
-    <div className={s.list}><div className={s.discountHead}><span>Name</span><span>Code</span><span>Uses</span><span>Active</span><span></span></div>{rows.map(d => <div className={s.discountRow} key={d.id}><div className={s.dName}><strong>{d.name}</strong><small>{d.kind === 'gift_card' ? `${money(d.balance)} balance` : d.mode === 'percent' ? `${d.amount}% off` : `${money(d.amount)} off`}</small></div><span className={s.dCode}>{d.code}</span><span className={s.dUses}><em>Used </em>{d.uses} / {d.maxUses ?? '∞'}</span><span className={s.dActive}><Badge type={d.active ? 'confirmed' : 'canceled'} label={d.active ? 'Active' : 'Inactive'} /></span><div className={`${s.rowActions} ${s.dActions}`}><button className={s.textButton} onClick={() => setEditing({ ...d })}>Edit</button><button className={s.dangerText} onClick={() => { if (d.kind === 'gift_card' && d.uses > 0) { toast('Used gift cards cannot be deleted'); return } if (confirm(`Delete ${d.code}?`)) { setData(v => ({ ...v, discounts: v.discounts.filter(item => item.id !== d.id) })); toast('Discount deleted') } }}>Delete</button></div></div>)}{!rows.length && <div className={s.empty}>No {tab === 'coupon' ? 'coupons' : 'gift cards'} yet.</div>}</div>
+    <div className={s.list}><div className={s.discountHead}><span>Name</span><span>Code</span><span>Uses</span><span>Active</span><span></span></div>{rows.map(d => <div className={s.discountRow} key={d.id}><div className={s.dName}><strong>{d.name}</strong><small>{d.kind === 'gift_card' ? `${money(d.balance)} balance` : d.mode === 'percent' ? `${d.amount}% off` : `${money(d.amount)} off`}</small></div><span className={s.dCode}>{d.code}</span><span className={s.dUses}><em>Used </em>{d.uses} / {d.maxUses ?? '∞'}</span><span className={s.dActive}><Badge type={d.active ? 'confirmed' : 'canceled'} label={d.active ? 'Active' : 'Inactive'} /></span><div className={`${s.rowActions} ${s.dActions}`}><button className={s.textButton} onClick={() => setEditing({ ...d })}>Edit</button><button className={s.dangerText} onClick={async () => { if (d.kind === 'gift_card' && d.uses > 0) { toast('Used gift cards cannot be deleted'); return } if (await askConfirm(`Delete ${d.code}?`)) { setData(v => ({ ...v, discounts: v.discounts.filter(item => item.id !== d.id) })); toast('Discount deleted') } }}>Delete</button></div></div>)}{!rows.length && <div className={s.empty}>No {tab === 'coupon' ? 'coupons' : 'gift cards'} yet.</div>}</div>
     {editing && <Modal title={editing.id ? 'Edit Discount' : `New ${editing.kind === 'coupon' ? 'Coupon' : 'Gift Card'}`} onClose={() => setEditing(null)} footer={<><button style={T.btn} onClick={() => setEditing(null)}>Cancel</button><button style={T.btnPrimary} onClick={save}>Save Discount</button></>}>
       <div className={s.formGrid}>{field('Name', input(editing.name, name => setEditing(v => ({ ...v, name }))))}{field('Code', input(editing.code, code => setEditing(v => ({ ...v, code: code.toUpperCase() }))))}</div>
       {editing.kind === 'coupon' && field('Type', <select className={s.input} value={editing.mode} onChange={e => setEditing(v => ({ ...v, mode: e.target.value }))}><option value="percent">Percent off</option><option value="fixed">Fixed amount off</option></select>)}

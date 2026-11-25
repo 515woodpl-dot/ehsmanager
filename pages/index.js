@@ -5,7 +5,7 @@ import { seed } from '../lib/data'
 import { pibase } from '../lib/pibase'
 import { loadUserData, syncCollections } from '../lib/db'
 import { assignInvoiceNumbers, hasInvoiceNumber, invoiceLabel } from '../lib/invoices'
-import { Toast } from '../components/UI'
+import { Toast, askConfirm } from '../components/UI'
 import Projects, { CardModalExport as CardModal } from '../components/Projects'
 import Clients from '../components/Clients'
 import ContactFormSettings from '../components/ContactForm'
@@ -63,7 +63,7 @@ function GlobalSearch({ data, setView }) {
               onMouseEnter={e => e.currentTarget.style.background = C.surface2}
               onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
               <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.08em', color: C.faint, fontWeight: 600, marginBottom: 1 }}>{r.cat}</div>
+                <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.08em', color: C.faint, fontWeight: 600, marginBottom: 1 }}>{r.cat}</div>
                 <div style={{ fontWeight: 500, fontSize: 13.5 }}>{r.label}</div>
                 <div style={{ fontSize: 12, color: C.muted }}>{r.sub}</div>
               </div>
@@ -388,7 +388,7 @@ export default function Home() {
   }, [dbReady])
 
   const handleSignOut = async () => {
-    if (saveStatus !== 'saved' && !window.confirm('Changes are still saving. Sign out anyway?')) return
+    if (saveStatus !== 'saved' && !(await askConfirm('Changes are still saving. Sign out anyway?', { confirmLabel: 'Sign out' }))) return
     if (pibase) await pibase.auth.signOut()
   }
 
@@ -445,7 +445,7 @@ export default function Home() {
               ☰
             </button>
             <GlobalSearch data={data} setView={setActiveView} />
-            {pibase && <span role="status" style={{ fontSize: 12, color: saveStatus === 'retrying' ? '#991F1F' : C.muted, whiteSpace: 'nowrap' }}>
+            {pibase && <span role="status" style={{ fontSize: 12, color: saveStatus === 'retrying' ? C.red : C.muted, whiteSpace: 'nowrap' }}>
               {saveStatus === 'saved' ? 'Saved' : saveStatus === 'retrying' ? 'Save failed · retrying' : 'Saving…'}
             </span>}
           </div>

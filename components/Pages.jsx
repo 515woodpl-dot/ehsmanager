@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { T, C } from '../lib/tokens'
 import { pibase } from '../lib/pibase'
-import { Modal, Badge, Avatar, SearchBar } from './UI'
+import { Modal, Badge, Avatar, SearchBar, askConfirm } from './UI'
 import { InvoiceModal, RecordPaymentModal, SendInvoiceModal } from './InvoiceModals'
 import { invoiceLabel, nextInstallment, paymentSchedule } from '../lib/invoices'
 import { docTone } from '../lib/documents'
@@ -318,7 +318,7 @@ export function Calendar({ data, setData, toast, openClientCard }) {
     setData(d => ({ ...d, bookings: [...d.bookings, { id: uid(), ...form, clientId: client.id, status: 'pending' }] })); toast('Booking added'); setModal(false); setForm(blank)
   }
   const toggle = id => { setData(d => ({ ...d, bookings: d.bookings.map(b => b.id === id ? { ...b, status: b.status === 'confirmed' ? 'pending' : 'confirmed' } : b) })); toast('Status updated') }
-  const del = id => { if (!confirm('Delete booking?')) return; setData(d => ({ ...d, bookings: d.bookings.filter(b => b.id !== id) })); toast('Deleted') }
+  const del = async id => { if (!(await askConfirm('Delete this booking?'))) return; setData(d => ({ ...d, bookings: d.bookings.filter(b => b.id !== id) })); toast('Deleted') }
   const [sendingReminder, setSendingReminder] = useState(null)
   const sendReminder = async (b) => {
     const client = data.clients.find(c => c.id === b.clientId || c.name === b.client)
@@ -385,7 +385,7 @@ export function Calendar({ data, setData, toast, openClientCard }) {
             </div>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: 1, marginBottom: 1 }} className="cal-head-grid">
-            {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => <div key={d} style={{ fontSize: 10, fontWeight: 600, color: C.faint, textAlign: 'center', padding: '6px 0', letterSpacing: '0.05em', textTransform: 'uppercase' }}>{d}</div>)}
+            {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => <div key={d} style={{ fontSize: 11, fontWeight: 600, color: C.faint, textAlign: 'center', padding: '6px 0', letterSpacing: '0.05em', textTransform: 'uppercase' }}>{d}</div>)}
           </div>
           <div className="calendar-month-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: 1, background: C.border, border: `1px solid ${C.border}`, borderRadius: 8, overflow: 'hidden' }}>
             {cells.map((d, i) => {
@@ -412,8 +412,8 @@ export function Calendar({ data, setData, toast, openClientCard }) {
           {[...data.bookings].filter(b => matchesFilter(b) && (calView === 'list' || (calView === 'day' ? b.date === selectedDate : b.date >= weekStart && b.date <= weekEnd))).sort((a, b) => a.date.localeCompare(b.date)).map((b, i) => (
             <div key={b.id} style={{ ...T.dataRow, borderBottom: i === data.bookings.length - 1 ? 'none' : `1px solid ${C.border}` }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 13 }}>
-                <div style={{ width: 42, height: 42, borderRadius: 10, background: C.surface2, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                  <div style={{ fontSize: 9, fontWeight: 500, color: C.faint, textTransform: 'uppercase' }}>{b.date ? new Date(b.date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short' }) : ''}</div>
+                <div style={{ width: 42, height: 42, borderRadius: 12, background: C.surface2, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <div style={{ fontSize: 11, fontWeight: 500, color: C.faint, textTransform: 'uppercase' }}>{b.date ? new Date(b.date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short' }) : ''}</div>
                   <div style={{ fontSize: 16, fontWeight: 400, fontFamily: "'DM Serif Display', Georgia, serif", color: C.text, lineHeight: 1.1 }}>{b.date ? new Date(b.date + 'T00:00:00').getDate() : '?'}</div>
                 </div>
                 <div><div style={{ fontWeight: 500 }}>{b.client}</div><div style={{ fontSize: 12, color: C.muted }}>{b.type} · {b.location} · {fmtTime(b.time)}</div></div>
@@ -457,7 +457,7 @@ export function Invoices({ data, setData, toast }) {
   const [show, setShow] = useState('all') // all | open | paid
   const viewInvoice = viewId ? data.invoices.find(i => i.id === viewId) : null
   const clientFor = inv => data.clients.find(c => c.id === inv.clientId) || data.clients.find(c => c.name === inv.client)
-  const del = inv => { if (!confirm(`Delete ${invoiceLabel(inv)}? This cannot be undone.`)) return; setData(d => ({ ...d, invoices: d.invoices.filter(i => i.id !== inv.id) })); setViewId(null); toast(`${invoiceLabel(inv)} deleted`) }
+  const del = async inv => { if (!(await askConfirm(`Delete ${invoiceLabel(inv)}? This cannot be undone.`))) return; setData(d => ({ ...d, invoices: d.invoices.filter(i => i.id !== inv.id) })); setViewId(null); toast(`${invoiceLabel(inv)} deleted`) }
   const total = data.invoices.reduce((s, i) => s + i.amount, 0)
   const collected = data.invoices.reduce((s, i) => s + i.paid, 0)
   return (

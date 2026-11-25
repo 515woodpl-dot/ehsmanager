@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { T, C } from '../lib/tokens'
 import { pibase } from '../lib/pibase'
 import { canPromptInstall, currentSubscription, deviceName, isIOS, isStandalone, promptInstall, pushSupported, subscribe, subscribePush } from '../lib/pwa'
+import { askConfirm } from './UI'
 
 async function api(path, options = {}) {
   const { data: { session } } = await pibase.auth.getSession()
@@ -232,7 +233,7 @@ export default function Settings({ toast = () => {} }) {
   }
 
   const setKey = (field, value) => setKeys(k => ({ ...k, [field]: value }))
-  const removeKey = field => { if (confirm('Remove this saved key?')) save('keys', { keys: { [field]: null } }) }
+  const removeKey = async field => { if (await askConfirm('Remove this saved key?')) save('keys', { keys: { [field]: null } }) }
   const keysFor = fields => Object.fromEntries(fields.filter(f => keys[f]?.trim()).map(f => [f, keys[f]]))
 
   const uploadLogo = async event => {
@@ -263,7 +264,7 @@ export default function Settings({ toast = () => {} }) {
       <Section title="Business profile" subtitle="Shown on every email, invoice, quote, questionnaire and chat page your clients see.">
         <Field label="Logo" hint="PNG, JPG or WebP. It's resized automatically. Shown at the top of emails and client pages.">
           <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
-            <div style={{ width: 200, height: 80, border: `1px dashed ${C.border2}`, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', background: C.surface2, overflow: 'hidden' }}>
+            <div style={{ width: 200, height: 80, border: `1px dashed ${C.border2}`, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', background: C.surface2, overflow: 'hidden' }}>
               {branding.logo ? <img src={branding.logo} alt="Logo preview" style={{ maxWidth: '100%', maxHeight: '100%' }} /> : <span style={{ fontSize: 12, color: C.faint }}>No logo</span>}
             </div>
             <button type="button" style={T.btn} onClick={() => fileRef.current.click()}>{branding.logo ? 'Replace logo' : 'Upload logo'}</button>

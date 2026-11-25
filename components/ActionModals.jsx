@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { T, C } from '../lib/tokens'
 import { pibase } from '../lib/pibase'
-import { Modal } from './UI'
+import { Modal, askConfirm } from './UI'
 import { LineItemBuilder, calcTotal } from './LineItemBuilder'
 import ContractBuilder from './ContractBuilder'
 import ContractDocument from './ContractDocument'
@@ -49,7 +49,7 @@ export async function copyChatLink(clientId, toast) {
 const clientFor = (data, doc, fallback) => data.clients.find(c => c.id === doc?.clientId) || fallback || data.clients.find(c => c.name === doc?.client) || null
 
 function Banner({ tone = 'open', children }) {
-  const colors = tone === 'done' ? [C.greenBg, C.green] : ['#FFF1DC', '#8A5300']
+  const colors = tone === 'done' ? [C.greenBg, C.green] : [C.amberBg, C.amber]
   return <div style={{ margin: '0 0 18px', padding: '10px 14px', background: colors[0], color: colors[1], borderRadius: 8, fontSize: 13 }}>{children}</div>
 }
 
@@ -87,8 +87,8 @@ export function QuoteModal({ client: clientProp, quote, data, setData, toast, on
   }
 
   // Accepting a quote turns it into an unpaid invoice with the same items.
-  const accept = () => {
-    if (!confirm(`Mark quote ${quoteLabel(quote)} as accepted and create an invoice for ${fmt$(total)}?`)) return
+  const accept = async () => {
+    if (!(await askConfirm(`Mark quote ${quoteLabel(quote)} as accepted and create an invoice for ${fmt$(total)}?`, { title: 'Accept quote?', confirmLabel: 'Accept & invoice' }))) return
     const number = nextInvoiceNumber(data.invoices)
     const invoice = { id: uid(), number, client: clientName, clientId: client?.id || quote.clientId || null, amount: total, due: '', status: 'unpaid', paid: 0, note: lineData.notes || `From accepted quote ${quoteLabel(quote)}`, paymentIntentId: null, lineData, createdAt: new Date().toISOString() }
     setData(d => ({
@@ -99,8 +99,8 @@ export function QuoteModal({ client: clientProp, quote, data, setData, toast, on
     toast(`Quote accepted · invoice ${number} created`); onSaved?.(); onClose()
   }
 
-  const remove = () => {
-    if (!confirm(`Delete quote ${quoteLabel(quote)}? This cannot be undone.`)) return
+  const remove = async () => {
+    if (!(await askConfirm(`Delete quote ${quoteLabel(quote)}? This cannot be undone.`))) return
     setData(d => ({ ...d, quotes: d.quotes.filter(q => q.id !== quote.id) }))
     toast(`Quote ${quoteLabel(quote)} deleted`); onClose()
   }
@@ -230,8 +230,8 @@ export function ContractModal({ client: clientProp, contract, startMode = 'view'
     setBusy(false)
   }
 
-  const remove = () => {
-    if (!confirm('Delete this contract? This cannot be undone.')) return
+  const remove = async () => {
+    if (!(await askConfirm('Delete this contract? This cannot be undone.'))) return
     setData(d => ({ ...d, contracts: d.contracts.filter(k => k.id !== live.id) }))
     toast('Contract deleted'); onClose()
   }
@@ -336,8 +336,8 @@ export function QuestionnaireModal({ client: clientProp, questionnaire, data, se
     onSaved?.(); setSendFor(saved)
   }
 
-  const remove = () => {
-    if (!confirm(`Delete "${live.title}"? This cannot be undone.`)) return
+  const remove = async () => {
+    if (!(await askConfirm(`Delete "${live.title}"? This cannot be undone.`))) return
     setData(d => ({ ...d, questionnaires: d.questionnaires.filter(q => q.id !== live.id) }))
     toast('Questionnaire deleted'); onClose()
   }
@@ -439,8 +439,8 @@ export function SessionModal({ client: clientProp, session, data, setData, toast
     onSaved?.(); onClose()
   }
 
-  const remove = () => {
-    if (!confirm('Delete this session? This cannot be undone.')) return
+  const remove = async () => {
+    if (!(await askConfirm('Delete this session? This cannot be undone.'))) return
     setData(d => ({ ...d, bookings: d.bookings.filter(b => b.id !== session.id) }))
     toast('Session deleted'); onClose()
   }

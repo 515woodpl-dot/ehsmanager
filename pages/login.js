@@ -63,7 +63,7 @@ export default function Login() {
           <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 16, padding: 32, boxShadow: '0 4px 24px rgba(0,0,0,0.06)' }}>
 
             {/* Tabs */}
-            <div style={{ display: 'flex', marginBottom: 28, background: C.surface2, borderRadius: 10, padding: 3 }}>
+            <div style={{ display: 'flex', marginBottom: 28, background: C.surface2, borderRadius: 12, padding: 3 }}>
               {[['login', 'Log in'], ['signup', 'Create account']].map(([t, l]) => (
                 <button key={t} onClick={() => { setTab(t); setError(null); setSuccess(null) }}
                   style={{ flex: 1, padding: '8px 0', borderRadius: 8, border: 'none', background: tab === t ? C.surface : 'transparent', color: C.text, fontWeight: tab === t ? 500 : 400, fontSize: 13.5, cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.12s' }}>
@@ -73,13 +73,13 @@ export default function Login() {
             </div>
 
             {success && (
-              <div style={{ background: '#F0FFF4', border: '1px solid #C6F6D5', borderRadius: 10, padding: '12px 16px', marginBottom: 20, fontSize: 13.5, color: '#276749' }}>
+              <div style={{ background: C.greenBg, border: `1px solid ${C.green}33`, borderRadius: 12, padding: '12px 16px', marginBottom: 20, fontSize: 13.5, color: C.green }}>
                 {success}
               </div>
             )}
 
             {error && (
-              <div style={{ background: '#FFF5F5', border: '1px solid #FED7D7', borderRadius: 10, padding: '12px 16px', marginBottom: 20, fontSize: 13.5, color: '#C53030' }}>
+              <div style={{ background: C.redBg, border: `1px solid ${C.red}33`, borderRadius: 12, padding: '12px 16px', marginBottom: 20, fontSize: 13.5, color: C.red }}>
                 {error}
               </div>
             )}

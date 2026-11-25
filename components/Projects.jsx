@@ -471,7 +471,7 @@ function BoardView({ clients, stages, onCardClick, setData, toast }) {
         const cards = clients.filter(c => c.status === stage.id)
         return (
           <div key={stage.id}
-            style={{ background: over === stage.id ? '#F0F0FF' : C.surface2, borderRadius: 12, padding: 12, minHeight: 100, border: `1px solid ${over === stage.id ? '#C4C4F8' : C.border}`, transition: 'all 0.15s' }}
+            style={{ background: over === stage.id ? C.purpleBg : C.surface2, borderRadius: 12, padding: 12, minHeight: 100, border: `1px solid ${over === stage.id ? C.purple : C.border}`, transition: 'all 0.15s' }}
             onDragOver={e => { e.preventDefault(); setOver(stage.id) }}
             onDragLeave={() => setOver(null)}
             onDrop={e => drop(e, stage.id)}>

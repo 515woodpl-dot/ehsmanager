@@ -4,6 +4,7 @@ import { pibase } from '../lib/pibase'
 import { LineItemBuilder, calcTotal } from './LineItemBuilder'
 import { applyPayment, invoiceLabel, invoiceStatus, nextInstallment, nextInvoiceNumber, normaliseSchedule, paymentSchedule } from '../lib/invoices'
 import { buildItemCatalog } from '../lib/documents'
+import { askConfirm } from './UI'
 
 const uid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => { const r = Math.random() * 16 | 0; return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16) })
 const fmt$ = n => '$' + Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -76,8 +77,8 @@ export function InvoiceModal({ client: clientProp, invoice, data, setData, toast
     else onClose()
   }
 
-  const remove = () => {
-    if (!confirm(`Delete ${invoiceLabel(invoice)}? This cannot be undone.`)) return
+  const remove = async () => {
+    if (!(await askConfirm(`Delete ${invoiceLabel(invoice)}? This cannot be undone.`))) return
     setData(d => ({ ...d, invoices: d.invoices.filter(i => i.id !== invoice.id) }))
     toast(`${invoiceLabel(invoice)} deleted`); onClose()
   }
@@ -122,7 +123,7 @@ export function InvoiceModal({ client: clientProp, invoice, data, setData, toast
       )}
 
       {clientInvoices.length > 0 && (
-        <div style={{ marginBottom: 20, padding: '12px 16px', background: C.surface2, borderRadius: 10, border: `1px solid ${C.border}` }}>
+        <div style={{ marginBottom: 20, padding: '12px 16px', background: C.surface2, borderRadius: 12, border: `1px solid ${C.border}` }}>
           <div style={{ fontSize: 12, fontWeight: 600, color: C.muted, marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Other invoices for {clientName}</div>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             {clientInvoices.map(i => (
@@ -270,7 +271,7 @@ export function RecordPaymentModal({ invoice, setData, toast, onClose }) {
   return (
     <Overlay onClose={onClose} maxWidth={560}>
       <Header title="Record a payment" onClose={onClose} />
-      <div style={{ marginBottom: 16, padding: '12px 16px', background: C.surface2, borderRadius: 10, fontSize: 13 }}>
+      <div style={{ marginBottom: 16, padding: '12px 16px', background: C.surface2, borderRadius: 12, fontSize: 13 }}>
         <div style={{ fontWeight: 500 }}>{invoiceLabel(invoice)} · {invoice.client}</div>
         <div style={{ color: C.muted, marginTop: 2 }}>Total {fmt$(invoice.amount)} · paid {fmt$(invoice.paid)} · <strong style={{ color: C.text }}>{fmt$(balance)} owed</strong></div>
         {schedule.length > 1 && (
@@ -299,7 +300,7 @@ export function RecordPaymentModal({ invoice, setData, toast, onClose }) {
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         {PAY_METHODS.map(opt => (
           <div key={opt.value} onClick={() => setMethod(opt.value)} role="radio" aria-checked={method === opt.value}
-            style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '12px 14px', borderRadius: 10, border: `1.5px solid ${method === opt.value ? C.text : C.border}`, background: method === opt.value ? C.surface3 : C.surface, cursor: 'pointer' }}>
+            style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '12px 14px', borderRadius: 12, border: `1.5px solid ${method === opt.value ? C.text : C.border}`, background: method === opt.value ? C.surface3 : C.surface, cursor: 'pointer' }}>
             <div style={{ width: 18, height: 18, borderRadius: '50%', border: `2px solid ${method === opt.value ? C.text : C.border2}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
               {method === opt.value && <div style={{ width: 9, height: 9, borderRadius: '50%', background: C.text }} />}
             </div>
@@ -402,7 +403,7 @@ export function SendEmailModal({ endpoint, payload, client, clientName, toast, o
       </div>
 
       <div style={{ ...T.formLabel, marginTop: 4 }}>Preview</div>
-      <div style={{ border: `1px solid ${C.border}`, borderRadius: 10, padding: '18px 20px', background: C.surface2 }}>
+      <div style={{ border: `1px solid ${C.border}`, borderRadius: 12, padding: '18px 20px', background: C.surface2 }}>
         <div style={{ fontSize: 13.5, lineHeight: 1.7, color: '#444', whiteSpace: 'pre-wrap' }}>{message}</div>
         <div style={{ display: 'inline-block', marginTop: 14, background: C.text, color: '#fff', padding: '10px 24px', borderRadius: 8, fontSize: 14, fontWeight: 500 }}>{buttonLabel}</div>
       </div>

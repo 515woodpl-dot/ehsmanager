@@ -249,7 +249,7 @@ export default function ContactPage() {
             {/* Submit */}
             {errors.submit && <div style={{ fontSize: 13, color: '#991F1F', marginBottom: 12, textAlign: 'center' }}>{errors.submit}</div>}
             <button type="submit" disabled={loading || !!configError} className="contact-submit"
-              style={{ width: '100%', padding: '13px', borderRadius: 10, border: 'none', background: loading ? '#555' : '#111110', color: '#fff', fontSize: 15, fontWeight: 500, cursor: loading ? 'not-allowed' : 'pointer', letterSpacing: '-0.1px', transition: 'background 0.15s' }}>
+              style={{ width: '100%', padding: '13px', borderRadius: 12, border: 'none', background: loading ? '#555' : '#111110', color: '#fff', fontSize: 15, fontWeight: 500, cursor: loading ? 'not-allowed' : 'pointer', letterSpacing: '-0.1px', transition: 'background 0.15s' }}>
               {loading ? 'Sending...' : (settings.buttonLabel || 'Submit')}
             </button>
           </form>

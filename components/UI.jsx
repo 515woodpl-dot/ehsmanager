@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { T, C } from '../lib/tokens'
 
 export function Toast({ msg, onDone }) {
@@ -26,6 +26,31 @@ export function Modal({ title, onClose, children, footer, wide, extraWide }) {
       </div>
     </div>
   )
+}
+
+// ── Styled replacements for window.confirm / window.alert ─────────
+// askConfirm(message, opts) → Promise<boolean>; notify(message) → Promise<void>.
+// <DialogHost /> (mounted once in _app) renders them with ConfirmModal.
+let pushDialog = null
+const openDialog = d => new Promise(resolve => {
+  if (!pushDialog) { resolve(d.alert ? undefined : window.confirm(d.message)); return }
+  pushDialog({ ...d, resolve })
+})
+export const askConfirm = (message, { title, confirmLabel, danger } = {}) => {
+  const isDelete = /^(delete|remove)\b/i.test(message)
+  return openDialog({ message, title: title || (isDelete ? 'Are you sure?' : 'Please confirm'), confirmLabel: confirmLabel || (isDelete ? 'Delete' : 'Continue'), danger: danger ?? isDelete })
+}
+export const notify = (message, title = 'Heads up') => openDialog({ message, title, alert: true })
+
+export function DialogHost() {
+  const [dialog, setDialog] = useState(null)
+  useEffect(() => { pushDialog = setDialog; return () => { pushDialog = null } }, [])
+  if (!dialog) return null
+  const close = value => { dialog.resolve(value); setDialog(null) }
+  if (dialog.alert) return <Modal title={dialog.title} onClose={() => close()} footer={<button style={T.btnPrimary} onClick={() => close()}>OK</button>}>
+    <div className="brand-confirm"><div className="brand-confirm-mark">EH</div><div><p style={{ marginTop: 0 }}>{dialog.message}</p></div></div>
+  </Modal>
+  return <ConfirmModal title={dialog.title} message={dialog.message} confirmLabel={dialog.confirmLabel} danger={dialog.danger} onConfirm={() => close(true)} onClose={() => close(false)} />
 }
 
 export function ConfirmModal({ title, message, confirmLabel = 'Confirm', onConfirm, onClose, danger = false }) {
