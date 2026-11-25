@@ -9,7 +9,7 @@ const DISMISS_DAYS = 30
 export function AppHead() {
   return (
     <Head>
-      <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+      <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
       <meta name="theme-color" content="#ffffff" />
       <meta name="application-name" content="EHS Studio" />
       <meta name="mobile-web-app-capable" content="yes" />

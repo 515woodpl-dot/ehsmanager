@@ -70,7 +70,7 @@ export default function BookingDetail() {
     } catch (e) { setError(e.message) } finally { setSending(false) }
   }
   return <div className={s.shell}>
-    <Head><title>{sessionType ? `${sessionType.name} | Ellie's Heartstrings` : 'Book a Session | Ellie\'s Heartstrings'}</title><meta name="viewport" content="width=device-width, initial-scale=1" /></Head>
+    <Head><title>{sessionType ? `${sessionType.name} | Ellie's Heartstrings` : 'Book a Session | Ellie\'s Heartstrings'}</title><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" /></Head>
     <BookingHeader />
     <main className={s.detail}>
       <Link href="/booking" className={s.back}>← All sessions</Link>

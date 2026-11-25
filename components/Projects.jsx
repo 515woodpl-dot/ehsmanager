@@ -2,7 +2,7 @@ import { useEffect, useState, useMemo } from 'react'
 import { QuoteModal, ContractModal, QuestionnaireModal, SessionModal, MessageModal, copyChatLink } from './ActionModals'
 import { T, C, badge } from '../lib/tokens'
 import { Modal, Badge, Avatar, Seg, ConfirmModal } from './UI'
-import { removeClient } from '../lib/data'
+import { removeClient, isInvoicePaid } from '../lib/data'
 import { InvoiceModal } from './InvoiceModals'
 import { invoiceLabel } from '../lib/invoices'
 import { docTone, quoteLabel } from '../lib/documents'
@@ -58,6 +58,8 @@ function ActivitySection({ title, onAdd, addLabel = '+ New', empty, children }) 
 
 const QUESTIONNAIRE_STATUS = { draft: 'Not sent', sent: 'Awaiting answers', completed: 'Answered' }
 const sessionStatus = b => b.status === 'canceled' ? 'Canceled' : docTone('session', b) === 'done' ? 'Done' : b.status === 'confirmed' ? 'Confirmed' : 'Upcoming'
+
+const keptPaid = (data, id) => { const n = data.invoices.filter(i => i.clientId === id && isInvoicePaid(i)).length; return n ? ` ${n} paid invoice${n > 1 ? 's' : ''} will be kept for your records.` : '' }
 
 // ── Card Modal ────────────────────────────────────────────────────
 function CardModal({ client: clientProp, stages, sessionTypes, data, setData, onClose, toast }) {
@@ -322,7 +324,7 @@ function CardModal({ client: clientProp, stages, sessionTypes, data, setData, on
     {openDoc?.kind === 'questionnaire' && <QuestionnaireModal {...modalProps} questionnaire={openDoc.item} onClose={closeDoc} />}
     {openDoc?.kind === 'session' && <SessionModal {...modalProps} session={openDoc.item} onClose={closeDoc} />}
 
-    {confirmDelete && <ConfirmModal danger title="Delete this project?" message={`${client.name}'s project will be removed. Existing invoices, sessions and contracts will remain in your records without a linked client.`} confirmLabel="Delete project" onClose={() => setConfirmDelete(false)} onConfirm={del} />}
+    {confirmDelete && <ConfirmModal danger title="Delete this project?" message={`${client.name}'s project and everything tied to it (invoices, sessions, calendar entries, contracts, quotes, questionnaires and messages) will be permanently deleted.${keptPaid(data, client.id)}`} confirmLabel="Delete project" onClose={() => setConfirmDelete(false)} onConfirm={del} />}
     </>
   )
 }
@@ -664,7 +666,7 @@ export default function Projects({ data, setData, toast }) {
       {/* Modals */}
       {newModal && <NewProjectModal stages={stages} sessionTypes={sessionTypes} onAdd={addProject} onClose={() => setNewModal(false)} onAddType={addSessionType} />}
       {stageModal && <StageModal stages={stages} onSave={saveStages} onClose={() => setStageModal(false)} />}
-      {archiveDelete && <ConfirmModal danger title="Delete archived project?" message={`${archiveDelete.name}'s project will be permanently removed from the client list.`} confirmLabel="Delete project" onClose={() => setArchiveDelete(null)} onConfirm={() => deletePermanently(archiveDelete.id)} />}
+      {archiveDelete && <ConfirmModal danger title="Delete archived project?" message={`${archiveDelete.name}'s project and everything tied to it (invoices, sessions, calendar entries, contracts, quotes, questionnaires and messages) will be permanently deleted.${keptPaid(data, archiveDelete.id)}`} confirmLabel="Delete project" onClose={() => setArchiveDelete(null)} onConfirm={() => deletePermanently(archiveDelete.id)} />}
       {cardModal && (
         <CardModal
           client={cardModal}

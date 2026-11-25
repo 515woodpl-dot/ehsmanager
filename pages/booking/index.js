@@ -28,7 +28,7 @@ export default function BookingLanding() {
   const visible = sessionTypes.filter(item => category === 'All sessions' || item.category === category)
   const base = publicBookingBase()
   return <div className={s.shell}>
-    <Head><title>Book a Photography Session | Ellie's Heartstrings</title><meta name="description" content="Explore portrait, maternity, milestone and family photography sessions with Ellie's Heartstrings." /><meta name="viewport" content="width=device-width, initial-scale=1" /></Head>
+    <Head><title>Book a Photography Session | Ellie's Heartstrings</title><meta name="description" content="Explore portrait, maternity, milestone and family photography sessions with Ellie's Heartstrings." /><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" /></Head>
     <BookingHeader />
     {preview && <div className={s.notice}>Booking is temporarily unavailable. Please try again shortly.</div>}
     <main>
