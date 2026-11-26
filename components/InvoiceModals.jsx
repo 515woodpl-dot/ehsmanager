@@ -343,8 +343,30 @@ export function defaultInvoiceEmail(invoice, clientName) {
 export function SendInvoiceModal({ invoice, client, toast, onClose, justCreated = false }) {
   const clientName = client?.name || invoice.client
   const initial = defaultInvoiceEmail(invoice, clientName)
+  const [copying, setCopying] = useState(false)
+  // Also offer the payment link here, for clients who don't get emails.
+  // A just-created invoice may take a moment to save, so retry briefly.
+  const copyPayLink = async () => {
+    setCopying(true)
+    try {
+      const { data: { session } } = await pibase.auth.getSession()
+      let body = null
+      for (let attempt = 0; attempt < 6; attempt++) {
+        const r = await fetch('/api/invoice-link', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token || ''}` }, body: JSON.stringify({ invoiceId: invoice.id }) })
+        body = await r.json().catch(() => ({}))
+        if (r.ok) break
+        if (r.status !== 404) throw new Error(body.error || 'Could not create the payment link')
+        body = null
+        await new Promise(done => setTimeout(done, 800))
+      }
+      if (!body?.url) throw new Error('The invoice is still saving — try again in a moment')
+      try { await navigator.clipboard.writeText(body.url); toast('Payment link copied — paste it in a text or WhatsApp') } catch { toast(body.url) }
+    } catch (error) { toast(error.message) }
+    setCopying(false)
+  }
   return (
     <SendEmailModal
+      extraActions={<button style={T.btn} disabled={copying} onClick={copyPayLink}>{copying ? 'Preparing…' : 'Copy payment link'}</button>}
       endpoint="/api/email-invoice" payload={{ invoice: { id: invoice.id } }}
       client={client} clientName={clientName} toast={toast} onClose={onClose} justCreated={justCreated}
       title={justCreated ? `Invoice ${invoiceLabel(invoice)} created — email it to ${clientName}?` : `Email invoice ${invoiceLabel(invoice)}`}

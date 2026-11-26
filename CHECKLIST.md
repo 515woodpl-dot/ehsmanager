@@ -31,6 +31,8 @@ every round of changes, and keep the "Open / follow-ups" list current.
 - [x] Stripe webhook now stores the processing fee on each payment.
 
 ### Payment links
+- [x] "Copy payment link" also in the window that opens right after saving
+      an invoice (and in Send), next to the email preview.
 - [x] "Pay link" on unpaid invoice cards and "Payment link" in the invoice
       view: copy, Share, Text message, WhatsApp, Open page. Same secure page
       as the invoice email. While open, it checks every 5 s and shows the
