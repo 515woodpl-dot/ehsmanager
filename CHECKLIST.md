@@ -37,6 +37,8 @@ every round of changes, and keep the "Open / follow-ups" list current.
 
 ### Payment links
 - [x] "Payment link" button in the Edit invoice window too.
+- [x] Client card → Send documents → **Payment link**: opens the link for the
+      unpaid invoice (asks which one if several; creates an invoice first if none).
 - [x] "Copy payment link" also in the window that opens right after saving
       an invoice (and in Send), next to the email preview.
 - [x] "Pay link" on unpaid invoice cards and "Payment link" in the invoice
