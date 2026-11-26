@@ -35,6 +35,16 @@ every round of changes, and keep the "Open / follow-ups" list current.
       (e.g. "Accept quote?" was hidden behind the quote editor).
 - [x] New quotes get the studio's sales tax by default, like invoices.
 
+### Finance maths review
+- [x] Stripe refunds are recorded (new webhook event **`charge.refunded`**,
+      full or partial, counted once): the invoice re-opens and Finances nets
+      the refund and its sales tax out in the month it happened.
+- [x] Sales-tax maths now matches the invoice editor exactly (discount capped
+      at the subtotal, no negative quantities/prices).
+- [x] Monthly figures are rounded so the months add up to the year total.
+- [x] Deleting an invoice that has payments warns that the income will
+      disappear from Finances and tax reports.
+
 ### Payment links
 - [x] "Payment link" button in the Edit invoice window too.
 - [x] Client card → Send documents → **Payment link**: opens the link for the
@@ -705,6 +715,10 @@ every round of changes, and keep the "Open / follow-ups" list current.
 ---
 
 ## Open / follow-ups
+- [ ] In Stripe → Webhooks, add the event **`charge.refunded`** to the
+      existing endpoint (alongside `payment_intent.succeeded`).
+- [ ] Refunds given outside Stripe (cash, Zelle) can't be recorded yet.
+- [ ] Editing an invoice's tax after it's been paid changes past tax figures.
 - [ ] Upgrade Next.js 16.4.0 → 16.4.6 (security fix); test the build first.
 - [ ] Confirm NJ sales-tax treatment of session fees / digital files with an
       accountant (rate is editable in Finances → Tax settings).

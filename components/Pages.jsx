@@ -458,7 +458,7 @@ export function Invoices({ data, setData, toast }) {
   const [show, setShow] = useState('all') // all | open | paid
   const viewInvoice = viewId ? data.invoices.find(i => i.id === viewId) : null
   const clientFor = inv => data.clients.find(c => c.id === inv.clientId) || data.clients.find(c => c.name === inv.client)
-  const del = async inv => { if (!(await askConfirm(`Delete ${invoiceLabel(inv)}? This cannot be undone.`))) return; setData(d => ({ ...d, invoices: d.invoices.filter(i => i.id !== inv.id) })); setViewId(null); toast(`${invoiceLabel(inv)} deleted`) }
+  const del = async inv => { if (!(await askConfirm(`Delete ${invoiceLabel(inv)}?${Number(inv.paid) > 0 ? ` It has ${fmt$(inv.paid)} in payments, which will disappear from Finances and your tax reports. Only delete it if the money was refunded or it was a test.` : ''} This cannot be undone.`))) return; setData(d => ({ ...d, invoices: d.invoices.filter(i => i.id !== inv.id) })); setViewId(null); toast(`${invoiceLabel(inv)} deleted`) }
   const total = data.invoices.reduce((s, i) => s + i.amount, 0)
   const collected = data.invoices.reduce((s, i) => s + i.paid, 0)
   return (

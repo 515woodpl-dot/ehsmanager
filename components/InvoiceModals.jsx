@@ -84,7 +84,7 @@ export function InvoiceModal({ client: clientProp, invoice, data, setData, toast
   }
 
   const remove = async () => {
-    if (!(await askConfirm(`Delete ${invoiceLabel(invoice)}? This cannot be undone.`))) return
+    if (!(await askConfirm(`Delete ${invoiceLabel(invoice)}?${Number(invoice.paid) > 0 ? ` It has ${fmt$(invoice.paid)} in payments, which will disappear from Finances and your tax reports. Only delete it if the money was refunded or it was a test.` : ''} This cannot be undone.`))) return
     setData(d => ({ ...d, invoices: d.invoices.filter(i => i.id !== invoice.id) }))
     toast(`${invoiceLabel(invoice)} deleted`); onClose()
   }
