@@ -13,7 +13,7 @@ export function Toast({ msg, onDone }) {
   return <div style={T.toast}>✓ {msg}</div>
 }
 
-export function Modal({ title, onClose, children, footer, wide, extraWide }) {
+export function Modal({ title, onClose, children, footer, wide, extraWide, zIndex }) {
   useEffect(() => {
     const h = e => { if (e.key === 'Escape') onClose() }
     const previous = document.body.style.overflow
@@ -22,7 +22,7 @@ export function Modal({ title, onClose, children, footer, wide, extraWide }) {
     return () => { window.removeEventListener('keydown', h); document.body.style.overflow = previous }
   }, [])
   return (
-    <div style={T.overlay} onClick={e => { if (e.target === e.currentTarget) onClose() }}>
+    <div style={zIndex ? { ...T.overlay, zIndex } : T.overlay} onClick={e => { if (e.target === e.currentTarget) onClose() }}>
       <div className="modal-inner" role="dialog" aria-modal="true" aria-label={title} style={{ ...T.modal, maxWidth: extraWide ? 900 : wide ? 640 : 520 }}>
         <div style={T.modalHeader}>
           <div style={T.modalTitle}>{title}</div>
@@ -55,7 +55,7 @@ export function DialogHost() {
   if (!dialog) return null
   const close = value => { dialog.resolve(value); setDialog(null) }
   if (dialog.alert) return <NoticeBanner title={dialog.title} message={dialog.message} onClose={() => close()} />
-  return <ConfirmModal title={dialog.title} message={dialog.message} confirmLabel={dialog.confirmLabel} danger={dialog.danger} onConfirm={() => close(true)} onClose={() => close(false)} />
+  return <ConfirmModal title={dialog.title} message={dialog.message} confirmLabel={dialog.confirmLabel} danger={dialog.danger} onConfirm={() => close(true)} onClose={() => close(false)} zIndex={500} />
 }
 
 // App's own notification banner (replaces the browser's "site says" alert).
@@ -68,8 +68,8 @@ function NoticeBanner({ title, message, onClose }) {
   </div>
 }
 
-export function ConfirmModal({ title, message, confirmLabel = 'Confirm', onConfirm, onClose, danger = false }) {
-  return <Modal title={title} onClose={onClose} footer={<>
+export function ConfirmModal({ title, message, confirmLabel = 'Confirm', onConfirm, onClose, danger = false, zIndex }) {
+  return <Modal title={title} zIndex={zIndex} onClose={onClose} footer={<>
     <button style={T.btn} onClick={onClose}>Keep it</button>
     <button style={danger ? T.btnDanger : T.btnPrimary} onClick={onConfirm}>{confirmLabel}</button>
   </>}>

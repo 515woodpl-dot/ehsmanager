@@ -30,6 +30,11 @@ every round of changes, and keep the "Open / follow-ups" list current.
 - [x] CSV exports: P&L summary, payments, invoices, expenses, sales tax.
 - [x] Stripe webhook now stores the processing fee on each payment.
 
+### Fixes after testing
+- [x] App confirm dialogs and banners now always appear above open windows
+      (e.g. "Accept quote?" was hidden behind the quote editor).
+- [x] New quotes get the studio's sales tax by default, like invoices.
+
 ### Payment links
 - [x] "Copy payment link" also in the window that opens right after saving
       an invoice (and in Send), next to the email preview.

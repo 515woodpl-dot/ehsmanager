@@ -4,6 +4,7 @@ import { pibase } from '../lib/pibase'
 import { Modal, askConfirm } from './UI'
 import { LocationField, studioAddressNow } from './LocationField'
 import { LineItemBuilder, calcTotal } from './LineItemBuilder'
+import { DEFAULT_ACCOUNTING } from '../lib/accounting'
 import ContractBuilder from './ContractBuilder'
 import ContractDocument from './ContractDocument'
 import { contractHighlights } from '../lib/contractTemplate'
@@ -55,13 +56,18 @@ function Banner({ tone = 'open', children }) {
 }
 
 // ── Quote ─────────────────────────────────────────────────────────
-const emptyQuoteLines = () => ({ items: [{ id: uid(), name: '', description: '', qty: 1, price: '' }], discount: '', discountType: '%', tax: '', notes: '' })
+const emptyQuoteLines = (tax = '') => ({ items: [{ id: uid(), name: '', description: '', qty: 1, price: '' }], discount: '', discountType: '%', tax, notes: '' })
 
 export function QuoteModal({ client: clientProp, quote, data, setData, toast, onClose, onSaved }) {
   const isEdit = !!quote
   const client = clientFor(data, quote, clientProp)
   const clientName = client?.name || quote?.client || ''
-  const [lineData, setLineData] = useState(() => quote?.lineData?.items?.length ? quote.lineData : emptyQuoteLines())
+  const [lineData, setLineData] = useState(() => {
+    if (quote?.lineData?.items?.length) return quote.lineData
+    // New quotes carry the studio's sales tax too, so the invoice they become matches.
+    const acct = { ...DEFAULT_ACCOUNTING, ...(data.accounting || {}) }
+    return emptyQuoteLines(acct.taxByDefault !== false ? String(acct.taxRate) : '')
+  })
   const [validUntil, setValidUntil] = useState(quote?.validUntil || '')
   const [sendFor, setSendFor] = useState(null)
   const total = calcTotal(lineData)
