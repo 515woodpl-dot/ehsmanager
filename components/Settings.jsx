@@ -301,6 +301,14 @@ export default function Settings({ toast = () => {} }) {
         <Field label="Email signature" hint="Ends every email. Leave blank for “Warmly, [your first name]”.">
           <textarea style={{ ...T.formInput, resize: 'vertical' }} rows={3} value={branding.signature || ''} onChange={e => setBranding({ ...branding, signature: e.target.value })} placeholder={`Warmly,\n${branding.ownerName || 'Ellie'}`} />
         </Field>
+        <div style={{ ...T.formLabel, marginTop: 8 }}>Booking page</div>
+        <Field label="Welcome text" hint="Shown under your logo on the public booking page.">
+          <textarea style={{ ...T.formInput, resize: 'vertical' }} rows={3} value={branding.bookingWelcome || ''} onChange={e => setBranding({ ...branding, bookingWelcome: e.target.value })} placeholder="Welcome! We're so glad you're here. Booking your session is simple—just pick a date and time that works best for you." />
+        </Field>
+        <div style={T.formRow} className="form-row-2">
+          <Field label="Instagram">{b('instagramUrl', { placeholder: 'https://instagram.com/…' })}</Field>
+          <Field label="Facebook">{b('facebookUrl', { placeholder: 'https://facebook.com/…' })}</Field>
+        </div>
         <div style={{ display: 'flex', justifyContent: 'flex-end' }}>{saveButton('branding', { branding })}</div>
       </Section>
 

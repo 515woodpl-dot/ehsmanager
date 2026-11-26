@@ -3,7 +3,8 @@ import { QuoteModal, ContractModal, QuestionnaireModal, SessionModal, MessageMod
 import { T, C, badge } from '../lib/tokens'
 import { Modal, Badge, Avatar, Seg, ConfirmModal } from './UI'
 import { removeClient, isInvoicePaid } from '../lib/data'
-import { InvoiceModal, PaymentLinkModal } from './InvoiceModals'
+import { InvoiceModal } from './InvoiceModals'
+import { ShareLinksModal } from './ServiceLinks'
 import { invoiceLabel } from '../lib/invoices'
 import { docTone, quoteLabel } from '../lib/documents'
 
@@ -135,16 +136,6 @@ function CardModal({ client: clientProp, stages, sessionTypes, data, setData, on
   const open = (kind, item) => setOpenDoc({ kind, item })
   const closeDoc = () => setOpenDoc(null)
   const modalProps = { client, data, setData, toast, onSaved: showActivity }
-  // Payment link: straight to the link for one unpaid invoice, a picker for
-  // several, or a new invoice first when nothing is owed yet.
-  const unpaidInvoices = clientInvoices.filter(i => i.status !== 'paid' && (Number(i.amount) || 0) > (Number(i.paid) || 0))
-  const [linkInvoiceId, setLinkInvoiceId] = useState(null)
-  const startPaymentLink = () => {
-    if (unpaidInvoices.length === 1) return setLinkInvoiceId(unpaidInvoices[0].id)
-    if (unpaidInvoices.length > 1) return setActiveModal('paylink-pick')
-    toast('Create the invoice first — then tap "Copy payment link"')
-    setActiveModal('invoice')
-  }
   const leftTab = tab === 'activity' ? 'activity' : 'getstarted'
 
   const sectionLabel = text => <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: C.faint, marginBottom: 10 }}>{text}</div>
@@ -189,8 +180,8 @@ function CardModal({ client: clientProp, stages, sessionTypes, data, setData, on
             {leftTab === 'getstarted' && (
               <>
                 {sectionLabel('Send documents')}
+                <ActionItem icon="🔗" title="Share a link" subtitle="Pay, accept, sign or answer — by text or WhatsApp" onClick={() => setActiveModal('share')} color={C.text} />
                 <ActionItem icon="$" title="Invoice" subtitle="Get paid for your services" onClick={() => setActiveModal('invoice')} color={C.green} />
-                <ActionItem icon="🔗" title="Payment link" subtitle={unpaidInvoices.length ? 'Send by text or WhatsApp' : 'Create an invoice, then share its link'} onClick={startPaymentLink} color={C.green} />
                 <ActionItem icon="📋" title="Quote" subtitle="Get client acceptance" onClick={() => setActiveModal('quote')} color={C.amber} />
                 <ActionItem icon="✎" title="Contract" subtitle="Request a signature" onClick={() => setActiveModal('contract')} color={C.blue} />
                 <ActionItem icon="?" title="Questionnaire" subtitle="Learn about client needs" onClick={() => setActiveModal('questionnaire')} color={C.purple} />
@@ -322,11 +313,7 @@ function CardModal({ client: clientProp, stages, sessionTypes, data, setData, on
 
     {/* New documents */}
     {activeModal === 'invoice' && <InvoiceModal {...modalProps} onClose={() => setActiveModal(null)} />}
-    {activeModal === 'paylink-pick' && <Modal title="Which invoice?" onClose={() => setActiveModal(null)}>
-      <div style={{ display: 'grid', gap: 8 }}>{unpaidInvoices.map(i => <button key={i.id} style={{ ...T.btn, justifyContent: 'space-between', width: '100%', padding: '12px 14px' }} onClick={() => { setActiveModal(null); setLinkInvoiceId(i.id) }}>
-        <span>{invoiceLabel(i)}{i.due ? ` · due ${i.due}` : ''}</span><strong>${((Number(i.amount) || 0) - (Number(i.paid) || 0)).toFixed(2)} due</strong></button>)}</div>
-    </Modal>}
-    {linkInvoiceId && data.invoices.some(i => i.id === linkInvoiceId) && <PaymentLinkModal invoice={data.invoices.find(i => i.id === linkInvoiceId)} client={client} setData={setData} toast={toast} onClose={() => setLinkInvoiceId(null)} />}
+    {activeModal === 'share' && <ShareLinksModal client={client} data={data} setData={setData} toast={toast} onClose={() => setActiveModal(null)} onCreate={kind => setActiveModal(kind)} />}
     {activeModal === 'quote' && <QuoteModal {...modalProps} onClose={() => setActiveModal(null)} />}
     {activeModal === 'contract' && <ContractModal {...modalProps} onClose={() => setActiveModal(null)} />}
     {activeModal === 'questionnaire' && <QuestionnaireModal {...modalProps} onClose={() => setActiveModal(null)} />}

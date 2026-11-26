@@ -8,6 +8,18 @@ const publicType = row => ({
   durationMinutes: row.duration_minutes, price: Number(row.price),
   location: row.location || '', color: row.color || '#17bda5', sortOrder: row.sort_order || 0,
 })
+// Public header for the booking page (Settings → Business details).
+const publicStudio = (branding, ownerId) => {
+  const b = branding || {}
+  const social = url => /^https:\/\/([a-z0-9-]+\.)*(instagram|facebook)\.com\//i.test(url || '') ? url : ''
+  return {
+    name: b.businessName || "Ellie's Heartstrings",
+    welcome: b.bookingWelcome || "Welcome! We're so glad you're here. Booking your session is simple—just pick a date and time that works best for you. We can't wait to capture your story and create memories you'll cherish forever.",
+    email: b.studioEmail || 'hello@elliesheartstrings.com',
+    instagram: social(b.instagramUrl), facebook: social(b.facebookUrl),
+    logoUrl: /^data:image\//.test(b.logo || '') ? `/api/logo/${ownerId}` : '',
+  }
+}
 const clean = (value, length) => typeof value === 'string' ? value.trim().slice(0, length) : ''
 
 export default async function handler(req, res) {
@@ -16,9 +28,10 @@ export default async function handler(req, res) {
   const db = createServiceClient()
   if (!ownerId || !db) return res.status(503).json({ error: 'Booking is not configured yet' })
   try {
-    const { data: settings, error: settingsError } = await db.from('studio_settings').select('availability').eq('user_id', ownerId).single()
+    const { data: settings, error: settingsError } = await db.from('studio_settings').select('availability, branding').eq('user_id', ownerId).single()
     if (settingsError || !settings) return res.status(503).json({ error: 'Booking settings are unavailable' })
     const availability = settings.availability
+    const studio = publicStudio(settings.branding, ownerId)
     if (req.method === 'POST' && req.body?.action === 'quote') {
       const slug = clean(req.body.slug, 120), date = clean(req.body.date, 10)
       const code = clean(req.body.code, 40).toUpperCase()
@@ -39,10 +52,13 @@ export default async function handler(req, res) {
       const { data: rows, error } = slug ? await query.eq('slug', slug) : await query
       if (error) throw error
       const sessionTypes = (rows || []).map(publicType)
-      const bookingWindow = { noticeDays: availability?.noticeDays ?? 1, horizonDays: availability?.horizonDays ?? 90 }
-      if (!slug) return res.status(200).json({ sessionTypes, timezone: availability?.timezone || 'America/New_York', bookingWindow })
+      // Enough for the calendar to grey out closed days; exact times come per date.
+      const openWeekdays = [0, 1, 2, 3, 4, 5, 6].filter(day => (availability?.weekdays?.[day] || []).length > 0)
+      const blockedDates = (availability?.blockedDates || []).map(item => typeof item === 'string' ? item : item?.date).filter(Boolean)
+      const bookingWindow = { noticeDays: availability?.noticeDays ?? 1, horizonDays: availability?.horizonDays ?? 90, openWeekdays, blockedDates }
+      if (!slug) return res.status(200).json({ studio, sessionTypes, timezone: availability?.timezone || 'America/New_York', bookingWindow })
       if (!sessionTypes.length) return res.status(404).json({ error: 'Session type not found' })
-      if (!date) return res.status(200).json({ sessionType: sessionTypes[0], timezone: availability?.timezone || 'America/New_York', bookingWindow })
+      if (!date) return res.status(200).json({ studio, sessionType: sessionTypes[0], timezone: availability?.timezone || 'America/New_York', bookingWindow })
       if (!validDate(date)) return res.status(400).json({ error: 'Invalid date' })
       const { data: bookings, error: bookingsError } = await db.from('bookings').select('date,time,duration_minutes,status').eq('user_id', ownerId).eq('date', date)
       if (bookingsError) throw bookingsError

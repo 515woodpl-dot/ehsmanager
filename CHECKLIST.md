@@ -5,6 +5,39 @@ every round of changes, and keep the "Open / follow-ups" list current.
 
 ---
 
+## 2026-11-26 (round 11) — Booking page to replace Pixieset, service links
+
+### ⚠️ Before using
+- [ ] Settings → Business details: upload the **logo**, set **Studio email**,
+      and fill in **Booking page** (welcome text, Instagram, Facebook).
+- [ ] Session Types: add each package (or "Load sample packages"), upload
+      its **photo**, paste the full description, then switch on **Publish on
+      booking page**.
+- [ ] Photos are stored in `/var/www/ehs-media` (outside the code folder, so
+      deploys never touch them). Include it in backups.
+- [ ] Optional: point `booking.elliesheartstrings.com` at this server (the app
+      already serves /booking on that host), then change the Pixieset links.
+
+### Built
+- [x] New public /booking page in the Pixieset layout: social icons, round
+      logo, spaced business name, welcome text, email, then photo cards with
+      title, 2-line description, duration and price (3 / 2 / 1 columns).
+- [x] Session page: big photo, details, full description, location, and a
+      booking card with a month calendar (closed days greyed out), time
+      slots, client details, discount/gift-card code and total.
+- [x] Photo upload for session types (resized in the browser, kept under
+      the server's 1 MB limit, file type checked on the server).
+- [x] Settings: booking welcome text, Instagram and Facebook links.
+- [x] Client card → Send documents → **Share a link** (replaces "Payment
+      link"): one place for every client link — payment, quote, contract,
+      questionnaire and private chat — for clients who don't get emails.
+      Copy, Share, Text message, WhatsApp, "Copy message" (link + short
+      note) and Open page. The window shows live when the client pays,
+      accepts, signs or answers, and the app updates right away. Each type
+      with nothing waiting offers "+ Create …".
+
+---
+
 ## 2026-11-26 (round 10) — Finances, payment links, mobile/UI fixes, deploy
 
 ### ⚠️ Before using
