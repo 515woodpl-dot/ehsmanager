@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import Head from 'next/head'
 import { T, C } from '../lib/tokens'
+import { versionLabel } from '../lib/version'
 import { seed } from '../lib/data'
 import { pibase } from '../lib/pibase'
 import { loadUserData, syncCollections } from '../lib/db'
@@ -156,6 +157,7 @@ function Sidebar({ active, setActive, unread, open, onClose, user, onSignOut }) 
               <button onClick={onSignOut} style={{ background: 'none', border: 'none', padding: 0, fontSize: 11, color: C.faint, cursor: 'pointer', fontFamily: 'inherit' }}>Sign out</button>
             </div>
           </div>
+          <div title="App version · build · date" style={{ fontSize: 11, color: C.faint, padding: '2px 6px 0', letterSpacing: '0.02em' }}>{versionLabel()}</div>
         </div>
       </div>
 

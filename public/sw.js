@@ -11,7 +11,7 @@
  *
  * Bump VERSION to drop old caches.
  */
-const VERSION = 'ehs-v3'
+const VERSION = 'ehs-v4'
 const SHELL = `${VERSION}-shell`
 const ASSETS = `${VERSION}-assets`
 const PRECACHE = ['/offline.html', '/icons/icon-192.png', '/icons/icon-512.png']

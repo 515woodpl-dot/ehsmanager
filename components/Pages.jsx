@@ -659,6 +659,25 @@ export function Inbox({ data, setData, toast, openClientCard }) {
     } catch (error) { toast(error.message) }
   }
 
+  const deleteConversation = async () => {
+    if (!(await askConfirm(`Delete the whole conversation with ${active.from}? All its messages are removed from your inbox.`, { title: 'Delete conversation?', confirmLabel: 'Delete conversation' }))) return
+    const id = active.id
+    setData(d => ({ ...d, messages: d.messages.filter(m => m.id !== id) }))
+    setActiveId(null); setMobileThread(false); toast('Conversation deleted')
+  }
+  const deleteMessage = async msg => {
+    if (!(await askConfirm('Delete this message from your inbox? (An email already sent to the client stays in their mailbox.)', { title: 'Delete message?', confirmLabel: 'Delete message' }))) return
+    const conversationId = active.id
+    try {
+      const { data: { session } } = await pibase.auth.getSession()
+      const response = await fetch('/api/delete-message', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token || ''}` }, body: JSON.stringify({ conversationId, messageId: msg.id }) })
+      const body = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(body.error || 'Could not delete the message')
+      setData(d => ({ ...d, messages: d.messages.map(m => m.id === conversationId ? { ...m, thread: m.thread.filter(t => t.id !== msg.id) } : m) }))
+      toast('Message deleted')
+    } catch (error) { toast(error.message) }
+  }
+
   return (
     <div className={`inbox${mobileThread && active ? ' inbox-thread-open' : ''}`}>
       <div style={T.pageHeader} className="page-header-wrap inbox-header">
@@ -704,12 +723,13 @@ export function Inbox({ data, setData, toast, openClientCard }) {
                 </div>
                 <button style={T.btnSm} onClick={copyChat} title="Copy this client's private chat link">Chat link</button>
                 {activeClient && openClientCard && <button style={T.btnSm} onClick={() => openClientCard(activeClient)}>Client</button>}
+                <button style={{ ...T.btnSm, color: C.red, borderColor: C.red }} onClick={deleteConversation} title="Delete this conversation">Delete</button>
               </header>
               <div className="inbox-messages">
                 {active.thread.map(msg => (
                   <div key={msg.id} className={`inbox-bubble ${msg.out ? 'out' : 'in'}`}>
                     <div>{msg.text}</div>
-                    <small>{msg.time}{msg.via ? ` · ${msg.via === 'chat' ? 'chat' : 'email'}` : ''}</small>
+                    <small>{msg.time}{msg.via ? ` · ${msg.via === 'chat' ? 'chat' : 'email'}` : ''}<button className="inbox-bubble-delete" onClick={() => deleteMessage(msg)} aria-label="Delete message">Delete</button></small>
                   </div>
                 ))}
                 <div ref={endRef} />
