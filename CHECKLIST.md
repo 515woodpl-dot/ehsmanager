@@ -35,6 +35,12 @@ every round of changes, and keep the "Open / follow-ups" list current.
       (e.g. "Accept quote?" was hidden behind the quote editor).
 - [x] New quotes get the studio's sales tax by default, like invoices.
 
+### Zero-downtime deploys
+- [x] `deploy.sh` builds into `.next-build` while the site keeps running,
+      and swaps it in only if the build succeeds. No more 502 during deploys,
+      and a failed build leaves the site up.
+- [x] `bash deploy.sh --rollback` switches back to the previous build.
+
 ### Hotfix
 - [x] Client card crashed ("invoiceLabel is not defined"): an import was
       removed by mistake in dc07c5f. Restored, and the whole app was checked

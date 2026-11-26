@@ -5,6 +5,8 @@ const gitCommit = (() => { try { return execSync('git rev-parse --short HEAD', {
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  // deploy.sh builds into .next-build (NEXT_DIST_DIR) and swaps it in, so the live site never goes down.
+  distDir: process.env.NEXT_DIST_DIR || '.next',
   // Builds must be plain and repeatable: no AI-agent upgrade nudges (which stop
   // the build) and no agent feedback hooks. Upgrade Next.js deliberately instead.
   experimental: { agentUpgrade: false, agentFeedback: false },
