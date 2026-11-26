@@ -36,6 +36,7 @@ every round of changes, and keep the "Open / follow-ups" list current.
 - [x] New quotes get the studio's sales tax by default, like invoices.
 
 ### Payment links
+- [x] "Payment link" button in the Edit invoice window too.
 - [x] "Copy payment link" also in the window that opens right after saving
       an invoice (and in Send), next to the email preview.
 - [x] "Pay link" on unpaid invoice cards and "Payment link" in the invoice
