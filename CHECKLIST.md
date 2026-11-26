@@ -8,7 +8,8 @@ every round of changes, and keep the "Open / follow-ups" list current.
 ## 2026-11-26 (round 10) — Finances, payment links, mobile/UI fixes, deploy
 
 ### ⚠️ Before using
-- [ ] **Run the accounting migration once** (EHS database is `p_2870c72e`):
+- [x] **Accounting migration applied** 2026-11-26 to `p_2870c72e`, including
+      table owner + grants for the app roles. (Original instructions:)
       `docker exec -i pibase-m0-postgres-1 psql -U postgres -d p_2870c72e -v ON_ERROR_STOP=1 -1 < pibase-migration-005-accounting.sql`
       It adds an `expenses` table and `studio_settings.accounting`. Until it
       runs, Finances still shows payments and sales tax, but expenses and

@@ -18,5 +18,11 @@ alter table expenses enable row level security;
 drop policy if exists expenses_own on expenses;
 create policy expenses_own on expenses for all using (auth.uid() = user_id);
 
+-- Run as the superuser, the table would belong to postgres and the app's
+-- roles couldn't use it. Match the other tables (p_<project>_admin owns them).
+-- Replace p_2870c72e with the project id when applying to another project.
+alter table expenses owner to p_2870c72e_admin;
+grant select, insert, update, delete on expenses to p_2870c72e_anon, p_2870c72e_authenticated, p_2870c72e_service_role;
+
 -- { "taxRate": 6.625, "taxName": "NJ Sales Tax", "filing": "quarterly", "filings": { "2026-Q1": { "filedOn": "2026-04-18", "amount": 123.45, "note": "" } } }
 alter table studio_settings add column if not exists accounting jsonb not null default '{}'::jsonb;
