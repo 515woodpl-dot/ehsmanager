@@ -5,6 +5,9 @@ const gitCommit = (() => { try { return execSync('git rev-parse --short HEAD', {
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  // Builds must be plain and repeatable: no AI-agent upgrade nudges (which stop
+  // the build) and no agent feedback hooks. Upgrade Next.js deliberately instead.
+  experimental: { agentUpgrade: false, agentFeedback: false },
   env: {
     NEXT_PUBLIC_APP_VERSION: require('./package.json').version,
     NEXT_PUBLIC_APP_COMMIT: gitCommit,

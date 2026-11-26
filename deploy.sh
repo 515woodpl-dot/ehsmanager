@@ -4,6 +4,10 @@ echo "🚀 EHS Studio Manager — Deploying..."
 
 cd /var/www/ehsmanager
 
+# Plain, non-interactive build: no Next.js telemetry, upgrade prompts or AI-agent hooks.
+export NEXT_TELEMETRY_DISABLED=1
+export CI=1
+
 echo "📥 Pulling latest code..."
 git fetch origin
 git reset --hard origin/main
