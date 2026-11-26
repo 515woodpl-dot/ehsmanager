@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { T, C } from '../lib/tokens'
 import { pibase } from '../lib/pibase'
 import { Modal, Badge, Avatar, SearchBar, askConfirm } from './UI'
-import { InvoiceModal, RecordPaymentModal, SendInvoiceModal } from './InvoiceModals'
+import { InvoiceModal, RecordPaymentModal, SendInvoiceModal, PaymentLinkModal } from './InvoiceModals'
 import { invoiceLabel, nextInstallment, paymentSchedule } from '../lib/invoices'
 import { docTone } from '../lib/documents'
 import { ContractModal, ContractSignPanel } from './ActionModals'
@@ -452,6 +452,7 @@ export function Invoices({ data, setData, toast }) {
   const [modal, setModal] = useState(false)
   const [payModal, setPayModal] = useState(null) // invoice being marked paid
   const [sendFor, setSendFor] = useState(null) // invoice being emailed
+  const [linkFor, setLinkFor] = useState(null) // invoice whose payment link is open
   const [editFor, setEditFor] = useState(null) // invoice being edited
   const [viewId, setViewId] = useState(null)
   const [show, setShow] = useState('all') // all | open | paid
@@ -490,6 +491,7 @@ export function Invoices({ data, setData, toast }) {
                 {inv.status !== 'paid' && owing > 0 && <button style={{ ...T.btnSm, color: C.green, borderColor: C.green }} onClick={event => { event.stopPropagation(); setPayModal(inv) }}>Record payment</button>}
                 <button style={T.btnSm} onClick={event => { event.stopPropagation(); setEditFor(inv) }}>Edit</button>
                 <button style={T.btnSm} onClick={event => { event.stopPropagation(); setSendFor(inv) }}>Send</button>
+                {inv.status !== 'paid' && <button style={T.btnSm} onClick={event => { event.stopPropagation(); setLinkFor(inv) }}>Pay link</button>}
               </div>
             </article>
           )
@@ -498,7 +500,7 @@ export function Invoices({ data, setData, toast }) {
       {modal && <InvoiceModal data={data} setData={setData} toast={toast} onClose={() => setModal(false)} />}
       {editFor && <InvoiceModal invoice={editFor} client={clientFor(editFor)} data={data} setData={setData} toast={toast} onClose={() => setEditFor(null)} />}
       {sendFor && <SendInvoiceModal invoice={sendFor} client={clientFor(sendFor)} toast={toast} onClose={() => setSendFor(null)} />}
-      {viewInvoice && <Modal title={`${invoiceLabel(viewInvoice)} · ${viewInvoice.client}`} onClose={() => setViewId(null)} wide footer={<><button style={{ ...T.btn, color: C.red, borderColor: C.red }} onClick={() => del(viewInvoice)}>Delete</button><div style={{ flex: 1 }} /><button style={T.btn} onClick={() => { setEditFor(viewInvoice); setViewId(null) }}>Edit</button><button style={T.btn} onClick={() => { setSendFor(viewInvoice); setViewId(null) }}>Email client</button>{viewInvoice.status !== 'paid' && <button style={T.btnPrimary} onClick={() => { setPayModal(viewInvoice); setViewId(null) }}>Record payment</button>}</>}>
+      {viewInvoice && <Modal title={`${invoiceLabel(viewInvoice)} · ${viewInvoice.client}`} onClose={() => setViewId(null)} wide footer={<><button style={{ ...T.btn, color: C.red, borderColor: C.red }} onClick={() => del(viewInvoice)}>Delete</button><div style={{ flex: 1 }} />{viewInvoice.status !== 'paid' && <button style={T.btn} onClick={() => { setLinkFor(viewInvoice); setViewId(null) }}>Payment link</button>}<button style={T.btn} onClick={() => { setEditFor(viewInvoice); setViewId(null) }}>Edit</button><button style={T.btn} onClick={() => { setSendFor(viewInvoice); setViewId(null) }}>Email client</button>{viewInvoice.status !== 'paid' && <button style={T.btnPrimary} onClick={() => { setPayModal(viewInvoice); setViewId(null) }}>Record payment</button>}</>}>
         <div className="invoice-detail-grid"><div><span>Status</span><Badge type={viewInvoice.status} label={viewInvoice.status} /></div><div><span>Total</span><strong>{fmt$(viewInvoice.amount)}</strong></div><div><span>Paid</span><strong>{fmt$(viewInvoice.paid)}</strong></div><div><span>Balance</span><strong>{fmt$(viewInvoice.amount - viewInvoice.paid)}</strong></div><div><span>Due date</span><strong>{fmtDate(viewInvoice.due)}</strong></div><div><span>Payment</span><strong>{viewInvoice.paymentMethod || 'Not recorded'}</strong></div></div>
         {paymentSchedule(viewInvoice).length > 1 && <div className="invoice-line-items"><h3>Payment plan</h3>{paymentSchedule(viewInvoice).map(row => <div key={row.id}><span><strong style={{ fontWeight: 500 }}>{row.label}</strong>{row.due ? <><br /><small style={{ color: C.muted }}>Due {fmtDate(row.due)}</small></> : null}</span><strong style={{ color: row.status === 'paid' ? C.green : row.status === 'partial' ? C.amber : C.text }}>{row.status === 'paid' ? `${fmt$(row.amount)} · paid` : row.status === 'partial' ? `${fmt$(row.remaining)} of ${fmt$(row.amount)} left` : fmt$(row.amount)}</strong></div>)}</div>}
         {!!viewInvoice.lineData?.payments?.length && <div className="invoice-line-items"><h3>Payments received</h3>{viewInvoice.lineData.payments.map(p => <div key={p.id}><span>{new Date(p.at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}<br /><small style={{ color: C.muted }}>{p.method || 'Payment'}</small></span><strong>{fmt$(p.amount)}</strong></div>)}</div>}
@@ -506,6 +508,7 @@ export function Invoices({ data, setData, toast }) {
         {!!viewInvoice.lineData?.items?.length && <div className="invoice-line-items"><h3>Items</h3>{viewInvoice.lineData.items.map(item => <div key={item.id}><span><strong style={{ fontWeight: 500 }}>{item.name || 'Item'}</strong>{item.description ? <><br /><small style={{ color: C.muted, whiteSpace: 'pre-wrap' }}>{item.description}</small></> : null}</span><strong>{item.qty} × {fmt$(item.price)}</strong></div>)}</div>}
       </Modal>}
 
+      {linkFor && <PaymentLinkModal invoice={data.invoices.find(i => i.id === linkFor.id) || linkFor} client={clientFor(linkFor)} setData={setData} toast={toast} onClose={() => setLinkFor(null)} />}
       {payModal && <RecordPaymentModal invoice={data.invoices.find(i => i.id === payModal.id) || payModal} setData={setData} toast={toast} onClose={() => setPayModal(null)} />}
     </div>
   )

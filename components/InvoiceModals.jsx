@@ -1,10 +1,11 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { T, C } from '../lib/tokens'
 import { pibase } from '../lib/pibase'
 import { LineItemBuilder, calcTotal } from './LineItemBuilder'
 import { applyPayment, invoiceLabel, invoiceStatus, nextInstallment, nextInvoiceNumber, normaliseSchedule, paymentSchedule } from '../lib/invoices'
 import { buildItemCatalog } from '../lib/documents'
-import { askConfirm } from './UI'
+import { askConfirm, Modal } from './UI'
+import { DEFAULT_ACCOUNTING } from '../lib/accounting'
 
 const uid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => { const r = Math.random() * 16 | 0; return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16) })
 const fmt$ = n => '$' + Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -31,11 +32,11 @@ export function Header({ title, onClose }) {
   )
 }
 
-const emptyLineData = () => ({ items: [{ id: uid(), name: '', description: '', qty: 1, price: '' }], discount: '', discountType: '%', tax: '', notes: 'Thank you for your business' })
+const emptyLineData = (defaultTax = '') => ({ items: [{ id: uid(), name: '', description: '', qty: 1, price: '' }], discount: '', discountType: '%', tax: defaultTax, notes: 'Thank you for your business' })
 
 // Invoices created before line items existed only carry an amount + note.
-function lineDataFor(invoice) {
-  if (!invoice) return emptyLineData()
+function lineDataFor(invoice, defaultTax = '') {
+  if (!invoice) return emptyLineData(defaultTax)
   if (invoice.lineData?.items?.length) return invoice.lineData
   return { ...emptyLineData(), items: [{ id: uid(), name: invoice.note || 'Photography services', description: '', qty: 1, price: invoice.amount || '' }], notes: invoice.note || '' }
 }
@@ -46,7 +47,11 @@ function lineDataFor(invoice) {
 export function InvoiceModal({ client: clientProp, invoice, data, setData, toast, onClose, onSaved }) {
   const isEdit = !!invoice
   const [clientId, setClientId] = useState(invoice?.clientId || clientProp?.id || '')
-  const [lineData, setLineData] = useState(() => lineDataFor(invoice))
+  const [lineData, setLineData] = useState(() => {
+    // New invoices get the studio's sales tax (NJ 6.625%) unless turned off in Finances → Tax settings.
+    const acct = { ...DEFAULT_ACCOUNTING, ...(data.accounting || {}) }
+    return lineDataFor(invoice, acct.taxByDefault !== false ? String(acct.taxRate) : '')
+  })
   const [due, setDue] = useState(invoice?.due || '')
   const [sendFor, setSendFor] = useState(null) // invoice to email after saving
 
@@ -418,4 +423,65 @@ export function SendEmailModal({ endpoint, payload, client, clientName, toast, o
       </div>
     </Overlay>
   )
+}
+
+// ── Payment link ──────────────────────────────────────────────────
+// The client's secure invoice page (same one the email links to), to share
+// by text, WhatsApp, DM… when email doesn't arrive. While this is open the
+// app checks every few seconds and shows the payment the moment Stripe
+// confirms it.
+export function PaymentLinkModal({ invoice, client, setData, toast, onClose }) {
+  const [state, setState] = useState({ loading: true })
+  const startPaid = useRef(null)
+  const load = async () => {
+    const { data: { session } } = await pibase.auth.getSession()
+    const r = await fetch('/api/invoice-link', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token || ''}` }, body: JSON.stringify({ invoiceId: invoice.id }) })
+    const body = await r.json().catch(() => ({}))
+    if (!r.ok) throw new Error(body.error || 'Could not create the payment link')
+    return body
+  }
+  useEffect(() => {
+    let on = true
+    const tick = async first => {
+      try {
+        const body = await load()
+        if (!on) return
+        if (first) startPaid.current = body.paid
+        setState({ ...body, loading: false })
+        if (!first && body.paid > (startPaid.current ?? body.paid)) {
+          // Pull the payment into the app right away (the server is the source of truth).
+          setData(d => ({ ...d, invoices: d.invoices.map(i => i.id === invoice.id ? { ...i, paid: body.paid, status: body.status, paidAt: body.paidAt || i.paidAt, paymentMethod: body.paymentMethod || i.paymentMethod, lineData: { ...(i.lineData || {}), payments: body.payments } } : i) }))
+        }
+      } catch (error) { if (on && first) setState({ loading: false, error: error.message }) }
+    }
+    tick(true)
+    const id = setInterval(() => tick(false), 5000)
+    return () => { on = false; clearInterval(id) }
+  }, [invoice.id])
+
+  const url = state.url
+  const name = (client?.name || invoice.client || '').split(' ')[0]
+  const text = `Hi${name ? ` ${name}` : ''}, here's your invoice ${invoiceLabel(invoice)} from Ellie's Heartstrings. You can view it and pay securely here: ${url}`
+  const copy = async () => { try { await navigator.clipboard.writeText(url); toast('Payment link copied') } catch { toast(url) } }
+  const share = async () => { try { await navigator.share({ title: `Invoice ${invoiceLabel(invoice)}`, text, url }) } catch {} }
+  const received = state.paid != null && startPaid.current != null && state.paid > startPaid.current
+  const balance = state.amount != null ? Math.max(0, state.amount - state.paid) : Math.max(0, invoice.amount - invoice.paid)
+
+  return <Modal title={`Payment link · ${invoiceLabel(invoice)}`} onClose={onClose} footer={<button style={T.btnPrimary} onClick={onClose}>Done</button>}>
+    {state.loading && <p style={{ color: C.muted }}>Creating the link…</p>}
+    {state.error && <p style={{ color: C.red }}>{state.error}</p>}
+    {url && <>
+      <p style={{ color: C.muted, fontSize: 13.5, marginBottom: 12, lineHeight: 1.6 }}>Send this to {client?.name || invoice.client || 'your client'} by text, WhatsApp or DM. It opens the same secure invoice page as the email, with the Stripe <strong>Pay</strong> button. Payments show up here and on the invoice automatically.</p>
+      <div className="paylink-box"><input readOnly value={url} onFocus={e => e.target.select()} aria-label="Payment link" /><button style={T.btnPrimary} onClick={copy}>Copy</button></div>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
+        {typeof navigator !== 'undefined' && navigator.share && <button style={T.btn} onClick={share}>Share…</button>}
+        <a style={{ ...T.btn, textDecoration: 'none' }} href={`sms:${client?.phone ? encodeURIComponent(client.phone) : ''}?&body=${encodeURIComponent(text)}`}>Text message</a>
+        <a style={{ ...T.btn, textDecoration: 'none' }} href={`https://wa.me/?text=${encodeURIComponent(text)}`} target="_blank" rel="noreferrer">WhatsApp</a>
+        <a style={{ ...T.btn, textDecoration: 'none' }} href={url} target="_blank" rel="noreferrer">Open page</a>
+      </div>
+      <div className={`paylink-status${state.status === 'paid' ? ' paid' : received ? ' partial' : ''}`} role="status">
+        {state.status === 'paid' ? `✓ Paid in full — ${fmt$(state.paid)} received` : received ? `✓ Payment received — ${fmt$(state.paid)} paid, ${fmt$(balance)} still due` : <>Waiting for payment · {fmt$(balance)} due <span className="paylink-live" aria-hidden="true" /> live</>}
+      </div>
+    </>}
+  </Modal>
 }

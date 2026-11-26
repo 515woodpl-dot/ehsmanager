@@ -36,6 +36,14 @@ export default async function handler(req, res) {
       if (!db) return res.status(503).json({ error: 'Database not configured' })
       const { invoiceId, userId, label } = intent.metadata || {}
       if (!invoiceId || !userId) break
+      // Stripe's processing fee, for the accounting report (gross − fee = deposit).
+      let fee = null
+      try {
+        if (intent.latest_charge) {
+          const charge = await stripe.charges.retrieve(intent.latest_charge, { expand: ['balance_transaction'] })
+          if (charge?.balance_transaction?.fee != null) fee = charge.balance_transaction.fee / 100
+        }
+      } catch (error) { console.error('[webhook] fee lookup', error.message) }
       // Payments can be one installment or the whole balance. Each Stripe
       // payment is logged once (by its id), so a retried webhook is a no-op.
       // The update only applies if nobody changed `paid` in between.
@@ -46,7 +54,7 @@ export default async function handler(req, res) {
         if (lookupError || !row) return res.status(500).json({ error: 'Linked invoice not found' })
         const invoice = invoiceFromRow(row)
         if ((invoice.lineData.payments || []).some(p => p.intentId === intent.id)) { credited = true; break }
-        const updated = applyPayment(invoice, { id: `stripe-${intent.id}`, amount: intent.amount_received / 100, method: 'Stripe', intentId: intent.id })
+        const updated = applyPayment(invoice, { id: `stripe-${intent.id}`, amount: intent.amount_received / 100, method: 'Stripe', intentId: intent.id, fee })
         const { data: saved, error } = await db.from('invoices').update({
           paid: updated.paid, status: updated.status, payment_method: 'Stripe', paid_at: updated.paidAt,
           line_items: updated.lineData, updated_at: new Date().toISOString(),

@@ -5,6 +5,58 @@ every round of changes, and keep the "Open / follow-ups" list current.
 
 ---
 
+## 2026-11-26 (round 10) — Finances, payment links, mobile/UI fixes, deploy
+
+### ⚠️ Before using
+- [ ] **Run the accounting migration once** (EHS database is `p_2870c72e`):
+      `docker exec -i pibase-m0-postgres-1 psql -U postgres -d p_2870c72e -v ON_ERROR_STOP=1 -1 < pibase-migration-005-accounting.sql`
+      It adds an `expenses` table and `studio_settings.accounting`. Until it
+      runs, Finances still shows payments and sales tax, but expenses and
+      tax settings are disabled.
+- [ ] Deploy with `bash /var/www/ehsmanager/deploy.sh`, then check
+      `/api/version` shows the new commit.
+
+### Finances (new page)
+- [x] Year picker; Collected, Sales tax held, Expenses + fees, Net profit.
+- [x] Profit & loss, month-by-month table, sales by session type, received by
+      payment method, expenses by category. Cash basis (counted when paid).
+- [x] Payments ledger: date, client, invoice, method, amount, tax share,
+      Stripe fee, net deposit. Older invoices marked paid without itemised
+      payments are included (flagged *).
+- [x] Expenses: add / edit / delete with categories.
+- [x] NJ sales tax by quarter (ST-50 due dates), taxable vs non-taxable,
+      Past due / Filed status, "Mark filed" with date, amount and note.
+- [x] Tax settings: rate (default 6.625%), name, add to new invoices by default.
+- [x] CSV exports: P&L summary, payments, invoices, expenses, sales tax.
+- [x] Stripe webhook now stores the processing fee on each payment.
+
+### Payment links
+- [x] "Pay link" on unpaid invoice cards and "Payment link" in the invoice
+      view: copy, Share, Text message, WhatsApp, Open page. Same secure page
+      as the invoice email. While open, it checks every 5 s and shows the
+      payment as soon as Stripe confirms it.
+
+### Earlier today (commits 8e87c5c → 95b476f)
+- [x] No pinch zoom / sideways sliding; 16px inputs on phones.
+- [x] Deleting a project deletes its invoices, sessions, contracts, quotes,
+      questionnaires and messages; paid invoices are kept.
+- [x] App-styled confirm dialogs and notice banner instead of browser pop-ups.
+- [x] Sessions text larger on phones; shared colours/radii across pages.
+- [x] Contracts: Delete button; records when sent ("Sent <date> to <email>");
+      sending moves the project to Booked.
+- [x] Studio address (515 Wood Pl, Linden NJ 07036) is the default location,
+      with "Another location".
+- [x] Contract save names the missing fields; no due date needed at 100% retainer.
+- [x] Less flashing (one start-up screen, no reload on tab focus, refresh only
+      on real changes).
+- [x] Inbox: delete a conversation or a single message.
+- [x] Version label in the sidebar and `/api/version`.
+- [x] Builds no longer stop for Next.js AI-agent upgrade prompts.
+- [x] Server: 2 GB swap; overnight restart every 3 days at 4:20 AM ET
+      (`/etc/cron.d/ehs-scheduled-reboot`, log `/var/log/ehs-scheduled-reboot.log`).
+
+---
+
 ## 2026-10-16 (round 9) — Payment plans, studio countersigning, contract highlights, live chat
 
 ### ⚠️ Before using
@@ -643,9 +695,11 @@ every round of changes, and keep the "Open / follow-ups" list current.
 ---
 
 ## Open / follow-ups
-- [ ] Online payments were tested against a stand-in for Stripe (signed
-      webhook events), not a real Stripe account. Make one test payment in
-      Stripe test mode before going live.
+- [ ] Upgrade Next.js 16.4.0 → 16.4.6 (security fix); test the build first.
+- [ ] Confirm NJ sales-tax treatment of session fees / digital files with an
+      accountant (rate is editable in Finances → Tax settings).
+- [ ] Stripe fees are only captured for payments made after this release.
+- [x] ~~Make one real test payment~~ — $1 live payment went through on 2026-11-26.
 - [ ] The signed-contract copy is a link to the signed page (print / save
       as PDF), not a PDF attachment.
 - [ ] Payment reminders before each installment's due date aren't sent

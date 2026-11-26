@@ -845,3 +845,31 @@ body { padding-left: env(safe-area-inset-left); padding-right: env(safe-area-ins
 .inbox-bubble-delete { border: 0; background: none; color: inherit; font: inherit; text-decoration: underline; text-underline-offset: 2px; cursor: pointer; padding: 0 0 0 8px; opacity: 0; transition: opacity .15s; }
 .inbox-bubble:hover .inbox-bubble-delete, .inbox-bubble-delete:focus-visible { opacity: 1; }
 @media (hover: none) { .inbox-bubble-delete { opacity: 1; } }
+
+/* ── Finances ── */
+.fin-note { background: var(--amber-bg); color: var(--amber); border-radius: 12px; padding: 12px 16px; font-size: 13.5px; margin-bottom: 18px; line-height: 1.5; }
+.fin-note code, .fin-help code { font-size: 12px; }
+.fin-help { color: var(--muted); font-size: 12.5px; line-height: 1.6; margin-top: 14px; }
+.fin-toolbar { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+.fin-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.fin-table { width: 100%; border-collapse: collapse; font-size: 13.5px; font-variant-numeric: tabular-nums; }
+.fin-table th { font-size: 11px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); padding: 8px 10px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+.fin-table td { padding: 10px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+.fin-table tfoot td { font-weight: 600; border-bottom: 0; border-top: 2px solid var(--border2); }
+.fin-bar-row { margin-bottom: 12px; }
+.fin-bar-label { display: flex; justify-content: space-between; gap: 12px; font-size: 13.5px; margin-bottom: 5px; }
+.fin-bar { height: 6px; border-radius: 6px; background: var(--surface3); overflow: hidden; }
+.fin-bar > div { height: 100%; background: var(--text); border-radius: 6px; }
+.fin-pill { display: inline-block; padding: 2px 9px; border-radius: 20px; font-size: 11.5px; font-weight: 500; background: var(--surface3); color: var(--muted); }
+.fin-pill.ok { background: var(--green-bg); color: var(--green); }
+.fin-pill.late { background: var(--red-bg); color: var(--red); }
+@media (max-width: 768px) { .fin-table { font-size: 13px; } .fin-table td, .fin-table th { padding: 8px 6px; } }
+
+/* ── Payment link ── */
+.paylink-box { display: flex; gap: 8px; }
+.paylink-box input { flex: 1; min-width: 0; padding: 9px 12px; border: 1px solid var(--border2); border-radius: 8px; background: var(--surface2); font-family: inherit; color: var(--text); }
+.paylink-status { margin-top: 18px; padding: 12px 14px; border-radius: 12px; background: var(--surface2); color: var(--muted); font-size: 13.5px; display: flex; align-items: center; gap: 6px; }
+.paylink-status.partial { background: var(--amber-bg); color: var(--amber); font-weight: 500; }
+.paylink-status.paid { background: var(--green-bg); color: var(--green); font-weight: 600; }
+.paylink-live { width: 8px; height: 8px; border-radius: 50%; background: var(--green); margin-left: 6px; animation: paylink-pulse 1.6s ease-in-out infinite; }
+@keyframes paylink-pulse { 0%, 100% { opacity: .25; } 50% { opacity: 1; } }

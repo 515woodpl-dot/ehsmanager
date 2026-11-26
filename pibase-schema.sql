@@ -389,3 +389,22 @@ $$;
 drop trigger if exists release_booking_resources on bookings;
 create trigger release_booking_resources before update of status or delete on bookings
   for each row execute function public.release_booking_resources();
+
+-- ── Accounting (see pibase-migration-005-accounting.sql) ─────────────
+create table if not exists expenses (
+  id          uuid primary key default gen_random_uuid(),
+  user_id     uuid not null references profiles(id) on delete cascade,
+  date        date not null,
+  vendor      text,
+  category    text not null default 'Other',
+  amount      numeric(10,2) not null default 0,
+  method      text,
+  notes       text,
+  created_at  timestamptz not null default now(),
+  updated_at  timestamptz not null default now()
+);
+create index if not exists expenses_user_date on expenses(user_id, date);
+alter table expenses enable row level security;
+drop policy if exists expenses_own on expenses;
+create policy expenses_own on expenses for all using (auth.uid() = user_id);
+alter table studio_settings add column if not exists accounting jsonb not null default '{}'::jsonb;
