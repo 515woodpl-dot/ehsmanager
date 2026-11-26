@@ -3,6 +3,7 @@ import { T, C } from '../lib/tokens'
 import { CONTRACT_TEMPLATE, fillContract, highlightValues } from '../lib/contractTemplate'
 import ContractDocument from './ContractDocument'
 import { askConfirm, notify } from './UI'
+import { LocationField, studioAddressNow } from './LocationField'
 
 const uid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => { const r = Math.random() * 16 | 0; return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16) })
 
@@ -58,7 +59,7 @@ function buildFields(c, data) {
       sessionType: booking?.type || c?.type || 'Portrait',
       sessionDate: booking?.date || c?.date || '',
       sessionTime: booking?.time || '',
-      location: booking?.location || '',
+      location: booking?.location || studioAddressNow(),
       totalFee: invoice?.amount ? String(invoice.amount) : '',
       retainerPct: '50',
       remainingDueDate: invoice?.due || 'Proof Delivery Date',
@@ -242,7 +243,7 @@ export default function ContractBuilder({ client, contract = null, data, onSave,
               </Field>
             </div>
             <Field label="Location">
-              <input style={inp} value={fields.location} onChange={e => set('location', e.target.value)} />
+              <LocationField inputStyle={inp} value={fields.location} onChange={v => setFields(f => ({ ...f, location: v }))} />
             </Field>
           </Section>
 

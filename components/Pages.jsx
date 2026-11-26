@@ -517,6 +517,12 @@ export function Contracts({ data, setData, toast }) {
   const [viewModal, setViewModal] = useState(null)
   const [sendModal, setSendModal] = useState(null)
   const [signModal, setSignModal] = useState(null)
+  const deleteContract = async k => {
+    const signed = k.status === 'signed'
+    if (!(await askConfirm(`Delete the ${k.type || 'contract'} for ${k.client}?${signed ? ' It has been signed — you will lose the signed copy.' : ''} This cannot be undone.`, { title: signed ? 'Delete a signed contract?' : 'Delete contract?', confirmLabel: 'Delete contract', danger: true }))) return
+    setData(d => ({ ...d, contracts: d.contracts.filter(c => c.id !== k.id) }))
+    toast('Contract deleted')
+  }
   return (
     <div>
       <div style={T.pageHeader} className="page-header-wrap"><div><div style={T.pageTitle}>Contracts</div><div style={T.pageSub}>{data.contracts.filter(k => docTone('contract', k) === 'done').length} fully signed · {data.contracts.filter(k => docTone('contract', k) !== 'done').length} waiting</div></div><button style={T.btnPrimary} onClick={() => setModal(true)}>+ New contract</button></div>
@@ -537,6 +543,7 @@ export function Contracts({ data, setData, toast }) {
               {k.status === 'signed' && !k.fields?.studioSignature?.name && <button style={{ ...T.btnSm, color: C.green, borderColor: C.green }} onClick={e => { e.stopPropagation(); setViewModal(k) }}>Add your signature</button>}
               {k.status === 'pending' && <button style={T.btnSm} onClick={e => { e.stopPropagation(); setSendModal(k) }}>Send to sign</button>}
               {k.status === 'pending' && <button style={{ ...T.btnSm, color: C.green, borderColor: C.green }} onClick={e => { e.stopPropagation(); setSignModal(k) }}>Sign in person</button>}
+              <button style={{ ...T.btnSm, color: C.red, borderColor: C.red }} onClick={e => { e.stopPropagation(); deleteContract(k) }}>Delete</button>
             </div>
           </article>
         ))}

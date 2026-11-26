@@ -1,12 +1,13 @@
 import { useMemo, useState } from 'react'
 import { T, C } from '../lib/tokens'
 import { Modal, Badge, askConfirm } from './UI'
+import { LocationField, studioAddressNow, DEFAULT_STUDIO_ADDRESS } from './LocationField'
 import { DEMO_SESSION_CATALOG, DEFAULT_AVAILABILITY } from '../lib/data'
 import { availabilitySettings, durationLabel, money, publicBookingBase, safeImageUrl, slugify } from '../lib/booking'
 import s from '../styles/BookingAdmin.module.css'
 
 const uid = () => crypto.randomUUID()
-const blankType = { name: '', slug: '', category: 'Portrait', description: '', imageUrl: '', durationMinutes: 60, price: 0, location: '', color: '#E8D7CF', public: false }
+const blankType = { name: '', slug: '', category: 'Portrait', description: '', imageUrl: '', durationMinutes: 60, price: 0, location: DEFAULT_STUDIO_ADDRESS, color: '#E8D7CF', public: false }
 const blankDiscount = { name: '', code: '', kind: 'coupon', mode: 'percent', amount: 10, balance: null, uses: 0, maxUses: null, startsOn: '', endsOn: '', active: true }
 // "Sat, Jul 4, 2026 · 7:00 PM" — either part may be missing.
 const fmtWhen = (date, time) => {
@@ -67,7 +68,7 @@ export function SessionTypes({ data, setData, toast, setView }) {
     {types.length > 0 && <button className={s.textButton} onClick={importSamples}>Load missing sample packages as drafts</button>}
     <div className={s.related}><button onClick={() => setView('sessions')}>View sessions →</button><button onClick={() => setView('discounts')}>Manage discounts →</button></div>
     {editing && <Modal wide title={editing.id ? 'Edit Session Type' : 'New Session Type'} onClose={() => setEditing(null)} footer={<><button style={T.btn} onClick={() => setEditing(null)}>Cancel</button><button style={T.btnPrimary} onClick={saveType}>Save Session Type</button></>}>
-      <div className={s.formGrid}>{field('Name', input(editing.name, name => setEditing(v => ({ ...v, name, slug: v.id ? v.slug : slugify(name) })), { required: true }))}{field('Page URL', input(editing.slug, slug => setEditing(v => ({ ...v, slug: slugify(slug) })), { placeholder: 'maternity-classic' }))}{field('Category', input(editing.category, category => setEditing(v => ({ ...v, category }))))}{field('Duration (minutes)', input(editing.durationMinutes, durationMinutes => setEditing(v => ({ ...v, durationMinutes: Number(durationMinutes) })), { type: 'number', min: 30, max: 480, step: 30 }))}{field('Price (USD)', input(editing.price, price => setEditing(v => ({ ...v, price: Number(price) })), { type: 'number', min: 0, step: '.01' }))}{field('Location', input(editing.location, location => setEditing(v => ({ ...v, location }))))}{field('Photo URL (HTTPS)', input(editing.imageUrl, imageUrl => setEditing(v => ({ ...v, imageUrl })), { type: 'url', placeholder: 'https://...' }))}{field('Category color', input(editing.color, color => setEditing(v => ({ ...v, color })), { type: 'color' }))}</div>
+      <div className={s.formGrid}>{field('Name', input(editing.name, name => setEditing(v => ({ ...v, name, slug: v.id ? v.slug : slugify(name) })), { required: true }))}{field('Page URL', input(editing.slug, slug => setEditing(v => ({ ...v, slug: slugify(slug) })), { placeholder: 'maternity-classic' }))}{field('Category', input(editing.category, category => setEditing(v => ({ ...v, category }))))}{field('Duration (minutes)', input(editing.durationMinutes, durationMinutes => setEditing(v => ({ ...v, durationMinutes: Number(durationMinutes) })), { type: 'number', min: 30, max: 480, step: 30 }))}{field('Price (USD)', input(editing.price, price => setEditing(v => ({ ...v, price: Number(price) })), { type: 'number', min: 0, step: '.01' }))}{field('Location', <LocationField value={editing.location} onChange={location => setEditing(v => ({ ...v, location }))} />)}{field('Photo URL (HTTPS)', input(editing.imageUrl, imageUrl => setEditing(v => ({ ...v, imageUrl })), { type: 'url', placeholder: 'https://...' }))}{field('Category color', input(editing.color, color => setEditing(v => ({ ...v, color })), { type: 'color' }))}</div>
       {field('Description', <textarea className={s.input} rows={4} value={editing.description} onChange={e => setEditing(v => ({ ...v, description: e.target.value }))} />)}
       <label className={s.checkbox}><input type="checkbox" checked={editing.public} onChange={e => setEditing(v => ({ ...v, public: e.target.checked }))} /> Publish on booking page</label>
     </Modal>}
@@ -103,7 +104,7 @@ export function Sessions({ data, setData, toast, setView }) {
     const start = Number(form.time.slice(0,2)) * 60 + Number(form.time.slice(3,5))
     const conflict = data.bookings.some(b => { if (b.date !== form.date || !b.time || b.status === 'canceled') return false; const other = Number(b.time.slice(0,2)) * 60 + Number(b.time.slice(3,5)); return start < other + (b.durationMinutes || 60) && start + type.durationMinutes > other })
     if (conflict) return toast('That time overlaps another session')
-    const booking = { id: uid(), clientId: client.id, client: client.name, sessionTypeId: type.id, type: type.name, date: form.date, time: form.time, durationMinutes: type.durationMinutes, price: type.price, finalPrice: type.price, location: type.location, notes: form.notes, status: 'pending', source: 'manual' }
+    const booking = { id: uid(), clientId: client.id, client: client.name, sessionTypeId: type.id, type: type.name, date: form.date, time: form.time, durationMinutes: type.durationMinutes, price: type.price, finalPrice: type.price, location: type.location || studioAddressNow(), notes: form.notes, status: 'pending', source: 'manual' }
     setData(v => ({ ...v, bookings: [...v.bookings, booking] })); setCreating(false); toast('Session created')
   }
   return <div><div className={s.heading}><div><h1>Sessions</h1><p>Booking requests and scheduled sessions in one place.</p></div><button className={s.primaryButton} onClick={() => setCreating(true)}>+ New session</button></div>
