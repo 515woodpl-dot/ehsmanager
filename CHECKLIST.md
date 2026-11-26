@@ -35,6 +35,11 @@ every round of changes, and keep the "Open / follow-ups" list current.
       (e.g. "Accept quote?" was hidden behind the quote editor).
 - [x] New quotes get the studio's sales tax by default, like invoices.
 
+### Hotfix
+- [x] Client card crashed ("invoiceLabel is not defined"): an import was
+      removed by mistake in dc07c5f. Restored, and the whole app was checked
+      with ESLint `no-undef`: no other undefined names.
+
 ### Finance maths review
 - [x] Stripe refunds are recorded (new webhook event **`charge.refunded`**,
       full or partial, counted once): the invoice re-opens and Finances nets

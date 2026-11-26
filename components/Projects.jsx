@@ -4,6 +4,7 @@ import { T, C, badge } from '../lib/tokens'
 import { Modal, Badge, Avatar, Seg, ConfirmModal } from './UI'
 import { removeClient, isInvoicePaid } from '../lib/data'
 import { InvoiceModal, PaymentLinkModal } from './InvoiceModals'
+import { invoiceLabel } from '../lib/invoices'
 import { docTone, quoteLabel } from '../lib/documents'
 
 const uid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => { const r = Math.random() * 16 | 0; return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16) })
