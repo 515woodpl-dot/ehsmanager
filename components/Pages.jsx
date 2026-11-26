@@ -534,14 +534,14 @@ export function Contracts({ data, setData, toast }) {
               <div style={{ minWidth: 0 }}>
                 <div className="inv-card-num">{k.type || 'Contract'}</div>
                 <div className="inv-card-client">{k.client}</div>
-                <div className="inv-card-meta">{k.status === 'signed' ? `Signed${k.signedBy ? ` by ${k.signedBy}` : ''}${k.signedAt ? ` · ${k.signedAt}` : ''}${k.fields?.studioSignature?.name ? '' : ' · needs your signature'}` : `Created ${k.sent || '—'} · waiting for signature`}</div>
+                <div className="inv-card-meta">{k.status === 'signed' ? `Signed${k.signedBy ? ` by ${k.signedBy}` : ''}${k.signedAt ? ` · ${k.signedAt}` : ''}${k.fields?.studioSignature?.name ? '' : ' · needs your signature'}` : (k.fields?.sentAt ? `Sent ${new Date(k.fields.sentAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}${k.fields.sentTo ? ` to ${k.fields.sentTo}` : ''} · waiting for signature` : `Created ${k.sent || '—'} · not sent yet`)}</div>
               </div>
-              <Badge type={docTone('contract', k) === 'done' ? 'signed' : 'pending'} label={docTone('contract', k) === 'done' ? 'signed' : k.status === 'signed' ? 'sign now' : 'awaiting'} />
+              <Badge type={docTone('contract', k) === 'done' ? 'signed' : 'pending'} label={docTone('contract', k) === 'done' ? 'signed' : k.status === 'signed' ? 'sign now' : k.fields?.sentAt ? 'sent' : 'draft'} />
             </div>
             <div className="card-actions">
               <button style={T.btnSm} onClick={e => { e.stopPropagation(); setViewModal(k) }}>View</button>
               {k.status === 'signed' && !k.fields?.studioSignature?.name && <button style={{ ...T.btnSm, color: C.green, borderColor: C.green }} onClick={e => { e.stopPropagation(); setViewModal(k) }}>Add your signature</button>}
-              {k.status === 'pending' && <button style={T.btnSm} onClick={e => { e.stopPropagation(); setSendModal(k) }}>Send to sign</button>}
+              {k.status === 'pending' && <button style={T.btnSm} onClick={e => { e.stopPropagation(); setSendModal(k) }}>{k.fields?.sentAt ? 'Resend' : 'Send to sign'}</button>}
               {k.status === 'pending' && <button style={{ ...T.btnSm, color: C.green, borderColor: C.green }} onClick={e => { e.stopPropagation(); setSignModal(k) }}>Sign in person</button>}
               <button style={{ ...T.btnSm, color: C.red, borderColor: C.red }} onClick={e => { e.stopPropagation(); deleteContract(k) }}>Delete</button>
             </div>

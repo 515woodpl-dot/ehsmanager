@@ -23,7 +23,7 @@ export default async function handler(req, res) {
   const contractId = req.body?.contract?.id
   if (!contractId) return res.status(400).json({ error: 'Missing contract ID' })
   const { data: row, error: lookupError } = await auth.db.from('contracts')
-    .select('id, client_id, client_name, type, body, sent, status')
+    .select('id, client_id, client_name, type, body, sent, status, fields')
     .eq('id', contractId).eq('user_id', auth.user.id).single()
   if (lookupError || !row) return res.status(404).json({ error: 'Contract not found' })
   if (row.status !== 'pending') return res.status(409).json({ error: 'Contract is already signed' })
@@ -65,5 +65,6 @@ export default async function handler(req, res) {
     html,
   })
   if (result.error) return res.status(400).json({ error: result.error })
+  await auth.db.from('contracts').update({ fields: { ...(row.fields || {}), sentAt: new Date().toISOString(), sentTo: clientEmail } }).eq('id', row.id).eq('user_id', auth.user.id)
   return res.status(200).json({ id: result.id })
 }

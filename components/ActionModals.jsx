@@ -247,7 +247,27 @@ export function ContractModal({ client: clientProp, contract, startMode = 'view'
 
   if (mode === 'send') {
     return <SendEmailModal endpoint="/api/email-contract" payload={{ contract: { id: live.id } }} client={client} clientName={clientName} toast={toast}
-      onClose={result => (result?.sent || !contract || startMode === 'send' ? onClose() : setMode('view'))} justCreated={!contract}
+      onClose={result => {
+        if (result?.sent) {
+          const sentAt = new Date().toISOString()
+          // Sending the contract books the project — but never moves it backwards
+          // (e.g. a project already in post-production stays there).
+          const clientId = live.clientId || client?.id
+          setData(d => {
+            const order = (d.stages || []).map(st => st.id)
+            const bookedAt = order.indexOf('booked')
+            return {
+              ...d,
+              contracts: d.contracts.map(k => k.id === live.id ? { ...k, fields: { ...(k.fields || {}), sentAt, sentTo: client?.email || '' } } : k),
+              clients: d.clients.map(c => c.id === clientId && bookedAt >= 0 && order.indexOf(c.status) < bookedAt ? { ...c, status: 'booked' } : c),
+            }
+          })
+          const order = (data.stages || []).map(st => st.id)
+          const current = data.clients.find(c => c.id === clientId)
+          if (current && order.indexOf('booked') >= 0 && order.indexOf(current.status) < order.indexOf('booked')) setTimeout(() => toast(`${clientName} moved to Booked`), 2700)
+        }
+        return result?.sent || !contract || startMode === 'send' ? onClose() : setMode('view')
+      }} justCreated={!contract}
       title={!contract ? `Contract saved — email it to ${clientName} to sign?` : `Email contract to ${clientName}`} sentToast="Contract emailed"
       initialSubject={`Your ${live.type || 'photography agreement'} is ready to sign`}
       initialMessage={`Hi ${firstName(clientName)},\n\nYour ${live.type || 'photography agreement'} is ready. Please review it and sign securely using the button below.\n\nIf you have any questions about the terms, just reply to this email before signing.`}
