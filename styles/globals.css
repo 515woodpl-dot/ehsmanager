@@ -824,3 +824,19 @@ body { padding-left: env(safe-area-inset-left); padding-right: env(safe-area-ins
   input, select, textarea { font-size: 16px !important; }
   .modal-inner { max-width: 100vw !important; overflow-x: hidden; }
 }
+
+/* Start-up screen shared by every loading step (no jumping between screens) */
+.app-splash { min-height: 100vh; min-height: 100dvh; display: grid; place-content: center; justify-items: center; gap: 14px; padding: 24px; background: var(--bg); color: var(--muted); text-align: center; }
+.app-splash-mark { font-family: 'DM Serif Display', Georgia, serif; font-size: 26px; color: var(--text); letter-spacing: -0.3px; }
+.app-splash-msg p { max-width: 360px; line-height: 1.6; }
+.app-splash-bar { width: 120px; height: 2px; border-radius: 2px; background: var(--surface3); overflow: hidden; position: relative; }
+.app-splash-bar::after { content: ''; position: absolute; inset: 0; width: 40%; background: var(--text); animation: app-splash-slide 1s ease-in-out infinite; }
+@keyframes app-splash-slide { from { transform: translateX(-100%); } to { transform: translateX(250%); } }
+
+/* In-app notification banner */
+.notice-banner { position: fixed; z-index: 400; top: calc(16px + env(safe-area-inset-top)); left: 50%; transform: translateX(-50%); width: min(520px, calc(100vw - 32px)); display: flex; gap: 12px; align-items: flex-start; padding: 14px 16px; background: var(--surface); border: 1px solid var(--border); border-left: 4px solid var(--amber); border-radius: 12px; box-shadow: 0 12px 40px rgba(0,0,0,.14); animation: notice-in .2s ease-out; }
+.notice-banner-mark { width: 26px; height: 26px; flex: none; border-radius: 50%; display: grid; place-items: center; background: var(--amber-bg); color: var(--amber); font-weight: 700; font-size: 14px; }
+.notice-banner strong { display: block; font-size: 14px; color: var(--text); }
+.notice-banner p { margin-top: 3px; font-size: 13.5px; line-height: 1.5; color: var(--muted); }
+.notice-banner button { border: 0; background: none; color: var(--muted); font-size: 20px; line-height: 1; padding: 2px 4px; cursor: pointer; }
+@keyframes notice-in { from { opacity: 0; transform: translate(-50%, -8px); } to { opacity: 1; transform: translate(-50%, 0); } }

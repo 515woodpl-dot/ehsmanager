@@ -5,7 +5,7 @@ import { seed } from '../lib/data'
 import { pibase } from '../lib/pibase'
 import { loadUserData, syncCollections } from '../lib/db'
 import { assignInvoiceNumbers, hasInvoiceNumber, invoiceLabel } from '../lib/invoices'
-import { Toast, askConfirm } from '../components/UI'
+import { Toast, Splash, askConfirm } from '../components/UI'
 import Projects, { CardModalExport as CardModal } from '../components/Projects'
 import Clients from '../components/Clients'
 import ContactFormSettings from '../components/ContactForm'
@@ -251,9 +251,11 @@ export default function Home() {
 
     let loadGeneration = 0
 
+    let loadedUserId = null
     const loadSession = async session => {
+      if (session && session.user.id === loadedUserId) return
       const generation = ++loadGeneration
-      if (!session) { setUser(null); setDbReady(false); setData(seed); setAuthChecked(true); return }
+      if (!session) { loadedUserId = null; setUser(null); setDbReady(false); setData(seed); setAuthChecked(true); return }
       setUser(session.user)
       try {
         const dbData = await loadUserData(session.user.id)
@@ -261,6 +263,7 @@ export default function Home() {
         setData(dbData)
         setLoadError('')
         setDbReady(true)
+        loadedUserId = session.user.id
       } catch (error) {
         if (generation !== loadGeneration) return
         console.error('[db] initial load', error)
@@ -338,6 +341,7 @@ export default function Home() {
       try {
         const fresh = await loadUserData(user.id)
         if (!idle() || syncUserRef.current !== user.id) return
+        if (JSON.stringify(fresh) === JSON.stringify(latestDataRef.current)) return
         snapshotRef.current = fresh
         setData(fresh)
       } catch (error) {
@@ -393,11 +397,12 @@ export default function Home() {
   }
 
   if (!dbReady) {
-    return <main style={{ maxWidth: 520, margin: '12vh auto', padding: 24, fontFamily: 'sans-serif' }}>
-      <h1>EHS Studio Manager</h1>
-      <p>{typeof navigator !== 'undefined' && !navigator.onLine ? 'You\'re offline. Connect to the internet to load your studio.' : loadError || (authChecked ? 'Sign in to access your studio data.' : 'Loading studio data...')}</p>
-      {authChecked && <a href="/login">Go to sign in</a>}
-    </main>
+    const offline = typeof navigator !== 'undefined' && !navigator.onLine
+    if (!offline && !loadError && !authChecked) return <Splash />
+    return <Splash>
+      <p>{offline ? 'You\'re offline. Connect to the internet to load your studio.' : loadError || 'Sign in to access your studio data.'}</p>
+      {authChecked && <a href="/login" style={{ ...T.btnPrimary, marginTop: 16, textDecoration: 'none' }}>Go to sign in</a>}
+    </Splash>
   }
 
   const props = { data, setData, toast, setView: setActiveView }

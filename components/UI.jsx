@@ -1,6 +1,13 @@
 import { useEffect, useState } from 'react'
 import { T, C } from '../lib/tokens'
 
+export function Splash({ children = '' }) {
+  return <main className="app-splash" aria-busy={!children}>
+    <div className="app-splash-mark">EHS Studio</div>
+    {children ? <div className="app-splash-msg">{children}</div> : <div className="app-splash-bar" />}
+  </main>
+}
+
 export function Toast({ msg, onDone }) {
   useEffect(() => { const id = setTimeout(onDone, 2600); return () => clearTimeout(id) }, [])
   return <div style={T.toast}>✓ {msg}</div>
@@ -47,10 +54,18 @@ export function DialogHost() {
   useEffect(() => { pushDialog = setDialog; return () => { pushDialog = null } }, [])
   if (!dialog) return null
   const close = value => { dialog.resolve(value); setDialog(null) }
-  if (dialog.alert) return <Modal title={dialog.title} onClose={() => close()} footer={<button style={T.btnPrimary} onClick={() => close()}>OK</button>}>
-    <div className="brand-confirm"><div className="brand-confirm-mark">EH</div><div><p style={{ marginTop: 0 }}>{dialog.message}</p></div></div>
-  </Modal>
+  if (dialog.alert) return <NoticeBanner title={dialog.title} message={dialog.message} onClose={() => close()} />
   return <ConfirmModal title={dialog.title} message={dialog.message} confirmLabel={dialog.confirmLabel} danger={dialog.danger} onConfirm={() => close(true)} onClose={() => close(false)} />
+}
+
+// App's own notification banner (replaces the browser's "site says" alert).
+function NoticeBanner({ title, message, onClose }) {
+  useEffect(() => { const id = setTimeout(onClose, 8000); return () => clearTimeout(id) }, [])
+  return <div className="notice-banner" role="alert">
+    <div className="notice-banner-mark">!</div>
+    <div style={{ flex: 1, minWidth: 0 }}><strong>{title}</strong><p>{message}</p></div>
+    <button onClick={onClose} aria-label="Dismiss">×</button>
+  </div>
 }
 
 export function ConfirmModal({ title, message, confirmLabel = 'Confirm', onConfirm, onClose, danger = false }) {

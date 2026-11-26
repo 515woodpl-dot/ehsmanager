@@ -137,7 +137,7 @@ export default function ContractBuilder({ client, contract = null, data, onSave,
     totalFee: totalFee > 0 ? money(totalFee) : '[Total Fee]',
     retainerAmount: totalFee > 0 ? money(retainerAmt) : '[Retainer]',
     remainingAmount: totalFee > 0 ? money(remainingAmt) : '[Remaining]',
-    remainingDueDate: fmtD(fields.remainingDueDate),
+    remainingDueDate: Number(fields.retainerPct) === 100 ? 'N/A (paid in full at signing)' : fmtD(fields.remainingDueDate),
     photographerEmail: fields.photographerEmail || '[Photographer Email]',
     photographerCity: fields.photographerCity || '[Photographer City]',
     governingState: fields.governingState || '[Governing State]',
@@ -151,8 +151,21 @@ export default function ContractBuilder({ client, contract = null, data, onSave,
       setTab('fields')
       return
     }
-    if (!activeClient || !fields.clientName.trim() || !fields.clientEmail.trim() || !fields.sessionDate || !fields.sessionTime || !fields.location.trim() || !fields.remainingDueDate || !Number.isFinite(totalFee) || totalFee <= 0 || !Number.isFinite(retainerPct) || retainerPct < 0 || retainerPct > 100) {
-      notify('Select a client and complete the client, session, and payment details before saving.')
+    // Say exactly what's missing. A 100% retainer leaves nothing to pay later, so no due date is needed.
+    const paidInFull = retainerPct === 100
+    const missing = [
+      !activeClient && 'client (pick one at the top)',
+      !fields.clientName.trim() && 'client full name',
+      !fields.clientEmail.trim() && 'client email',
+      !fields.sessionDate && 'session date',
+      !fields.sessionTime && 'session time',
+      !fields.location.trim() && 'location',
+      !(Number.isFinite(totalFee) && totalFee > 0) && 'total fee',
+      !(Number.isFinite(retainerPct) && retainerPct >= 0 && retainerPct <= 100) && 'retainer % (0–100)',
+      !paidInFull && !String(fields.remainingDueDate || '').trim() && 'remaining balance due date',
+    ].filter(Boolean)
+    if (missing.length) {
+      notify(`Please fill in: ${missing.join(', ')}.`, 'A few details are missing')
       setTab('fields')
       return
     }

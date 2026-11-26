@@ -3,7 +3,7 @@ import { useRouter } from 'next/router'
 import '../styles/globals.css'
 import { pibase } from '../lib/pibase'
 import { AppHead, PwaManager } from '../components/AppShell'
-import { DialogHost } from '../components/UI'
+import { DialogHost, Splash } from '../components/UI'
 
 const PUBLIC_ROUTES = ['/login', '/contact', '/booking', '/sign', '/invoice', '/quote', '/questionnaire', '/chat']
 
@@ -50,7 +50,7 @@ export default function App({ Component, pageProps }) {
     return () => subscription.unsubscribe()
   }, [router.pathname])
 
-  if (!ready) return <>{appPage && <AppHead />}<main style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', padding: 24, fontFamily: 'sans-serif', color: '#222' }}>Loading EHS Studio Manager…</main></>
+  if (!ready) return <>{appPage && <AppHead />}<Splash /></>
 
   if (authError && !isPublicRoute()) {
     return (
