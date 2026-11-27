@@ -3,6 +3,7 @@ import { notifyStudio } from '../../lib/push'
 import { verifyContractToken } from '../../lib/signingTokens'
 import { loadStudioConfig } from '../../lib/studioConfig'
 import { sendSignedCopy } from '../../lib/contractCopy'
+import { contractDate, contractLanguage } from '../../lib/contractTemplate'
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
@@ -18,13 +19,14 @@ export default async function handler(req, res) {
 
   const { data: current, error: lookupError } = await db
     .from('contracts')
-    .select('fields, status, user_id, client_name, type')
+    .select('fields, status, user_id, client_name, type, body')
     .eq('id', parsed.contractId)
     .single()
   if (lookupError || !current) return res.status(404).json({ error: 'Contract not found' })
-  if (current.status !== 'pending') return res.status(409).json({ error: 'Contract has already been signed' })
+  const es = contractLanguage(current) === 'es'
+  if (current.status !== 'pending') return res.status(409).json({ error: es ? 'Este contrato ya fue firmado' : 'Contract has already been signed' })
 
-  const signedAt = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+  const signedAt = contractDate(es ? 'es' : 'en')
   const { data: signed, error } = await db
     .from('contracts')
     .update({
@@ -37,8 +39,8 @@ export default async function handler(req, res) {
     .eq('status', 'pending')
     .select('id')
 
-  if (error) return res.status(500).json({ error: 'Unable to sign contract' })
-  if (!signed?.length) return res.status(409).json({ error: 'Contract has already been signed' })
+  if (error) return res.status(500).json({ error: es ? 'No se pudo firmar el contrato' : 'Unable to sign contract' })
+  if (!signed?.length) return res.status(409).json({ error: es ? 'Este contrato ya fue firmado' : 'Contract has already been signed' })
   await notifyStudio(db, current.user_id, { type: 'documents', title: `✍️ ${current.client_name || String(signerName).trim()} signed`, body: `${current.type || 'Services agreement'}${current.fields?.studioSignature?.name ? ' · fully signed, copy emailed' : ' · add your signature to complete it'}`, url: '/?view=contracts', tag: `contract-${parsed.contractId}` })
   // If the studio already signed, the client gets their signed copy now.
   const copy = current.fields?.studioSignature?.name ? await sendSignedCopy(db, await loadStudioConfig(db, current.user_id), parsed.contractId) : null

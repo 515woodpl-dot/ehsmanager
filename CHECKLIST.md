@@ -7,6 +7,33 @@ every round of changes, and keep the "Open / follow-ups" list current.
 
 ---
 
+## 2026-11-27 (515 round 2) — Decline & expiry, Spanish contract emails, security upgrade
+
+### ⚠️ Before using
+- [x] Database: `pibase-migration-006-proposal-expiry.sql` applied to `p_bcb1de3b`.
+- [ ] Deploy: `bash /root/work/515manager/deploy.sh` the first time (see round 1).
+
+### Proposals
+- [x] **Valid until** date (new proposals default to 30 days; empty = never
+      expires). Shown on the client page; after that day (New York time) the
+      client can't accept or decline and is asked to get in touch. The list
+      shows **Expired**.
+- [x] Client can **decline** ("No, gracias") with an optional reason → status
+      Declined, email + push to the studio, reason shown in the app. They can
+      still accept later while it's valid.
+
+### Contracts in Spanish
+- [x] Contract email (subject, text, button), default message in the app's
+      send window, signed-copy email, signature dates and signing errors
+      follow the contract's language. Sign-off "Saludos cordiales".
+
+### Security
+- [x] Next.js 16.4.0 → 16.4.6 (critical advisories, incl. remote code
+      execution in image optimization). `qs` updated. pdf.js 4.2.67 → 5.4.624,
+      which drops the `canvas`/`tar` chain. `npm audit`: 0 vulnerabilities.
+
+---
+
 ## 2026-11-27 (515 round 1) — Proposals by link, web design contracts, booking page, own deploy
 
 ### ⚠️ Before using
@@ -703,9 +730,6 @@ every round of changes, and keep the "Open / follow-ups" list current.
 ---
 
 ## Open / follow-ups
-- [ ] Proposals: no "decline" button for the client yet; no expiry date.
-- [ ] Contract emails and the signed-copy email are still English-only.
-- [ ] Next.js 16.4.0 → 16.4.6 security upgrade (same as EHS).
 - [ ] Online payments were tested against a stand-in for Stripe (signed
       webhook events), not a real Stripe account. Make one test payment in
       Stripe test mode before going live.

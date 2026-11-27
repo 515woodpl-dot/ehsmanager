@@ -87,3 +87,14 @@
   .body td:last-child { background: #fff5f7; }
   .body td:last-child::before { color: var(--accent-dark); }
 }
+
+/* Expiry + decline */
+.expiredTag { color: #fff; background: var(--accent); padding: 0 8px; }
+.declineLink { display: block; margin: 14px auto 0; border: 0; background: none; color: var(--muted); font: inherit; font-size: 15px; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.declineLink:hover { color: var(--ink); }
+.declineRow { display: flex; gap: 10px; }
+.secondary { flex: 1; height: 52px; border: 2px solid var(--ink); background: #fff; font-family: Oswald, 'Arial Narrow', sans-serif; font-size: 16px; text-transform: uppercase; letter-spacing: .06em; cursor: pointer; }
+.submitDark { flex: 1; height: 52px; border: 0; background: var(--ink); color: #fff; font-family: Oswald, 'Arial Narrow', sans-serif; font-size: 16px; text-transform: uppercase; letter-spacing: .06em; cursor: pointer; }
+.submitDark:disabled { opacity: .5; }
+.declinedNote { background: var(--soft); border-left: 4px solid var(--muted); padding: 14px 18px; margin-bottom: 22px; }
+.declinedNote p { margin: 6px 0 0; color: var(--muted); line-height: 1.6; }

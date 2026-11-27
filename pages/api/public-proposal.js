@@ -12,6 +12,9 @@ import { verifyProposalToken } from '../../lib/signingTokens'
 const esc = v => String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;')
 const clean = (v, n = 200) => typeof v === 'string' ? v.trim().slice(0, n) : ''
 const EMAIL = /^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/
+// A proposal can be accepted through the end of its "valid until" day (New York time).
+const todayNY = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York' }).format(new Date())
+const isExpired = row => !!row.valid_until && row.status !== 'accepted' && String(row.valid_until) < todayNY()
 
 function publicView(row, branding) {
   const b = branding || {}
@@ -22,6 +25,7 @@ function publicView(row, branding) {
       language: row.language === 'en' ? 'en' : 'es', body: row.body || '', status: row.status,
       date: row.sent_at || row.created_at, acceptedAt: row.accepted_at || null,
       acceptedBy: row.acceptance?.name || null,
+      validUntil: row.valid_until || null, expired: isExpired(row), declinedAt: row.declined_at || null,
     },
     studio: {
       name: b.businessName || '515Studio', email: b.studioEmail || 'hello@515studio.net', phone: b.phone || '',
@@ -53,6 +57,28 @@ export default async function handler(req, res) {
   }
 
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
+  const es = row.language !== 'en'
+  if (row.status !== 'accepted' && isExpired(row)) return res.status(410).json({ error: es ? 'Esta propuesta ya venció. Escríbanos y con gusto se la actualizamos.' : 'This proposal has expired. Contact us and we’ll gladly update it.' })
+
+  // Client declines (optionally saying why). They can still accept later
+  // while the proposal is valid, if they change their mind.
+  if (req.body?.action === 'decline') {
+    if (row.status === 'accepted') return res.status(409).json({ error: es ? 'Esta propuesta ya fue aceptada.' : 'This proposal was already accepted.' })
+    const reason = clean(req.body.reason, 1000)
+    const declinedAt = new Date().toISOString()
+    const { error } = await db.from('proposals').update({ status: 'declined', declined_at: declinedAt, decline_reason: reason || null, updated_at: declinedAt }).eq('id', row.id).neq('status', 'accepted')
+    if (error) { console.error('[public-proposal] decline', error.message); return res.status(500).json({ error: es ? 'No se pudo guardar. Intente de nuevo.' : 'Could not save. Please try again.' }) }
+    await notifyStudio(db, row.user_id, { type: 'documents', title: `${row.prospect || row.contact_name || 'A client'} declined your proposal`, body: reason || row.title, url: '/?view=proposals', tag: `proposal-decline-${row.id}` }).catch(() => {})
+    try {
+      const config = await loadStudioConfig(db, row.user_id)
+      if (config.branding.studioEmail) {
+        const html = emailWrap(`<h1>Proposal declined</h1><p><strong>${esc(row.prospect || row.contact_name || 'The client')}</strong> declined <strong>${esc(row.title)}</strong>.</p>${reason ? `<div class="box"><strong>Their reason:</strong><br/><br/>${esc(reason)}</div>` : '<p>They didn’t give a reason.</p>'}<a href="${esc(process.env.NEXT_PUBLIC_APP_URL || 'https://manager.515studio.net')}/?view=proposals" class="btn">Open proposals</a>`, config)
+        const result = await sendStudioEmail(config, { to: config.branding.studioEmail, subject: `Proposal declined: ${row.prospect || row.title}`, html })
+        if (result.error) console.error('[public-proposal] decline email', result.error)
+      }
+    } catch (error) { console.error('[public-proposal] decline email', error.message) }
+    return res.status(200).json({ ok: true })
+  }
   if (row.status === 'accepted') return res.status(409).json({ error: 'This proposal was already accepted. We will be in touch soon.' })
   const body = req.body || {}
   if (body.company_website_hp) return res.status(200).json({ ok: true }) // bot trap
@@ -69,7 +95,7 @@ export default async function handler(req, res) {
 
   // 1. Claim the acceptance first — only one submission can win.
   const { data: claimed, error: claimError } = await db.from('proposals')
-    .update({ status: 'accepted', accepted_at: acceptedAt, acceptance, updated_at: acceptedAt })
+    .update({ status: 'accepted', accepted_at: acceptedAt, acceptance, declined_at: null, decline_reason: null, updated_at: acceptedAt })
     .eq('id', row.id).neq('status', 'accepted').select('id')
   if (claimError) { console.error('[public-proposal] accept', claimError.message); return res.status(500).json({ error: 'Your acceptance could not be saved. Please try again.' }) }
   if (!claimed?.length) return res.status(409).json({ error: 'This proposal was already accepted. We will be in touch soon.' })

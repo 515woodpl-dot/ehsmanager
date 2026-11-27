@@ -14,7 +14,11 @@ const STATUS = {
   draft: ['Draft', C.surface3, C.muted], sent: ['Sent', C.blueBg, C.blue], viewed: ['Opened', C.amberBg, C.amber],
   accepted: ['Accepted', C.greenBg, C.green], declined: ['Declined', C.redBg, C.red],
 }
-const StatusPill = ({ status }) => { const [label, bg, color] = STATUS[status] || STATUS.draft; return <span style={{ display: 'inline-flex', padding: '2px 10px', borderRadius: 20, fontSize: 11.5, fontWeight: 500, background: bg, color, whiteSpace: 'nowrap' }}>{label}</span> }
+const StatusPill = ({ status, expired }) => { const [label, bg, color] = expired ? ['Expired', C.redBg, C.red] : STATUS[status] || STATUS.draft; return <span style={{ display: 'inline-flex', padding: '2px 10px', borderRadius: 20, fontSize: 11.5, fontWeight: 500, background: bg, color, whiteSpace: 'nowrap' }}>{label}</span> }
+const todayIso = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York' }).format(new Date())
+const plusDays = n => { const d = new Date(); d.setDate(d.getDate() + n); return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York' }).format(d) }
+const isExpired = p => !!p.validUntil && !['accepted', 'declined'].includes(p.status) && p.validUntil < todayIso()
+const fmtDay = iso => iso ? new Date(iso + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : ''
 const nextNumber = list => `P-${Math.max(1000, ...list.map(p => Number(/^P-(\d+)$/.exec(p.number || '')?.[1] || 0))) + 1}`
 
 async function api(path, init = {}) {
@@ -32,8 +36,8 @@ export default function Proposals({ data, setData, toast, setView }) {
   const [viewing, setViewing] = useState(null)
   const [deleting, setDeleting] = useState(null)
   const [filter, setFilter] = useState('all')
-  const counts = useMemo(() => ({ all: proposals.length, open: proposals.filter(p => !['accepted', 'declined'].includes(p.status)).length, accepted: proposals.filter(p => p.status === 'accepted').length }), [proposals])
-  const shown = proposals.filter(p => filter === 'all' || (filter === 'accepted' ? p.status === 'accepted' : !['accepted', 'declined'].includes(p.status)))
+  const counts = useMemo(() => ({ all: proposals.length, open: proposals.filter(p => !['accepted', 'declined'].includes(p.status) && !isExpired(p)).length, accepted: proposals.filter(p => p.status === 'accepted').length }), [proposals])
+  const shown = proposals.filter(p => filter === 'all' || (filter === 'accepted' ? p.status === 'accepted' : !['accepted', 'declined'].includes(p.status) && !isExpired(p)))
 
   if (!data.proposalsReady) return <div style={T.card}>Proposals need a one-time database update: apply <code>pibase-migration-005-proposals.sql</code>.</div>
 
@@ -47,7 +51,7 @@ export default function Proposals({ data, setData, toast, setView }) {
   return <div>
     <div style={T.pageHeader} className="page-header-wrap">
       <div><div style={T.pageTitle}>Proposals</div><div style={T.pageSub}>{counts.open} open · {counts.accepted} accepted</div></div>
-      <button style={T.btnPrimary} onClick={() => setEditing({ title: '', prospect: '', contactName: '', contactEmail: '', contactPhone: '', language: 'es', body: '', status: 'draft' })}>+ New proposal</button>
+      <button style={T.btnPrimary} onClick={() => setEditing({ title: '', prospect: '', contactName: '', contactEmail: '', contactPhone: '', language: 'es', body: '', status: 'draft', validUntil: plusDays(30) })}>+ New proposal</button>
     </div>
     <div className="chip-tabs" style={{ marginBottom: 16 }}>
       {[['all', 'All'], ['open', 'Open'], ['accepted', 'Accepted']].map(([k, l]) => <button key={k} className={filter === k ? 'active' : ''} onClick={() => setFilter(k)}>{l} <span>{counts[k]}</span></button>)}
@@ -63,10 +67,10 @@ export default function Proposals({ data, setData, toast, setView }) {
             <div style={{ fontWeight: 600, fontSize: 15.5 }}>{p.title}</div>
             <div style={{ color: C.muted, fontSize: 13.5, marginTop: 2 }}>{[p.prospect, p.contactName].filter(Boolean).join(' · ') || 'No client yet'}</div>
           </div>
-          <StatusPill status={p.status} />
+          <StatusPill status={p.status} expired={isExpired(p)} />
         </div>
         <div style={{ fontSize: 12.5, color: C.muted, marginTop: 10 }}>
-          {p.status === 'accepted' ? `Accepted ${fmtDate(p.acceptedAt)} by ${p.acceptance?.name || 'the client'}` : p.viewCount ? `Opened ${p.viewCount} time${p.viewCount > 1 ? 's' : ''} · last ${fmtDate(p.viewedAt)}` : p.sentAt ? `Sent ${fmtDate(p.sentAt)} · not opened yet` : `Created ${fmtDate(p.createdAt) || 'today'}`}
+          {p.status === 'declined' ? `Declined ${fmtDate(p.declinedAt)}${p.declineReason ? ` — “${p.declineReason.slice(0, 90)}${p.declineReason.length > 90 ? '…' : ''}”` : ''}` : p.status === 'accepted' ? `Accepted ${fmtDate(p.acceptedAt)} by ${p.acceptance?.name || 'the client'}` : p.viewCount ? `Opened ${p.viewCount} time${p.viewCount > 1 ? 's' : ''} · last ${fmtDate(p.viewedAt)}` : p.sentAt ? `Sent ${fmtDate(p.sentAt)} · not opened yet` : `Created ${fmtDate(p.createdAt) || 'today'}`}{p.validUntil && !['accepted', 'declined'].includes(p.status) ? ` · valid until ${fmtDay(p.validUntil)}` : ''}
         </div>
         <div className="card-actions" style={{ marginTop: 12 }} onClick={e => e.stopPropagation()}>
           <button style={T.btnSm} onClick={() => setSharing(p)}>Share link</button>
@@ -118,6 +122,9 @@ function ProposalEditor({ proposal, clients, toast, onClose, onSave }) {
   </>}>
     <div style={T.formRow} className="form-row-2">
       <div style={T.formGroup}><label style={T.formLabel}>Title</label><input style={T.formInput} value={p.title} onChange={e => set('title', e.target.value)} placeholder="Propuesta para MP Carpet Cleaning — Más clientes desde su página web" /></div>
+      <div style={T.formGroup}><label style={T.formLabel}>Valid until</label><input style={T.formInput} type="date" value={p.validUntil || ''} onChange={e => set('validUntil', e.target.value)} /><div style={{ fontSize: 11.5, color: C.muted, marginTop: 4 }}>Leave empty for no expiry.</div></div>
+    </div>
+    <div style={T.formRow} className="form-row-2">
       <div style={T.formGroup}><label style={T.formLabel}>Language of the page</label><select style={T.formInput} value={p.language} onChange={e => set('language', e.target.value)}><option value="es">Español</option><option value="en">English</option></select></div>
     </div>
     <div style={T.formGroup}>
@@ -162,7 +169,7 @@ function ShareProposal({ proposal, setData, toast, onClose }) {
         if (!on) return
         setState({ ...body, loading: false })
         // Bring views / acceptance into the app right away.
-        setData(d => ({ ...d, proposals: d.proposals.map(x => x.id === proposal.id ? { ...x, status: body.status, viewCount: body.viewCount, viewedAt: body.viewedAt, acceptedAt: body.acceptedAt, acceptance: body.acceptance, clientId: body.clientId || x.clientId } : x) }))
+        setData(d => ({ ...d, proposals: d.proposals.map(x => x.id === proposal.id ? { ...x, status: body.status, viewCount: body.viewCount, viewedAt: body.viewedAt, acceptedAt: body.acceptedAt, acceptance: body.acceptance, clientId: body.clientId || x.clientId, declinedAt: body.declinedAt, declineReason: body.declineReason } : x) }))
         if (body.status === 'accepted') return
       } catch (e) {
         if (!on) return
@@ -198,6 +205,7 @@ function ShareProposal({ proposal, setData, toast, onClose }) {
       </div>
       <div className={`paylink-status${state.status === 'accepted' ? ' paid' : state.viewCount ? ' partial' : ''}`} role="status">
         {state.status === 'accepted' ? `✓ Accepted by ${state.acceptance?.name || 'the client'} — they're now in Clients (Inquiry)`
+          : state.status === 'declined' ? `Declined${state.declineReason ? ` — “${state.declineReason}”` : ' (no reason given)'}. They can still accept while it's valid.`
           : state.viewCount ? <>Opened {state.viewCount} time{state.viewCount > 1 ? 's' : ''} — waiting for them to accept <span className="paylink-live" aria-hidden="true" /></>
           : <>Not opened yet <span className="paylink-live" aria-hidden="true" /> live</>}
       </div>
@@ -222,6 +230,11 @@ function ProposalDetail({ proposal: p, data, setData, toast, setView, onClose, o
       <StatusPill status={p.status} />
       <span style={{ color: C.muted, fontSize: 13 }}>{[p.prospect, p.contactName].filter(Boolean).join(' · ')}{p.viewCount ? ` · opened ${p.viewCount}×` : ''}</span>
     </div>
+    {p.status === 'declined' && <div style={{ ...T.card, background: C.redBg, borderColor: 'transparent', marginBottom: 18 }}>
+      <div style={{ fontWeight: 600, color: C.red, marginBottom: 6 }}>Declined {fmtDate(p.declinedAt)}</div>
+      <div style={{ fontSize: 13.5, lineHeight: 1.7 }}>{p.declineReason ? `“${p.declineReason}”` : 'No reason given.'} They can still accept it while it's valid — or edit it and send a new version.</div>
+    </div>}
+    {isExpired(p) && <div style={{ ...T.card, background: C.amberBg, borderColor: 'transparent', marginBottom: 18, fontSize: 13.5 }}>Expired on {fmtDay(p.validUntil)} — the client can no longer accept it. Edit it to give it a new date.</div>}
     {p.status === 'accepted' && <div style={{ ...T.card, background: C.greenBg, borderColor: 'transparent', marginBottom: 18 }}>
       <div style={{ fontWeight: 600, color: C.green, marginBottom: 8 }}>Accepted {fmtDate(p.acceptedAt)}</div>
       <div style={{ fontSize: 13.5, lineHeight: 1.8 }}>

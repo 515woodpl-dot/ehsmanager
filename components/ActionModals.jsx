@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { T, C } from '../lib/tokens'
 import { pibase } from '../lib/pibase'
 import { Modal } from './UI'
+import { contractLanguage } from '../lib/contractTemplate'
 import { LocationField, studioAddressNow } from './LocationField'
 import { LineItemBuilder, calcTotal } from './LineItemBuilder'
 import ContractBuilder from './ContractBuilder'
@@ -249,9 +250,9 @@ export function ContractModal({ client: clientProp, contract, startMode = 'view'
     return <SendEmailModal endpoint="/api/email-contract" payload={{ contract: { id: live.id } }} client={client} clientName={clientName} toast={toast}
       onClose={result => (result?.sent || !contract || startMode === 'send' ? onClose() : setMode('view'))} justCreated={!contract}
       title={!contract ? `Contract saved — email it to ${clientName} to sign?` : `Email contract to ${clientName}`} sentToast="Contract emailed"
-      initialSubject={`Your ${live.type || 'services agreement'} is ready to sign`}
-      initialMessage={`Hi ${firstName(clientName)},\n\nYour ${live.type || 'services agreement'} is ready. Please review it and sign securely using the button below.\n\nIf you have any questions about the terms, just reply to this email before signing.`}
-      buttonLabel="Review and sign contract"
+      initialSubject={contractLanguage(live) === 'es' ? `Su ${live.type || 'contrato'} está listo para firmar` : `Your ${live.type || 'services agreement'} is ready to sign`}
+      initialMessage={contractLanguage(live) === 'es' ? `Hola ${firstName(clientName)},\n\nSu ${live.type || 'contrato'} está listo. Por favor revíselo y fírmelo de forma segura con el botón de abajo.\n\nSi tiene preguntas sobre las condiciones, responda a este correo antes de firmar.` : `Hi ${firstName(clientName)},\n\nYour ${live.type || 'services agreement'} is ready. Please review it and sign securely using the button below.\n\nIf you have any questions about the terms, just reply to this email before signing.`}
+      buttonLabel={contractLanguage(live) === 'es' ? 'Revisar y firmar el contrato' : 'Review and sign contract'}
       extraActions={<button style={T.btn} disabled={busy} onClick={copyLink}>{busy ? 'Preparing…' : 'Copy signing link'}</button>} />
   }
 

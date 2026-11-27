@@ -1,5 +1,6 @@
 import { requireUser } from '../../lib/api-auth'
 import { cleanSignature, sendSignedCopy, signedDate } from '../../lib/contractCopy'
+import { contractLanguage } from '../../lib/contractTemplate'
 
 // The studio signs a contract — its own signature, or the client's when
 // they sign in person. Saved on the server (so it can't race the client's
@@ -11,7 +12,7 @@ export default async function handler(req, res) {
 
   const { contractId, role = 'studio', resend = false } = req.body || {}
   if (!contractId) return res.status(400).json({ error: 'Missing contract' })
-  const { data: row } = await auth.db.from('contracts').select('id, status, signed_by, signed_at, fields')
+  const { data: row } = await auth.db.from('contracts').select('id, status, signed_by, signed_at, fields, body')
     .eq('id', contractId).eq('user_id', auth.user.id).single()
   if (!row) return res.status(404).json({ error: 'Contract not found' })
   let fields = row.fields || {}
@@ -24,7 +25,7 @@ export default async function handler(req, res) {
   } else {
     const signature = cleanSignature({ ...req.body, name: req.body?.name || (role === 'studio' ? auth.config.branding.ownerName : '') })
     if (signature.error) return res.status(400).json({ error: signature.error })
-    const at = signedDate()
+    const at = signedDate(contractLanguage(row))
     if (role === 'client') {
       if (row.status !== 'pending') return res.status(409).json({ error: 'The client has already signed' })
       fields = { ...fields, signedVia: 'in_person', signatureMethod: signature.method, signatureData: signature.data }

@@ -14,6 +14,10 @@ const TEXT = {
     send: 'Aceptar propuesta', sending: 'Enviando…', thanks: '¡Gracias! Propuesta aceptada', thanksBody: n => `Gracias${n ? `, ${n}` : ''}. Recibimos sus datos y lo contactaremos muy pronto para coordinar los siguientes pasos.`,
     accepted: (who, date) => `Esta propuesta fue aceptada${who ? ` por ${who}` : ''}${date ? ` el ${date}` : ''}.`, questions: '¿Preguntas?', required: 'obligatorio',
     loading: 'Cargando la propuesta…', invalid: 'Este enlace no es válido o la propuesta ya no está disponible.', locale: 'es-US',
+    validUntil: d => `Válida hasta el ${d}`, expiredTitle: 'Esta propuesta venció', expiredBody: d => `Era válida hasta el ${d}. Escríbanos y con gusto se la actualizamos.`,
+    decline: 'No, gracias', declineTitle: '¿No es para usted?', declineBody: 'Nos ayuda mucho saber por qué. (Opcional)', declinePlaceholder: 'Por ejemplo: el momento no es el adecuado, el precio, ya tengo a alguien…',
+    declineSend: 'Rechazar propuesta', declineCancel: 'Volver', declinedTitle: 'Gracias por avisarnos', declinedBody: 'Registramos que no desea seguir adelante por ahora. Si cambia de opinión, puede aceptar la propuesta abajo mientras siga vigente, o escribirnos.',
+    changedMind: '¿Cambió de opinión? Acepte la propuesta:',
   },
   en: {
     proposal: 'Proposal', preparedFor: 'Prepared for', by: 'by', accept: 'Accept proposal', acceptTitle: 'Accept the proposal',
@@ -23,6 +27,10 @@ const TEXT = {
     send: 'Accept proposal', sending: 'Sending…', thanks: 'Thank you! Proposal accepted', thanksBody: n => `Thank you${n ? `, ${n}` : ''}. We've received your details and will contact you very soon to plan the next steps.`,
     accepted: (who, date) => `This proposal was accepted${who ? ` by ${who}` : ''}${date ? ` on ${date}` : ''}.`, questions: 'Questions?', required: 'required',
     loading: 'Loading the proposal…', invalid: 'This link is not valid or the proposal is no longer available.', locale: 'en-US',
+    validUntil: d => `Valid until ${d}`, expiredTitle: 'This proposal has expired', expiredBody: d => `It was valid until ${d}. Contact us and we'll gladly update it.`,
+    decline: 'No, thanks', declineTitle: 'Not for you?', declineBody: 'It really helps us to know why. (Optional)', declinePlaceholder: "For example: the timing isn't right, the price, I already have someone…",
+    declineSend: 'Decline proposal', declineCancel: 'Back', declinedTitle: 'Thanks for letting us know', declinedBody: "We've noted that you don't want to go ahead for now. If you change your mind, you can still accept below while the proposal is valid, or write to us.",
+    changedMind: 'Changed your mind? Accept the proposal:',
   },
 }
 
@@ -35,6 +43,9 @@ export default function ProposalPage() {
   const [sending, setSending] = useState(false)
   const [formError, setFormError] = useState('')
   const [done, setDone] = useState(false)
+  const [declining, setDeclining] = useState(false)
+  const [reason, setReason] = useState('')
+  const [declined, setDeclined] = useState(false)
   const formRef = useRef(null)
 
   useEffect(() => {
@@ -67,11 +78,25 @@ export default function ProposalPage() {
     setSending(false)
   }
 
+  const decline = async () => {
+    setFormError(''); setSending(true)
+    try {
+      const r = await fetch('/api/public-proposal', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token, action: 'decline', reason }) })
+      const body = await r.json().catch(() => ({}))
+      if (!r.ok) throw new Error(body.error || 'Error')
+      setDeclined(true); setDeclining(false)
+      setTimeout(() => formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50)
+    } catch (err) { setFormError(err.message) }
+    setSending(false)
+  }
+
   if (error) return <div className={s.shell}><Head><title>515Studio</title><meta name="viewport" content={VIEWPORT} /></Head><div className={s.center}>{TEXT.es.invalid}<br /><span>{TEXT.en.invalid}</span></div></div>
   if (!data) return <div className={s.shell}><Head><title>515Studio</title><meta name="viewport" content={VIEWPORT} /></Head><div className={s.center}>…</div></div>
 
   const { proposal: p, studio } = data
   const accepted = p.status === 'accepted' || done
+  const expired = p.expired && !accepted
+  const wasDeclined = !accepted && (declined || p.status === 'declined')
   return <div className={s.shell} lang={lang}>
     <Head>
       <title>{`${p.title} | ${studio.name}`}</title>
@@ -84,7 +109,7 @@ export default function ProposalPage() {
 
     <header className={s.top}>
       <a href={studio.website} target="_blank" rel="noreferrer" className={s.brand}><img src={studio.logoUrl} alt={studio.name} /></a>
-      {!accepted && <a href="#accept" className={s.topCta}>{t.accept}</a>}
+      {!accepted && !expired && <a href="#accept" className={s.topCta}>{t.accept}</a>}
     </header>
 
     <section className={s.hero}>
@@ -95,6 +120,7 @@ export default function ProposalPage() {
           {p.prospect && <span>{t.preparedFor} <strong>{p.prospect}</strong></span>}
           <span>{fmtDate(p.date)}</span>
           <span>{t.by} {studio.name}</span>
+          {p.validUntil && !accepted && <span className={expired ? s.expiredTag : undefined}>{t.validUntil(fmtDate(p.validUntil + 'T12:00:00'))}</span>}
         </div>
       </div>
     </section>
@@ -109,8 +135,19 @@ export default function ProposalPage() {
           <h2>{done ? t.thanks : t.accepted(p.acceptedBy, fmtDate(p.acceptedAt))}</h2>
           {done && <p>{t.thanksBody(form.name.split(' ')[0])}</p>}
           <p className={s.contactLine}>{t.questions} <a href={`mailto:${studio.email}`}>{studio.email}</a>{studio.phone ? <> · <a href={`tel:${studio.phone}`}>{studio.phone}</a></> : null}</p>
+        </div> : expired ? <div className={s.thanks}>
+          <h2>{t.expiredTitle}</h2>
+          <p>{t.expiredBody(fmtDate(p.validUntil + 'T12:00:00'))}</p>
+          <p className={s.contactLine}><a href={`mailto:${studio.email}`}>{studio.email}</a>{studio.phone ? <> · <a href={`tel:${studio.phone}`}>{studio.phone}</a></> : null}</p>
+        </div> : declining ? <div>
+          <h2>{t.declineTitle}</h2>
+          <p className={s.formIntro}>{t.declineBody}</p>
+          <label className={s.field}><textarea rows={4} value={reason} onChange={e => setReason(e.target.value)} maxLength={1000} placeholder={t.declinePlaceholder} /></label>
+          {formError && <div className={s.error} role="alert">{formError}</div>}
+          <div className={s.declineRow}><button type="button" className={s.secondary} onClick={() => setDeclining(false)}>{t.declineCancel}</button><button type="button" className={s.submitDark} disabled={sending} onClick={decline}>{sending ? t.sending : t.declineSend}</button></div>
         </div> : <form onSubmit={submit} noValidate>
-          <h2>{t.acceptTitle}</h2>
+          {wasDeclined && <div className={s.declinedNote}><strong>{t.declinedTitle}</strong><p>{t.declinedBody}</p></div>}
+          <h2>{wasDeclined ? t.changedMind : t.acceptTitle}</h2>
           <p className={s.formIntro}>{t.acceptIntro}</p>
           <div className={s.grid2}>
             <label className={s.field}><span>{t.name} *</span><input value={form.name} onChange={e => set('name', e.target.value)} autoComplete="name" required maxLength={120} /></label>
@@ -126,6 +163,7 @@ export default function ProposalPage() {
           <label className={s.agree}><input type="checkbox" checked={form.agree} onChange={e => set('agree', e.target.checked)} /><span>{t.agree}</span></label>
           {formError && <div className={s.error} role="alert">{formError}</div>}
           <button className={s.submit} disabled={sending}>{sending ? t.sending : t.send}</button>
+          {!wasDeclined && <button type="button" className={s.declineLink} onClick={() => { setFormError(''); setDeclining(true) }}>{t.decline}</button>}
           <p className={s.contactLine}>{t.questions} <a href={`mailto:${studio.email}`}>{studio.email}</a>{studio.phone ? <> · <a href={`tel:${studio.phone}`}>{studio.phone}</a></> : null}</p>
         </form>}
       </section>
