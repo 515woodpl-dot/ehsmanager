@@ -215,6 +215,16 @@ function ShareProposal({ proposal, setData, toast, onClose }) {
 
 function ProposalDetail({ proposal: p, data, setData, toast, setView, onClose, onEdit, onShare, onDelete }) {
   const [next, setNext] = useState(null) // 'quote' | 'contract'
+  const [resetting, setResetting] = useState(false)
+  const resetViews = async () => {
+    setResetting(true)
+    try {
+      const r = await api('/api/proposal-link', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: p.id, action: 'reset-views' }) })
+      setData(d => ({ ...d, proposals: d.proposals.map(x => x.id === p.id ? { ...x, viewCount: 0, viewedAt: null, status: r.status } : x) }))
+      toast('Views reset')
+    } catch (e) { toast(e.message) }
+    setResetting(false)
+  }
   const client = data.clients.find(c => c.id === p.clientId) || null
   const a = p.acceptance || {}
   if (next && client) {
@@ -229,6 +239,7 @@ function ProposalDetail({ proposal: p, data, setData, toast, setView, onClose, o
     <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginBottom: 16 }}>
       <StatusPill status={p.status} />
       <span style={{ color: C.muted, fontSize: 13 }}>{[p.prospect, p.contactName].filter(Boolean).join(' · ')}{p.viewCount ? ` · opened ${p.viewCount}×` : ''}</span>
+      {p.viewCount > 0 && p.status !== 'accepted' && <button style={T.btnSm} disabled={resetting} onClick={resetViews}>{resetting ? 'Resetting…' : 'Reset views'}</button>}
     </div>
     {p.status === 'declined' && <div style={{ ...T.card, background: C.redBg, borderColor: 'transparent', marginBottom: 18 }}>
       <div style={{ fontWeight: 600, color: C.red, marginBottom: 6 }}>Declined {fmtDate(p.declinedAt)}</div>

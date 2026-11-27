@@ -10,6 +10,15 @@ export default async function handler(req, res) {
   if (!auth) return
   res.setHeader('Cache-Control', 'no-store')
   const id = String(req.body?.id || '')
+  // Clear the "Opened" count (e.g. after checking the page yourself).
+  if (req.body?.action === 'reset-views') {
+    const { data: current } = await auth.db.from('proposals').select('id, status, sent_at').eq('id', id).eq('user_id', auth.user.id).maybeSingle()
+    if (!current) return res.status(404).json({ error: 'Proposal not found' })
+    const status = current.status === 'viewed' ? (current.sent_at ? 'sent' : 'draft') : current.status
+    const { error } = await auth.db.from('proposals').update({ view_count: 0, viewed_at: null, status, updated_at: new Date().toISOString() }).eq('id', id).eq('user_id', auth.user.id)
+    if (error) return res.status(500).json({ error: 'Could not reset the views' })
+    return res.status(200).json({ ok: true, status })
+  }
   const { data: row } = await auth.db.from('proposals').select('id, status, view_count, viewed_at, accepted_at, acceptance, client_id, declined_at, decline_reason').eq('id', id).eq('user_id', auth.user.id).maybeSingle()
   if (!row) return res.status(404).json({ error: 'Still saving the proposal — try again in a moment' })
   let url = null

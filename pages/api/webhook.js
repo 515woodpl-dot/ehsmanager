@@ -1,7 +1,7 @@
 import { createServiceClient } from '../../lib/pibase'
 import { notifyStudio } from '../../lib/push'
 import { defaultStudioId, getStripe, loadStudioConfig } from '../../lib/studioConfig'
-import { applyPayment, invoiceFromRow } from '../../lib/invoices'
+import { applyPayment, applyRefund, invoiceFromRow } from '../../lib/invoices'
 export const config = { api: { bodyParser: false } }
 async function getRawBody(req) {
   return new Promise((resolve, reject) => {
@@ -36,6 +36,14 @@ export default async function handler(req, res) {
       if (!db) return res.status(503).json({ error: 'Database not configured' })
       const { invoiceId, userId, label } = intent.metadata || {}
       if (!invoiceId || !userId) break
+      // Stripe's processing fee, for the accounting report (gross − fee = deposit).
+      let fee = null
+      try {
+        if (intent.latest_charge) {
+          const charge = await stripe.charges.retrieve(intent.latest_charge, { expand: ['balance_transaction'] })
+          if (charge?.balance_transaction?.fee != null) fee = charge.balance_transaction.fee / 100
+        }
+      } catch (error) { console.error('[webhook] fee lookup', error.message) }
       // Payments can be one installment or the whole balance. Each Stripe
       // payment is logged once (by its id), so a retried webhook is a no-op.
       // The update only applies if nobody changed `paid` in between.
@@ -46,7 +54,7 @@ export default async function handler(req, res) {
         if (lookupError || !row) return res.status(500).json({ error: 'Linked invoice not found' })
         const invoice = invoiceFromRow(row)
         if ((invoice.lineData.payments || []).some(p => p.intentId === intent.id)) { credited = true; break }
-        const updated = applyPayment(invoice, { id: `stripe-${intent.id}`, amount: intent.amount_received / 100, method: 'Stripe', intentId: intent.id })
+        const updated = applyPayment(invoice, { id: `stripe-${intent.id}`, amount: intent.amount_received / 100, method: 'Stripe', intentId: intent.id, fee })
         const { data: saved, error } = await db.from('invoices').update({
           paid: updated.paid, status: updated.status, payment_method: 'Stripe', paid_at: updated.paidAt,
           line_items: updated.lineData, updated_at: new Date().toISOString(),
@@ -58,6 +66,33 @@ export default async function handler(req, res) {
         }
       }
       if (!credited) return res.status(500).json({ error: 'Invoice changed while recording payment, retry' })
+      break
+    }
+    case 'charge.refunded': {
+      // Full or partial refunds made in the Stripe Dashboard. amount_refunded
+      // is a running total, so only the part not yet recorded is added;
+      // retried webhooks change nothing.
+      const charge = event.data.object
+      const db = createServiceClient()
+      if (!db || !charge.payment_intent) break
+      const intent = await stripe.paymentIntents.retrieve(typeof charge.payment_intent === 'string' ? charge.payment_intent : charge.payment_intent.id)
+      const { invoiceId, userId } = intent.metadata || {}
+      if (!invoiceId || !userId) break
+      for (let attempt = 0; attempt < 3; attempt++) {
+        const { data: row } = await db.from('invoices').select('id, amount, paid, status, due, line_items').eq('id', invoiceId).eq('user_id', userId).single()
+        if (!row) break
+        const invoice = invoiceFromRow(row)
+        const recorded = -(invoice.lineData.payments || []).filter(p => p.refundOf === intent.id).reduce((s, p) => s + (Number(p.amount) || 0), 0)
+        const owed = Math.round((charge.amount_refunded / 100 - recorded) * 100) / 100
+        if (owed <= 0) break
+        const updated = applyRefund(invoice, { id: `refund-${charge.id}-${charge.amount_refunded}`, amount: owed, method: 'Stripe refund', refundOf: intent.id })
+        const { data: saved } = await db.from('invoices').update({ paid: updated.paid, status: updated.status, paid_at: updated.paidAt, line_items: updated.lineData, updated_at: new Date().toISOString() })
+          .eq('id', invoiceId).eq('user_id', userId).eq('paid', row.paid).select('id')
+        if (saved?.length) {
+          await notifyStudio(db, userId, { type: 'payments', title: 'Refund recorded', body: `$${owed.toFixed(2)} refunded in Stripe` }).catch(() => {})
+          break
+        }
+      }
       break
     }
     case 'payment_intent.payment_failed': {

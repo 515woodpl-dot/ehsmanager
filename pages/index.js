@@ -10,13 +10,14 @@ import Projects, { CardModalExport as CardModal } from '../components/Projects'
 import Clients from '../components/Clients'
 import ContactFormSettings from '../components/ContactForm'
 import Proposals from '../components/Proposals'
+import Finances from '../components/Finances'
 import Settings from '../components/Settings'
 import { Dashboard, Analytics, Calendar, Invoices, Contracts, Inbox } from '../components/Pages'
 import { SessionTypes, Sessions, Discounts } from '../components/BookingAdmin'
 
 const todayLabel = () => new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
 const VIEW_STORAGE_KEY = 'ehs-studio-active-view'
-const VALID_VIEWS = new Set(['dashboard', 'analytics', 'projects', 'clients', 'sessiontypes', 'sessions', 'calendar', 'discounts', 'invoices', 'contracts', 'proposals', 'inbox', 'contactform', 'settings'])
+const VALID_VIEWS = new Set(['dashboard', 'analytics', 'finances', 'projects', 'clients', 'sessiontypes', 'sessions', 'calendar', 'discounts', 'invoices', 'contracts', 'proposals', 'inbox', 'contactform', 'settings'])
 
 function getInitialView() {
   if (typeof window === 'undefined') return 'dashboard'
@@ -82,6 +83,7 @@ function Sidebar({ active, setActive, unread, open, onClose, user, onSignOut }) 
   const nav1 = [
     { id: 'dashboard', label: 'Dashboard' },
     { id: 'analytics', label: 'Analytics' },
+    { id: 'finances', label: 'Finances' },
     { id: 'projects', label: 'Projects' },
     { id: 'clients', label: 'Clients' },
   ]
@@ -413,6 +415,7 @@ export default function Home() {
   const views = {
     dashboard: <Dashboard {...props} openClientCard={c => setCalendarCardModal(c)} />,
     analytics: <Analytics {...props} />,
+    finances: <Finances {...props} />,
     projects: <Projects {...props} />,
     clients: <Clients {...props} sessionTypes={data.sessionTypes} />,
     sessiontypes: <SessionTypes {...props} />,

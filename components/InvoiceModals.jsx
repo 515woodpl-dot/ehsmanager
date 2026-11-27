@@ -1,4 +1,6 @@
 import { useState } from 'react'
+import { askConfirm } from './UI'
+import { DEFAULT_ACCOUNTING } from '../lib/accounting'
 import { T, C } from '../lib/tokens'
 import { pibase } from '../lib/pibase'
 import { LineItemBuilder, calcTotal } from './LineItemBuilder'
@@ -30,11 +32,11 @@ export function Header({ title, onClose }) {
   )
 }
 
-const emptyLineData = () => ({ items: [{ id: uid(), name: '', description: '', qty: 1, price: '' }], discount: '', discountType: '%', tax: '', notes: 'Thank you for your business' })
+const emptyLineData = (defaultTax = '') => ({ items: [{ id: uid(), name: '', description: '', qty: 1, price: '' }], discount: '', discountType: '%', tax: defaultTax, notes: 'Thank you for your business' })
 
 // Invoices created before line items existed only carry an amount + note.
-function lineDataFor(invoice) {
-  if (!invoice) return emptyLineData()
+function lineDataFor(invoice, defaultTax = '') {
+  if (!invoice) return emptyLineData(defaultTax)
   if (invoice.lineData?.items?.length) return invoice.lineData
   return { ...emptyLineData(), items: [{ id: uid(), name: invoice.note || 'Services', description: '', qty: 1, price: invoice.amount || '' }], notes: invoice.note || '' }
 }
@@ -45,7 +47,10 @@ function lineDataFor(invoice) {
 export function InvoiceModal({ client: clientProp, invoice, data, setData, toast, onClose, onSaved }) {
   const isEdit = !!invoice
   const [clientId, setClientId] = useState(invoice?.clientId || clientProp?.id || '')
-  const [lineData, setLineData] = useState(() => lineDataFor(invoice))
+  const [lineData, setLineData] = useState(() => {
+    const acct = { ...DEFAULT_ACCOUNTING, ...(data.accounting || {}) }
+    return lineDataFor(invoice, acct.taxByDefault !== false ? String(acct.taxRate) : '')
+  })
   const [due, setDue] = useState(invoice?.due || '')
   const [sendFor, setSendFor] = useState(null) // invoice to email after saving
 
@@ -76,8 +81,8 @@ export function InvoiceModal({ client: clientProp, invoice, data, setData, toast
     else onClose()
   }
 
-  const remove = () => {
-    if (!confirm(`Delete ${invoiceLabel(invoice)}? This cannot be undone.`)) return
+  const remove = async () => {
+    if (!(await askConfirm(`Delete ${invoiceLabel(invoice)}?${Number(invoice.paid) > 0 ? ` It has ${fmt$(invoice.paid)} in payments, which will disappear from Finances and your tax reports. Only delete it if the money was refunded or it was a test.` : ''} This cannot be undone.`))) return
     setData(d => ({ ...d, invoices: d.invoices.filter(i => i.id !== invoice.id) }))
     toast(`${invoiceLabel(invoice)} deleted`); onClose()
   }

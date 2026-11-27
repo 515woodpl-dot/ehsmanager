@@ -7,6 +7,29 @@ every round of changes, and keep the "Open / follow-ups" list current.
 
 ---
 
+## 2026-11-27 — Finances (same maths as Ellie's app), reset proposal views
+
+### ⚠️ Before using
+- [x] Database: `pibase-migration-007-accounting.sql` applied to `p_bcb1de3b`
+      (expenses table with owner + grants, `studio_settings.accounting`).
+- [ ] Stripe → Webhooks: add the event `charge.refunded` so refunds are recorded.
+
+### Finances (sidebar, under Analytics)
+- [x] Identical to Ellie's app: P&L by year, monthly table, payments ledger
+      with tax share / Stripe fee / deposit, expenses, NJ sales tax by quarter
+      with filed status, CSV exports, Stripe refunds recorded.
+- [x] One difference: tax is **not** added to new invoices/quotes
+      automatically (web services are generally not taxed like photography).
+      Rate stays 6.625%; turn it on in Finances → Tax settings if needed.
+- [x] Deleting an invoice with payments warns first; app-styled dialogs.
+
+### Proposals
+- [x] **Reset views** button in the proposal window (back to Sent, 0 views).
+- [x] Opening a proposal on a device where you're logged in to the manager
+      no longer counts as a client view.
+
+---
+
 ## 2026-11-27 — Phone layout (same as Ellie's app)
 
 - [x] Page no longer wider than the phone (right side was cut off), no

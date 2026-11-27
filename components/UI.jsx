@@ -1,12 +1,19 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { T, C } from '../lib/tokens'
+
+export function Splash({ children = '' }) {
+  return <main className="app-splash" aria-busy={!children}>
+    <div className="app-splash-mark">EHS Studio</div>
+    {children ? <div className="app-splash-msg">{children}</div> : <div className="app-splash-bar" />}
+  </main>
+}
 
 export function Toast({ msg, onDone }) {
   useEffect(() => { const id = setTimeout(onDone, 2600); return () => clearTimeout(id) }, [])
   return <div style={T.toast}>✓ {msg}</div>
 }
 
-export function Modal({ title, onClose, children, footer, wide, extraWide }) {
+export function Modal({ title, onClose, children, footer, wide, extraWide, zIndex }) {
   useEffect(() => {
     const h = e => { if (e.key === 'Escape') onClose() }
     const previous = document.body.style.overflow
@@ -15,7 +22,7 @@ export function Modal({ title, onClose, children, footer, wide, extraWide }) {
     return () => { window.removeEventListener('keydown', h); document.body.style.overflow = previous }
   }, [])
   return (
-    <div style={T.overlay} onClick={e => { if (e.target === e.currentTarget) onClose() }}>
+    <div style={zIndex ? { ...T.overlay, zIndex } : T.overlay} onClick={e => { if (e.target === e.currentTarget) onClose() }}>
       <div className="modal-inner" role="dialog" aria-modal="true" aria-label={title} style={{ ...T.modal, maxWidth: extraWide ? 900 : wide ? 640 : 520 }}>
         <div style={T.modalHeader}>
           <div style={T.modalTitle}>{title}</div>
@@ -28,13 +35,46 @@ export function Modal({ title, onClose, children, footer, wide, extraWide }) {
   )
 }
 
-export function ConfirmModal({ title, message, confirmLabel = 'Confirm', onConfirm, onClose, danger = false }) {
-  return <Modal title={title} onClose={onClose} footer={<>
+// ── Styled replacements for window.confirm / window.alert ─────────
+// askConfirm(message, opts) → Promise<boolean>; notify(message) → Promise<void>.
+// <DialogHost /> (mounted once in _app) renders them with ConfirmModal.
+let pushDialog = null
+const openDialog = d => new Promise(resolve => {
+  if (!pushDialog) { resolve(d.alert ? undefined : window.confirm(d.message)); return }
+  pushDialog({ ...d, resolve })
+})
+export const askConfirm = (message, { title, confirmLabel, danger } = {}) => {
+  const isDelete = /^(delete|remove)\b/i.test(message)
+  return openDialog({ message, title: title || (isDelete ? 'Are you sure?' : 'Please confirm'), confirmLabel: confirmLabel || (isDelete ? 'Delete' : 'Continue'), danger: danger ?? isDelete })
+}
+export const notify = (message, title = 'Heads up') => openDialog({ message, title, alert: true })
+
+export function DialogHost() {
+  const [dialog, setDialog] = useState(null)
+  useEffect(() => { pushDialog = setDialog; return () => { pushDialog = null } }, [])
+  if (!dialog) return null
+  const close = value => { dialog.resolve(value); setDialog(null) }
+  if (dialog.alert) return <NoticeBanner title={dialog.title} message={dialog.message} onClose={() => close()} />
+  return <ConfirmModal title={dialog.title} message={dialog.message} confirmLabel={dialog.confirmLabel} danger={dialog.danger} onConfirm={() => close(true)} onClose={() => close(false)} zIndex={500} />
+}
+
+// App's own notification banner (replaces the browser's "site says" alert).
+function NoticeBanner({ title, message, onClose }) {
+  useEffect(() => { const id = setTimeout(onClose, 8000); return () => clearTimeout(id) }, [])
+  return <div className="notice-banner" role="alert">
+    <div className="notice-banner-mark">!</div>
+    <div style={{ flex: 1, minWidth: 0 }}><strong>{title}</strong><p>{message}</p></div>
+    <button onClick={onClose} aria-label="Dismiss">×</button>
+  </div>
+}
+
+export function ConfirmModal({ title, message, confirmLabel = 'Confirm', onConfirm, onClose, danger = false, zIndex }) {
+  return <Modal title={title} zIndex={zIndex} onClose={onClose} footer={<>
     <button style={T.btn} onClick={onClose}>Keep it</button>
     <button style={danger ? T.btnDanger : T.btnPrimary} onClick={onConfirm}>{confirmLabel}</button>
   </>}>
     <div className="brand-confirm">
-      <div className="brand-confirm-mark">EH</div>
+      <div className="brand-confirm-mark">515</div>
       <div><strong>{title}</strong><p>{message}</p></div>
     </div>
   </Modal>

@@ -3,6 +3,7 @@ import { useRouter } from 'next/router'
 import '../styles/globals.css'
 import { pibase } from '../lib/pibase'
 import { AppHead, PwaManager } from '../components/AppShell'
+import { DialogHost } from '../components/UI'
 
 const PUBLIC_ROUTES = ['/login', '/contact', '/booking', '/sign', '/invoice', '/quote', '/questionnaire', '/chat', '/proposal']
 
@@ -79,5 +80,6 @@ export default function App({ Component, pageProps }) {
     {appPage && <AppHead />}
     <Component {...pageProps} />
     {appPage && <PwaManager />}
+    {appPage && <DialogHost />}
   </>
 }

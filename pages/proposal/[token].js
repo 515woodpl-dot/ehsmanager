@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import Head from 'next/head'
 import { useRouter } from 'next/router'
 import { ProposalBody } from '../../lib/proposalMarkdown'
+import { pibase } from '../../lib/pibase'
 import s from '../../styles/Proposal.module.css'
 
 const VIEWPORT = 'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content'
@@ -50,8 +51,9 @@ export default function ProposalPage() {
 
   useEffect(() => {
     if (!token) return
-    const preview = new URLSearchParams(window.location.search).get('preview') ? '&preview=1' : ''
-    fetch(`/api/public-proposal?token=${encodeURIComponent(token)}${preview}`).then(async r => {
+    const studioCheck = async () => { try { return !!(await pibase?.auth.getSession())?.data?.session } catch { return false } }
+    ;(async () => (new URLSearchParams(window.location.search).get('preview') || await studioCheck()) ? '&preview=1' : '')().then(preview =>
+    fetch(`/api/public-proposal?token=${encodeURIComponent(token)}${preview}`)).then(async r => {
       const body = await r.json().catch(() => ({}))
       if (!r.ok) throw new Error(body.error || 'invalid')
       setData(body)
