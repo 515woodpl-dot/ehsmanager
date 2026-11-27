@@ -5,6 +5,15 @@ every round of changes, and keep the "Open / follow-ups" list current.
 
 ---
 
+## 2026-11-27 — Phone keyboard covering fields
+
+- [x] On phones the keyboard now resizes the page instead of covering it
+      (viewport `interactive-widget=resizes-content`), the login page starts
+      near the top, and any field you tap scrolls into view above the
+      keyboard — on every page and inside pop-up windows.
+
+---
+
 ## 2026-11-27 (round 12) — Security upgrade
 
 - [x] Next.js 16.4.0 → 16.4.6 (critical advisories, incl. remote code

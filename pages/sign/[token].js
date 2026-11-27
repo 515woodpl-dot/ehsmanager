@@ -51,7 +51,7 @@ export default function SignContractPage({ token, contract }) {
     <>
       <Head>
         <title>Sign Contract</title>
-        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content" />
       </Head>
       <main className="sign-page">
         <section className="sign-card">

@@ -5,7 +5,7 @@ import { durationLabel, money, publicBookingBase, safeImageUrl } from '../../lib
 import { ClockIcon, FacebookIcon, InstagramIcon, MailIcon, PriceIcon } from '../../components/BookingIcons'
 import s from '../../styles/Booking.module.css'
 
-const VIEWPORT = 'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover'
+const VIEWPORT = 'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content'
 export const DEFAULT_STUDIO = { name: "Ellie's Heartstrings", welcome: '', email: 'hello@elliesheartstrings.com', instagram: '', facebook: '', logoUrl: '' }
 
 export function SessionMeta({ item }) {

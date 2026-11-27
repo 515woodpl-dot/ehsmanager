@@ -9,7 +9,7 @@ const DISMISS_DAYS = 30
 export function AppHead() {
   return (
     <Head>
-      <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+      <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content" />
       <meta name="theme-color" content="#ffffff" />
       {/* Fetch fonts early so text doesn't visibly swap fonts after the page appears */}
       <link rel="preconnect" href="https://fonts.googleapis.com" />

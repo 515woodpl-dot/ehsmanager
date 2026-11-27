@@ -43,7 +43,7 @@ export default function PublicDocument({ pageTitle, eyebrow, title, statusLabel,
     <>
       <Head>
         <title>{pageTitle}</title>
-        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content" />
         <meta name="robots" content="noindex" />
       </Head>
       <main className="inv-page">
