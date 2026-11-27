@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { ServiceLinkModal } from './ServiceLinks'
 import { askConfirm } from './UI'
 import { DEFAULT_ACCOUNTING } from '../lib/accounting'
 import { T, C } from '../lib/tokens'
@@ -53,6 +54,7 @@ export function InvoiceModal({ client: clientProp, invoice, data, setData, toast
   })
   const [due, setDue] = useState(invoice?.due || '')
   const [sendFor, setSendFor] = useState(null) // invoice to email after saving
+  const [linkOpen, setLinkOpen] = useState(false)
 
   const client = data.clients.find(c => c.id === clientId) || (clientProp?.id === clientId ? clientProp : null)
   const clientName = client?.name || invoice?.client || ''
@@ -87,6 +89,7 @@ export function InvoiceModal({ client: clientProp, invoice, data, setData, toast
     toast(`${invoiceLabel(invoice)} deleted`); onClose()
   }
 
+  if (linkOpen && invoice) return <PaymentLinkModal invoice={data.invoices.find(i => i.id === invoice.id) || invoice} client={client} setData={setData} toast={toast} onClose={onClose} />
   if (sendFor) return <SendInvoiceModal invoice={sendFor} client={client} toast={toast} onClose={onClose} justCreated={!isEdit} />
 
   const clientInvoices = clientId ? data.invoices.filter(i => i.clientId === clientId && i.id !== invoice?.id) : []
@@ -149,6 +152,7 @@ export function InvoiceModal({ client: clientProp, invoice, data, setData, toast
         {isEdit && <button style={{ ...T.btn, color: C.red, borderColor: C.red }} onClick={remove}>Delete invoice</button>}
         <div style={{ flex: 1 }} />
         <button style={T.btn} onClick={onClose}>Cancel</button>
+        {isEdit && invoice.status !== 'paid' && <button style={T.btn} onClick={() => setLinkOpen(true)}>Payment link</button>}
         {isEdit && <button style={T.btn} onClick={() => save({ thenSend: true })}>Save &amp; email client</button>}
         <button style={T.btnPrimary} onClick={() => save()}>{isEdit ? 'Save changes' : 'Create invoice'} · {fmt$(total)}</button>
       </div>
@@ -342,8 +346,30 @@ export function defaultInvoiceEmail(invoice, clientName) {
 export function SendInvoiceModal({ invoice, client, toast, onClose, justCreated = false }) {
   const clientName = client?.name || invoice.client
   const initial = defaultInvoiceEmail(invoice, clientName)
+  const [copying, setCopying] = useState(false)
+  // Also offer the payment link here, for clients who don't get emails.
+  // A just-created invoice may take a moment to save, so retry briefly.
+  const copyPayLink = async () => {
+    setCopying(true)
+    try {
+      const { data: { session } } = await pibase.auth.getSession()
+      let body = null
+      for (let attempt = 0; attempt < 6; attempt++) {
+        const r = await fetch('/api/invoice-link', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token || ''}` }, body: JSON.stringify({ invoiceId: invoice.id }) })
+        body = await r.json().catch(() => ({}))
+        if (r.ok) break
+        if (r.status !== 404) throw new Error(body.error || 'Could not create the payment link')
+        body = null
+        await new Promise(done => setTimeout(done, 800))
+      }
+      if (!body?.url) throw new Error('The invoice is still saving — try again in a moment')
+      try { await navigator.clipboard.writeText(body.url); toast('Payment link copied — paste it in a text or WhatsApp') } catch { toast(body.url) }
+    } catch (error) { toast(error.message) }
+    setCopying(false)
+  }
   return (
     <SendEmailModal
+      extraActions={<button style={T.btn} disabled={copying} onClick={copyPayLink}>{copying ? 'Preparing…' : 'Copy payment link'}</button>}
       endpoint="/api/email-invoice" payload={{ invoice: { id: invoice.id } }}
       client={client} clientName={clientName} toast={toast} onClose={onClose} justCreated={justCreated}
       title={justCreated ? `Invoice ${invoiceLabel(invoice)} created — email it to ${clientName}?` : `Email invoice ${invoiceLabel(invoice)}`}
@@ -422,4 +448,10 @@ export function SendEmailModal({ endpoint, payload, client, clientName, toast, o
       </div>
     </Overlay>
   )
+}
+
+// ── Payment link ──────────────────────────────────────────────────
+// Same window as every other client link (components/ServiceLinks.jsx).
+export function PaymentLinkModal({ invoice, client, setData, toast, onClose }) {
+  return <ServiceLinkModal kind="invoice" doc={invoice} client={client} setData={setData} toast={toast} onClose={onClose} />
 }

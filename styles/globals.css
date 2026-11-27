@@ -888,3 +888,13 @@ body { padding-left: env(safe-area-inset-left); padding-right: env(safe-area-ins
 .notice-banner p { margin-top: 3px; font-size: 13.5px; line-height: 1.5; color: var(--muted); }
 .notice-banner button { border: 0; background: none; color: var(--muted); font-size: 20px; line-height: 1; padding: 2px 4px; cursor: pointer; }
 @keyframes notice-in { from { opacity: 0; transform: translate(-50%, -8px); } to { opacity: 1; transform: translate(-50%, 0); } }
+
+/* Share a link picker */
+.share-groups { display: grid; gap: 16px; }
+.share-group-label { font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
+.share-row { width: 100%; display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 14px; margin-bottom: 6px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); font: inherit; color: var(--text); cursor: pointer; text-align: left; }
+.share-row:hover { border-color: var(--border2); background: var(--surface2); }
+.share-row strong { display: block; font-weight: 500; font-size: 14px; }
+.share-row small { display: block; color: var(--muted); font-size: 12.5px; margin-top: 2px; }
+.share-row-create { border-style: dashed; color: var(--muted); }
+.share-row-create small { margin: 0; }

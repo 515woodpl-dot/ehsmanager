@@ -7,6 +7,18 @@ every round of changes, and keep the "Open / follow-ups" list current.
 
 ---
 
+## 2026-11-27 — Payment links and Share a link (same as Ellie's app)
+
+- [x] Invoices: **Pay link** on unpaid cards, **Payment link** in the invoice
+      view and the edit window, **Copy payment link** right after saving and in
+      Send. Copy / Share / Text / WhatsApp / Copy message; shows live when paid.
+- [x] Client card → Send documents → **Share a link**: payment, quote, contract,
+      questionnaire and private chat links, with live status.
+- [x] These are the app's own secure invoice pages (Stripe Checkout behind the
+      Pay button) — not Stripe "Payment Links", so that key permission stays None.
+
+---
+
 ## 2026-11-27 — Finances (same maths as Ellie's app), reset proposal views
 
 ### ⚠️ Before using
