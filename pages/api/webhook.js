@@ -2,6 +2,7 @@ import { createServiceClient } from '../../lib/pibase'
 import { notifyStudio } from '../../lib/push'
 import { defaultStudioId, getStripe, loadStudioConfig } from '../../lib/studioConfig'
 import { applyPayment, applyRefund, invoiceFromRow } from '../../lib/invoices'
+import { sendPaymentReceipt } from '../../lib/paymentReceipt'
 export const config = { api: { bodyParser: false } }
 async function getRawBody(req) {
   return new Promise((resolve, reject) => {
@@ -37,20 +38,23 @@ export default async function handler(req, res) {
       const { invoiceId, userId, label } = intent.metadata || {}
       if (!invoiceId || !userId) break
       // Stripe's processing fee, for the accounting report (gross − fee = deposit).
-      let fee = null
-      try {
-        if (intent.latest_charge) {
+      let fee = null, payerEmail = ''
+      for (let attempt = 0; attempt < 4 && intent.latest_charge && fee == null; attempt++) {
+        try {
+          if (attempt) await new Promise(done => setTimeout(done, 1500))
           const charge = await stripe.charges.retrieve(intent.latest_charge, { expand: ['balance_transaction'] })
+          payerEmail = charge?.billing_details?.email || charge?.receipt_email || payerEmail
           if (charge?.balance_transaction?.fee != null) fee = charge.balance_transaction.fee / 100
-        }
-      } catch (error) { console.error('[webhook] fee lookup', error.message) }
+        } catch (error) { console.error('[webhook] fee lookup', error.message); break }
+      }
+      if (fee == null && intent.latest_charge) console.log('[webhook] fee not available yet for', intent.id)
       // Payments can be one installment or the whole balance. Each Stripe
       // payment is logged once (by its id), so a retried webhook is a no-op.
       // The update only applies if nobody changed `paid` in between.
       let credited = false
       for (let attempt = 0; attempt < 3 && !credited; attempt++) {
         const { data: row, error: lookupError } = await db.from('invoices')
-          .select('id, amount, paid, status, due, line_items').eq('id', invoiceId).eq('user_id', userId).single()
+          .select('id, amount, paid, status, due, line_items, client_id, client_name, number').eq('id', invoiceId).eq('user_id', userId).single()
         if (lookupError || !row) return res.status(500).json({ error: 'Linked invoice not found' })
         const invoice = invoiceFromRow(row)
         if ((invoice.lineData.payments || []).some(p => p.intentId === intent.id)) { credited = true; break }
@@ -62,6 +66,9 @@ export default async function handler(req, res) {
         if (error) return res.status(500).json({ error: 'Unable to update invoice' })
         if (saved?.length) {
           credited = true
+          // The client's receipt (once per payment — retried webhooks stop above).
+          const receipt = await sendPaymentReceipt(db, { userId, invoiceRow: row, amount: intent.amount_received / 100, paidTotal: updated.paid, fallbackEmail: payerEmail || intent.receipt_email || '' })
+          if (receipt.error) console.error('[webhook] receipt', receipt.error)
           await notifyStudio(db, userId, { type: 'payments', title: `💰 Payment received`, body: `$${(intent.amount_received / 100).toLocaleString('en-US', { minimumFractionDigits: 2 })} paid online${label ? ` · ${label}` : ''}${updated.status === 'paid' ? ' · invoice paid in full' : ''}`, url: '/?view=invoices', tag: `payment-${intent.id}` })
         }
       }
