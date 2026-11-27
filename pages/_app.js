@@ -17,6 +17,19 @@ export default function App({ Component, pageProps }) {
 
   const isPublicRoute = () => PUBLIC_ROUTES.some(r => router.pathname.startsWith(r))
 
+  // Phones: keep the field being typed in visible above the keyboard
+  // (login, forms, and fields inside pop-up windows).
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.matchMedia?.('(pointer: coarse)').matches) return
+    const typing = el => el && (el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || (el.tagName === 'INPUT' && !['checkbox', 'radio', 'button', 'submit', 'file', 'range', 'color'].includes(el.type)))
+    const reveal = () => { const el = document.activeElement; if (typing(el)) el.scrollIntoView({ block: 'center', behavior: 'smooth' }) }
+    let timer = null
+    const onFocus = e => { if (typing(e.target)) { clearTimeout(timer); timer = setTimeout(reveal, 350) } }
+    document.addEventListener('focusin', onFocus)
+    window.visualViewport?.addEventListener('resize', reveal)
+    return () => { clearTimeout(timer); document.removeEventListener('focusin', onFocus); window.visualViewport?.removeEventListener('resize', reveal) }
+  }, [])
+
   useEffect(() => {
     if (!pibase) return
     if (isPublicRoute()) setReady(true)

@@ -4,7 +4,7 @@ import { useRouter } from 'next/router'
 import { ProposalBody } from '../../lib/proposalMarkdown'
 import s from '../../styles/Proposal.module.css'
 
-const VIEWPORT = 'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover'
+const VIEWPORT = 'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content'
 const TEXT = {
   es: {
     proposal: 'Propuesta', preparedFor: 'Preparada para', by: 'por', accept: 'Aceptar propuesta', acceptTitle: 'Aceptar la propuesta',
