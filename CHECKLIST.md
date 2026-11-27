@@ -7,6 +7,18 @@ every round of changes, and keep the "Open / follow-ups" list current.
 
 ---
 
+## 2026-11-27 — Payment receipts for clients
+
+- [x] When a client pays online, they get the app's own receipt email
+      (amount, invoice, date, total, balance remaining or "Paid in full",
+      link to the invoice). Sent once per payment, from the studio's address.
+- [x] Stripe fee: retried for a few seconds when Stripe hasn't attached it yet
+      (it was missing on the first live test payment).
+- [ ] In Stripe → Settings → Customer emails, leave "Successful payments" OFF,
+      or clients get two receipts.
+
+---
+
 ## 2026-11-27 — Payment links and Share a link (same as Ellie's app)
 
 - [x] Invoices: **Pay link** on unpaid cards, **Payment link** in the invoice
