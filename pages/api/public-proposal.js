@@ -67,29 +67,32 @@ export default async function handler(req, res) {
   const acceptedAt = new Date().toISOString()
   const acceptance = { ...d, at: acceptedAt, userAgent: clean(req.headers['user-agent'] || '', 300) }
 
-  // 1. Client: reuse one with the same email, otherwise create it (Inquiry stage).
-  let clientId = row.client_id
-  if (!clientId) {
-    const { data: existing } = await db.from('clients').select('id').eq('user_id', row.user_id).eq('email', d.email).maybeSingle()
-    clientId = existing?.id || null
-  }
+  // 1. Claim the acceptance first — only one submission can win.
+  const { data: claimed, error: claimError } = await db.from('proposals')
+    .update({ status: 'accepted', accepted_at: acceptedAt, acceptance, updated_at: acceptedAt })
+    .eq('id', row.id).neq('status', 'accepted').select('id')
+  if (claimError) { console.error('[public-proposal] accept', claimError.message); return res.status(500).json({ error: 'Your acceptance could not be saved. Please try again.' }) }
+  if (!claimed?.length) return res.status(409).json({ error: 'This proposal was already accepted. We will be in touch soon.' })
+
+  // 2. Client: the one the proposal was made for, else one with the same
+  //    email (any letter case), else a new one in the Inquiry stage.
   const notes = [
     `Accepted proposal: ${row.title}${row.number ? ` (${row.number})` : ''}`,
     d.business && `Business: ${d.business}`, (d.address || d.city) && `Address: ${[d.address, d.city].filter(Boolean).join(', ')}`,
     d.website && `Current website: ${d.website}`, d.message && `Message: ${d.message}`,
   ].filter(Boolean).join('\n')
+  let clientId = row.client_id
+  if (!clientId) {
+    const pattern = d.email.replace(/[\\%_]/g, m => `\\${m}`)
+    const { data: matches } = await db.from('clients').select('id').eq('user_id', row.user_id).ilike('email', pattern).order('created_at', { ascending: true }).limit(1)
+    clientId = matches?.[0]?.id || null
+  }
   if (!clientId) {
     const { data: created, error } = await db.from('clients').insert({ user_id: row.user_id, name: d.business ? `${d.name} — ${d.business}` : d.name, email: d.email, phone: d.phone, type: 'Web Design & Development', status: 'inquiry', notes }).select('id').single()
-    if (error) { console.error('[public-proposal] client insert', error.message); return res.status(500).json({ error: 'Your acceptance could not be saved. Please try again.' }) }
-    clientId = created.id
+    if (error) console.error('[public-proposal] client insert', error.message)
+    clientId = created?.id || null
   }
-
-  // 2. Mark accepted — only once, even if two submissions race.
-  const { data: saved, error: updateError } = await db.from('proposals')
-    .update({ status: 'accepted', accepted_at: acceptedAt, acceptance, client_id: clientId, updated_at: acceptedAt })
-    .eq('id', row.id).neq('status', 'accepted').select('id')
-  if (updateError) { console.error('[public-proposal] accept', updateError.message); return res.status(500).json({ error: 'Your acceptance could not be saved. Please try again.' }) }
-  if (!saved?.length) return res.status(409).json({ error: 'This proposal was already accepted. We will be in touch soon.' })
+  if (clientId) await db.from('proposals').update({ client_id: clientId }).eq('id', row.id)
 
   // 3. Lead row (same list as the contact form), then tell the studio.
   await db.from('leads').insert({ user_id: row.user_id, name: d.name, email: d.email, phone: d.phone, interest: 'Proposal accepted', message: notes, source: 'proposal' }).then(({ error }) => { if (error) console.error('[public-proposal] lead insert', error.message) })

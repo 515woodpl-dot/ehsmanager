@@ -48,6 +48,17 @@ every round of changes, and keep the "Open / follow-ups" list current.
 - [x] Default location (515 Wood Pl, Linden NJ 07036, or Settings address)
       with "Another location", in contracts, meetings and services.
 
+### Audit fixes (same day)
+- [x] Proposal editor: **Client** picker — link an existing client (fills name,
+      email, phone); acceptance then updates that client instead of adding one.
+- [x] Accepting claims the proposal first, so two quick clicks can't create two
+      clients; existing clients match by email in any letter case, and
+      duplicate emails no longer cause a new client.
+- [x] Proposal numbers use the highest number + 1 (they repeated after a delete).
+- [x] Contract lines that read badly once filled in ("due on Website launch",
+      "a las por definir") reworded in both languages.
+- [x] Signing page shows Spanish buttons and messages for Spanish contracts.
+
 ### Deploy
 - [x] Own zero-downtime `deploy.sh` (branch `515studio`, PM2 `515manager`),
       `--rollback`; builds skip Next.js AI-agent prompts.
@@ -693,6 +704,7 @@ every round of changes, and keep the "Open / follow-ups" list current.
 
 ## Open / follow-ups
 - [ ] Proposals: no "decline" button for the client yet; no expiry date.
+- [ ] Contract emails and the signed-copy email are still English-only.
 - [ ] Next.js 16.4.0 → 16.4.6 security upgrade (same as EHS).
 - [ ] Online payments were tested against a stand-in for Stripe (signed
       webhook events), not a real Stripe account. Make one test payment in

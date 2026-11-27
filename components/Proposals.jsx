@@ -15,7 +15,7 @@ const STATUS = {
   accepted: ['Accepted', C.greenBg, C.green], declined: ['Declined', C.redBg, C.red],
 }
 const StatusPill = ({ status }) => { const [label, bg, color] = STATUS[status] || STATUS.draft; return <span style={{ display: 'inline-flex', padding: '2px 10px', borderRadius: 20, fontSize: 11.5, fontWeight: 500, background: bg, color, whiteSpace: 'nowrap' }}>{label}</span> }
-const nextNumber = list => `P-${1001 + list.filter(p => /^P-\d+$/.test(p.number || '')).length}`
+const nextNumber = list => `P-${Math.max(1000, ...list.map(p => Number(/^P-(\d+)$/.exec(p.number || '')?.[1] || 0))) + 1}`
 
 async function api(path, init = {}) {
   const { data: { session } } = await pibase.auth.getSession()
@@ -76,7 +76,7 @@ export default function Proposals({ data, setData, toast, setView }) {
       </article>)}
     </div>
 
-    {editing && <ProposalEditor proposal={editing} toast={toast} onClose={() => setEditing(null)} onSave={(p, thenShare) => { const row = save(p); setEditing(null); toast('Proposal saved'); if (thenShare) setSharing(row) }} />}
+    {editing && <ProposalEditor proposal={editing} clients={data.clients || []} toast={toast} onClose={() => setEditing(null)} onSave={(p, thenShare) => { const row = save(p); setEditing(null); toast('Proposal saved'); if (thenShare) setSharing(row) }} />}
     {sharing && <ShareProposal proposal={proposals.find(p => p.id === sharing.id) || sharing} setData={setData} toast={toast} onClose={() => setSharing(null)} />}
     {viewing && <ProposalDetail proposal={proposals.find(p => p.id === viewing.id) || viewing} data={data} setData={setData} toast={toast} setView={setView}
       onClose={() => setViewing(null)} onEdit={p => { setViewing(null); setEditing(p) }} onShare={p => { setViewing(null); setSharing(p) }} onDelete={p => setDeleting(p)} />}
@@ -84,12 +84,20 @@ export default function Proposals({ data, setData, toast, setView }) {
   </div>
 }
 
-function ProposalEditor({ proposal, toast, onClose, onSave }) {
+function ProposalEditor({ proposal, clients, toast, onClose, onSave }) {
   const [p, setP] = useState(proposal)
   const [tab, setTab] = useState('write')
   const [importing, setImporting] = useState(false)
   const file = useRef(null)
   const set = (k, v) => setP(x => ({ ...x, [k]: v }))
+  // Picking an existing client links the proposal to them (acceptance then
+  // updates that client instead of creating a new one) and fills their details.
+  const pickClient = id => {
+    const c = clients.find(x => x.id === id)
+    setP(x => c
+      ? { ...x, clientId: c.id, contactName: c.name || '', contactEmail: c.email || '', contactPhone: c.phone || '' }
+      : { ...x, clientId: null })
+  }
   const importPdf = async f => {
     if (!f) return
     if (f.size > 950 * 1024) { toast('That PDF is over 1 MB — export a smaller one, or paste the text'); return }
@@ -111,6 +119,13 @@ function ProposalEditor({ proposal, toast, onClose, onSave }) {
     <div style={T.formRow} className="form-row-2">
       <div style={T.formGroup}><label style={T.formLabel}>Title</label><input style={T.formInput} value={p.title} onChange={e => set('title', e.target.value)} placeholder="Propuesta para MP Carpet Cleaning — Más clientes desde su página web" /></div>
       <div style={T.formGroup}><label style={T.formLabel}>Language of the page</label><select style={T.formInput} value={p.language} onChange={e => set('language', e.target.value)}><option value="es">Español</option><option value="en">English</option></select></div>
+    </div>
+    <div style={T.formGroup}>
+      <label style={T.formLabel}>Client</label>
+      <select style={T.formInput} value={p.clientId || ''} onChange={e => pickClient(e.target.value)}>
+        <option value="">New client — added automatically when they accept</option>
+        {clients.filter(c => !c.archived || c.id === p.clientId).map(c => <option key={c.id} value={c.id}>{c.name}{c.email ? ` · ${c.email}` : ''}</option>)}
+      </select>
     </div>
     <div style={T.formRow} className="form-row-2">
       <div style={T.formGroup}><label style={T.formLabel}>Business it's for</label><input style={T.formInput} value={p.prospect} onChange={e => set('prospect', e.target.value)} placeholder="MP Carpet Cleaning" /></div>

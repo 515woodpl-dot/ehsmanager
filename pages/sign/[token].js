@@ -6,7 +6,13 @@ import ContractDocument from '../../components/ContractDocument'
 import { contractHighlights } from '../../lib/contractTemplate'
 import SignaturePad from '../../components/SignaturePad'
 
+const SIGN_TEXT = {
+  en: { agreeFirst: 'Please confirm you reviewed and agree to the contract.', drawFirst: 'Draw your signature before signing.', failed: 'Unable to sign contract.', title: 'Sign Contract', fallbackType: 'Services Agreement', sent: d => `Sent ${d}`, ready: 'Ready for review', both: 'Signed by both', signed: 'Signed', awaiting: 'Awaiting signature', bothDone: 'Signed by both parties.', doneThanks: 'Contract signed. Thank you.', copyEmailed: ' A signed copy has been emailed to you.', keepPage: ' Keep this page — you can print it or save it as a PDF.', copyLater: ' You will get a signed copy by email once we add our signature.', print: 'Print or save as PDF', name: 'Full legal name', method: 'Signature method', draw: 'Draw signature', typed: 'Use typed name', email: 'Email', agree: 'I reviewed and agree to this contract. My selected signature and full legal name act as my electronic signature.', signing: 'Signing...', sign: 'Sign contract' },
+  es: { agreeFirst: 'Confirme que revisó y acepta el contrato.', drawFirst: 'Dibuje su firma antes de firmar.', failed: 'No se pudo firmar el contrato.', title: 'Firmar contrato', fallbackType: 'Contrato de servicios', sent: d => `Enviado ${d}`, ready: 'Listo para revisar', both: 'Firmado por ambas partes', signed: 'Firmado', awaiting: 'Pendiente de firma', bothDone: 'Firmado por ambas partes.', doneThanks: 'Contrato firmado. ¡Gracias!', copyEmailed: ' Le enviamos una copia firmada por correo.', keepPage: ' Guarde esta página: puede imprimirla o guardarla como PDF.', copyLater: ' Recibirá una copia firmada por correo cuando agreguemos nuestra firma.', print: 'Imprimir o guardar como PDF', name: 'Nombre legal completo', method: 'Forma de firmar', draw: 'Dibujar firma', typed: 'Usar nombre escrito', email: 'Correo electrónico', agree: 'Revisé y acepto este contrato. La firma seleccionada y mi nombre legal completo constituyen mi firma electrónica.', signing: 'Firmando...', sign: 'Firmar contrato' },
+}
+
 export default function SignContractPage({ token, contract }) {
+  const t = SIGN_TEXT[/\nFirmas\n/.test(contract.body || '') ? 'es' : 'en']
   const [signerName, setSignerName] = useState(contract.signedBy || contract.client || '')
   const [signerEmail, setSignerEmail] = useState('')
   const [accepted, setAccepted] = useState(contract.status === 'signed')
@@ -22,11 +28,11 @@ export default function SignContractPage({ token, contract }) {
     event.preventDefault()
     setError('')
     if (!accepted) {
-      setError('Please confirm you reviewed and agree to the contract.')
+      setError(t.agreeFirst)
       return
     }
     if (signatureMethod === 'draw' && !signatureData) {
-      setError('Draw your signature before signing.')
+      setError(t.drawFirst)
       return
     }
     setStatus('sending')
@@ -37,7 +43,7 @@ export default function SignContractPage({ token, contract }) {
     })
     const data = await res.json().catch(() => ({}))
     if (!res.ok) {
-      setError(data.error || 'Unable to sign contract.')
+      setError(data.error || t.failed)
       setStatus('idle')
       return
     }
@@ -50,17 +56,17 @@ export default function SignContractPage({ token, contract }) {
   return (
     <>
       <Head>
-        <title>Sign Contract</title>
+        <title>{t.title}</title>
         <meta name="viewport" content="width=device-width, initial-scale=1" />
       </Head>
       <main className="sign-page">
         <section className="sign-card">
           <p className="sign-eyebrow">515Studio</p>
-          <h1>{contract.type || 'Services Agreement'}</h1>
+          <h1>{contract.type || t.fallbackType}</h1>
           <div className="sign-meta">
             <span>{contract.client}</span>
-            <span>{contract.sent ? `Sent ${contract.sent}` : 'Ready for review'}</span>
-            <span>{status === 'signed' ? (contract.studioSignature ? 'Signed by both' : 'Signed') : 'Awaiting signature'}</span>
+            <span>{contract.sent ? t.sent(contract.sent) : t.ready}</span>
+            <span>{status === 'signed' ? (contract.studioSignature ? t.both : t.signed) : t.awaiting}</span>
           </div>
         </section>
 
@@ -71,31 +77,31 @@ export default function SignContractPage({ token, contract }) {
         <form className="sign-card" onSubmit={submit}>
           {status === 'signed' ? (
             <div className="sign-success">
-              {contract.studioSignature ? 'Signed by both parties.' : 'Contract signed. Thank you.'}
-              {copySent ? ' A signed copy has been emailed to you.' : contract.studioSignature ? ' Keep this page — you can print it or save it as a PDF.' : ' You will get a signed copy by email once we add our signature.'}
-              <button type="button" className="sign-print" onClick={() => window.print()}>Print or save as PDF</button>
+              {contract.studioSignature ? t.bothDone : t.doneThanks}
+              {copySent ? t.copyEmailed : contract.studioSignature ? t.keepPage : t.copyLater}
+              <button type="button" className="sign-print" onClick={() => window.print()}>{t.print}</button>
             </div>
           ) : (
             <>
               <label>
-                <span>Full legal name</span>
+                <span>{t.name}</span>
                 <input value={signerName} onChange={e => setSignerName(e.target.value)} required />
               </label>
-              <div className="signature-methods" role="group" aria-label="Signature method">
-                <button type="button" className={signatureMethod === 'draw' ? 'active' : ''} onClick={() => setSignatureMethod('draw')}>Draw signature</button>
-                <button type="button" className={signatureMethod === 'type' ? 'active' : ''} onClick={() => setSignatureMethod('type')}>Use typed name</button>
+              <div className="signature-methods" role="group" aria-label={t.method}>
+                <button type="button" className={signatureMethod === 'draw' ? 'active' : ''} onClick={() => setSignatureMethod('draw')}>{t.draw}</button>
+                <button type="button" className={signatureMethod === 'type' ? 'active' : ''} onClick={() => setSignatureMethod('type')}>{t.typed}</button>
               </div>
               {signatureMethod === 'draw' && <SignaturePad onChange={setSignatureData} />}
               <label>
-                <span>Email</span>
+                <span>{t.email}</span>
                 <input type="email" value={signerEmail} onChange={e => setSignerEmail(e.target.value)} />
               </label>
               <label className="sign-check">
                 <input type="checkbox" checked={accepted} onChange={e => setAccepted(e.target.checked)} />
-                <span>I reviewed and agree to this contract. My selected signature and full legal name act as my electronic signature.</span>
+                <span>{t.agree}</span>
               </label>
               {error && <p className="sign-error">{error}</p>}
-              <button type="submit" disabled={status === 'sending'}>{status === 'sending' ? 'Signing...' : 'Sign contract'}</button>
+              <button type="submit" disabled={status === 'sending'}>{status === 'sending' ? t.signing : t.sign}</button>
             </>
           )}
         </form>
