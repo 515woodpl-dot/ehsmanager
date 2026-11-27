@@ -111,7 +111,7 @@ export default function ContactPage() {
     <>
       <Head>
         <title>{settings.formTitle || 'Contact Us'}</title>
-        <meta name="viewport" content="width=device-width, initial-scale=1, interactive-widget=resizes-content" />
+        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="true" />
         <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500&family=DM+Serif+Display&display=swap" rel="stylesheet" />

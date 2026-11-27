@@ -7,6 +7,14 @@ every round of changes, and keep the "Open / follow-ups" list current.
 
 ---
 
+## 2026-11-27 — Phone layout (same as Ellie's app)
+
+- [x] Page no longer wider than the phone (right side was cut off), no
+      sideways sliding, no pinch/double-tap zoom, 16px form fields so the
+      browser doesn't zoom in on tap; top bar shrinks to fit.
+
+---
+
 ## 2026-11-27 — Phone keyboard covering fields
 
 - [x] On phones the keyboard now resizes the page instead of covering it
