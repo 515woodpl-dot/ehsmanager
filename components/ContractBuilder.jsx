@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react'
 import { T, C } from '../lib/tokens'
-import { CONTRACT_TEMPLATE, fillContract, highlightValues } from '../lib/contractTemplate'
+import { LocationField, studioAddressNow } from './LocationField'
+import { CONTRACT_TEMPLATES, DEFAULT_TEMPLATE, fillContract, highlightValues, templateFor } from '../lib/contractTemplate'
 import ContractDocument from './ContractDocument'
 
 const uid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => { const r = Math.random() * 16 | 0; return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16) })
@@ -50,17 +51,18 @@ function buildFields(c, data) {
   const today = new Date().toISOString().slice(0, 10)
   return {
     fields: {
-      contractTitle: 'Digital Services Agreement',
+      template: DEFAULT_TEMPLATE,
+      contractTitle: CONTRACT_TEMPLATES[DEFAULT_TEMPLATE].title,
       effectiveDate: today,
       clientName: c?.name || '',
       clientEmail: c?.email || '',
       sessionType: booking?.type || c?.type || 'Web Development',
       sessionDate: booking?.date || c?.date || '',
       sessionTime: booking?.time || '',
-      location: booking?.location || '',
+      location: booking?.location || studioAddressNow(),
       totalFee: invoice?.amount ? String(invoice.amount) : '',
       retainerPct: '50',
-      remainingDueDate: invoice?.due || 'Proof Delivery Date',
+      remainingDueDate: invoice?.due || CONTRACT_TEMPLATES[DEFAULT_TEMPLATE].due,
       governingState: 'New Jersey',
       photographerEmail: 'hello@515studio.net',
       photographerCity: 'New Jersey',
@@ -73,7 +75,7 @@ function buildFields(c, data) {
 export default function ContractBuilder({ client, contract = null, data, onSave, onClose }) {
   // Editing keeps what was saved; a new contract auto-fills from the client.
   const built = buildFields(client, data)
-  const initial = contract?.fields ? { fields: { ...built.fields, ...contract.fields }, sources: built.sources } : built
+  const initial = contract?.fields ? { fields: { ...built.fields, template: 'digital', ...contract.fields }, sources: built.sources } : built
   const [selectedClientId, setSelectedClientId] = useState(client?.id || '')
   const [fields, setFields] = useState(initial.fields)
   const [sources, setSources] = useState(initial.sources)
@@ -112,13 +114,15 @@ export default function ContractBuilder({ client, contract = null, data, onSave,
   const remainingAmt = Math.round((totalFee - retainerAmt) * 100) / 100
   const money = amount => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount)
 
+  const template = templateFor(fields.template)
+  const es = template.lang === 'es'
   const fmtD = iso => {
-    if (!iso) return '[Date]'
+    if (!iso) return es ? '[Fecha]' : '[Date]'
     const d = new Date(iso + 'T00:00:00')
-    return isNaN(d) ? iso : d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+    return isNaN(d) ? iso : d.toLocaleDateString(es ? 'es-US' : 'en-US', { month: 'long', day: 'numeric', year: 'numeric' })
   }
   const fmtT = t => {
-    if (!t) return 'TBD'
+    if (!t) return es ? 'por definir' : 'TBD'
     const [h, m] = t.split(':'); const hr = parseInt(h)
     return `${hr % 12 || 12}:${m} ${hr < 12 ? 'AM' : 'PM'}`
   }
@@ -141,7 +145,19 @@ export default function ContractBuilder({ client, contract = null, data, onSave,
     governingState: fields.governingState || '[Governing State]',
   }), [fields, totalFee, retainerAmt, remainingAmt])
 
-  const previewText = useMemo(() => fillContract(CONTRACT_TEMPLATE, contractFields), [contractFields])
+  const previewText = useMemo(() => fillContract(template.body, contractFields), [contractFields, template])
+
+  // Switching type also switches the title and the default balance milestone,
+  // unless those were changed by hand.
+  const chooseTemplate = id => {
+    const next = templateFor(id)
+    setTouched(true)
+    setFields(f => ({
+      ...f, template: id,
+      contractTitle: !f.contractTitle || Object.values(CONTRACT_TEMPLATES).some(t => t.title === f.contractTitle) ? next.title : f.contractTitle,
+      remainingDueDate: !f.remainingDueDate || Object.values(CONTRACT_TEMPLATES).some(t => t.due === f.remainingDueDate) || f.remainingDueDate === 'Proof Delivery Date' ? next.due : f.remainingDueDate,
+    }))
+  }
 
   const save = () => {
     if (fields.headerImageUrl && !/^https:\/\//i.test(fields.headerImageUrl)) {
@@ -212,6 +228,13 @@ export default function ContractBuilder({ client, contract = null, data, onSave,
             )}
           </div>
 
+          {/* Contract type */}
+          <Field label="Contract type" hint="English or Spanish. Both are drafts — have a lawyer review them before relying on them.">
+            <select style={inp} value={fields.template || 'digital'} onChange={e => chooseTemplate(e.target.value)}>
+              {Object.entries(CONTRACT_TEMPLATES).map(([id, t]) => <option key={id} value={id}>{t.label}</option>)}
+            </select>
+          </Field>
+
           {/* Contract title */}
           <Field label="Contract title">
             <input style={inp} value={fields.contractTitle} onChange={e => set('contractTitle', e.target.value)} />
@@ -241,7 +264,7 @@ export default function ContractBuilder({ client, contract = null, data, onSave,
               </Field>
             </div>
             <Field label="Location">
-              <input style={inp} value={fields.location} onChange={e => set('location', e.target.value)} />
+              <LocationField inputStyle={inp} value={fields.location} onChange={v => setFields(f => ({ ...f, location: v }))} />
             </Field>
           </Section>
 

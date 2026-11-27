@@ -4,9 +4,11 @@ import { Modal, Badge } from './UI'
 import { DEMO_SESSION_CATALOG, DEFAULT_AVAILABILITY } from '../lib/data'
 import { availabilitySettings, durationLabel, money, publicBookingBase, safeImageUrl, slugify } from '../lib/booking'
 import s from '../styles/BookingAdmin.module.css'
+import { PhotoField } from './PhotoField'
+import { LocationField, studioAddressNow, DEFAULT_STUDIO_ADDRESS } from './LocationField'
 
 const uid = () => crypto.randomUUID()
-const blankType = { name: '', slug: '', category: 'Web Development', description: '', imageUrl: '', durationMinutes: 60, price: 0, location: '', color: '#5db8be', public: false }
+const blankType = { name: '', slug: '', category: 'Web Development', description: '', imageUrl: '', durationMinutes: 60, price: 0, location: DEFAULT_STUDIO_ADDRESS, color: '#5db8be', public: false }
 const blankDiscount = { name: '', code: '', kind: 'coupon', mode: 'percent', amount: 10, balance: null, uses: 0, maxUses: null, startsOn: '', endsOn: '', active: true }
 // "Sat, Jul 4, 2026 · 7:00 PM" — either part may be missing.
 const fmtWhen = (date, time) => {
@@ -31,7 +33,7 @@ export function SessionTypes({ data, setData, toast, setView }) {
     if (!name || !slug) return toast('Enter a meeting name')
     if (types.some(item => item.id !== editing.id && item.slug === slug)) return toast('That page URL is already in use')
     if (editing.durationMinutes < 30 || editing.durationMinutes > 480 || editing.durationMinutes % 30 || Number(editing.price) < 0) return toast('Use a duration in 30-minute steps and a valid price')
-    if (editing.imageUrl && !safeImageUrl(editing.imageUrl)) return toast('Use an HTTPS image URL')
+    if (editing.imageUrl && !safeImageUrl(editing.imageUrl)) return toast('Upload the photo again')
     const row = { ...editing, id: editing.id || uid(), name, slug, durationMinutes: Number(editing.durationMinutes), price: Number(editing.price), sortOrder: editing.sortOrder ?? types.length }
     setData(current => ({ ...current, sessionCatalog: editing.id ? current.sessionCatalog.map(item => item.id === editing.id ? row : item) : [...current.sessionCatalog, row], sessionTypes: current.sessionTypes.includes(name) ? current.sessionTypes : [...current.sessionTypes, name] }))
     setEditing(null); toast('Service saved')
@@ -60,14 +62,15 @@ export function SessionTypes({ data, setData, toast, setView }) {
     <div className={s.publicIntro}><h2>Public</h2><span>Available to book at <a href={base} target="_blank" rel="noreferrer">{base.replace(/^https?:\/\//, '')}</a></span></div>
     {!types.length && <div className={s.empty}><h2>Your collections start here</h2><p>Create a package from scratch or load the reference packages as private drafts to review before publishing.</p><button className={s.softButton} onClick={importSamples}>Load sample packages</button></div>}
     <div className={s.typeGrid}>{types.map(item => <article className={s.typeCard} key={item.id}>
-      <div className={s.typeName}><span className={s.dot} style={{ background: item.color }} />{safeImageUrl(item.imageUrl) && <img src={item.imageUrl} alt="" />}<strong>{item.name}</strong></div>
+      {safeImageUrl(item.imageUrl) ? <img className={s.typeCover} src={item.imageUrl} alt="" /> : <button type="button" className={s.typeCoverEmpty} onClick={() => setEditing({ ...item })}>+ Add a photo</button>}<div className={s.typeName}><span className={s.dot} style={{ background: item.color }} /><strong>{item.name}</strong></div>
       <div className={s.meta}>{item.public ? 'Public' : 'Draft'} &nbsp;|&nbsp; {durationLabel(item.durationMinutes)} &nbsp;|&nbsp; {money(item.price)}</div>
       <div className={s.cardActions}>{item.public ? <><a className={s.softButton} href={`${base}/${item.slug}`} target="_blank" rel="noreferrer">View Page</a><button className={s.textButton} onClick={() => { navigator.clipboard?.writeText(`${base}/${item.slug}`); toast('Page link copied') }} aria-label={`Copy link for ${item.name}`}>↗ Copy link</button></> : <span className={s.meta}>Publish to view page</span>}<button className={s.textButton} onClick={() => setEditing({ ...item })}>Edit</button><button className={s.dangerText} onClick={() => remove(item)}>Delete</button></div>
     </article>)}</div>
     {types.length > 0 && <button className={s.textButton} onClick={importSamples}>Load missing sample packages as drafts</button>}
     <div className={s.related}><button onClick={() => setView('sessions')}>View meetings →</button><button onClick={() => setView('discounts')}>Manage discounts →</button></div>
     {editing && <Modal wide title={editing.id ? 'Edit Service' : 'New Service'} onClose={() => setEditing(null)} footer={<><button style={T.btn} onClick={() => setEditing(null)}>Cancel</button><button style={T.btnPrimary} onClick={saveType}>Save Service</button></>}>
-      <div className={s.formGrid}>{field('Name', input(editing.name, name => setEditing(v => ({ ...v, name, slug: v.id ? v.slug : slugify(name) })), { required: true }))}{field('Page URL', input(editing.slug, slug => setEditing(v => ({ ...v, slug: slugify(slug) })), { placeholder: 'maternity-classic' }))}{field('Category', input(editing.category, category => setEditing(v => ({ ...v, category }))))}{field('Duration (minutes)', input(editing.durationMinutes, durationMinutes => setEditing(v => ({ ...v, durationMinutes: Number(durationMinutes) })), { type: 'number', min: 30, max: 480, step: 30 }))}{field('Price (USD)', input(editing.price, price => setEditing(v => ({ ...v, price: Number(price) })), { type: 'number', min: 0, step: '.01' }))}{field('Location', input(editing.location, location => setEditing(v => ({ ...v, location }))))}{field('Image URL (HTTPS)', input(editing.imageUrl, imageUrl => setEditing(v => ({ ...v, imageUrl })), { type: 'url', placeholder: 'https://...' }))}{field('Category color', input(editing.color, color => setEditing(v => ({ ...v, color })), { type: 'color' }))}</div>
+      <div className={s.field}><span>Photo</span><PhotoField value={editing.imageUrl} onChange={imageUrl => setEditing(v => ({ ...v, imageUrl }))} toast={toast} /></div>
+      <div className={s.formGrid}>{field('Name', input(editing.name, name => setEditing(v => ({ ...v, name, slug: v.id ? v.slug : slugify(name) })), { required: true }))}{field('Page URL', input(editing.slug, slug => setEditing(v => ({ ...v, slug: slugify(slug) })), { placeholder: 'maternity-classic' }))}{field('Category', input(editing.category, category => setEditing(v => ({ ...v, category }))))}{field('Duration (minutes)', input(editing.durationMinutes, durationMinutes => setEditing(v => ({ ...v, durationMinutes: Number(durationMinutes) })), { type: 'number', min: 30, max: 480, step: 30 }))}{field('Price (USD)', input(editing.price, price => setEditing(v => ({ ...v, price: Number(price) })), { type: 'number', min: 0, step: '.01' }))}{field('Location', <LocationField value={editing.location} onChange={location => setEditing(v => ({ ...v, location }))} />)}{field('Category color', input(editing.color, color => setEditing(v => ({ ...v, color })), { type: 'color' }))}</div>
       {field('Description', <textarea className={s.input} rows={4} value={editing.description} onChange={e => setEditing(v => ({ ...v, description: e.target.value }))} />)}
       <label className={s.checkbox}><input type="checkbox" checked={editing.public} onChange={e => setEditing(v => ({ ...v, public: e.target.checked }))} /> Publish on booking page</label>
     </Modal>}
@@ -103,7 +106,7 @@ export function Sessions({ data, setData, toast, setView }) {
     const start = Number(form.time.slice(0,2)) * 60 + Number(form.time.slice(3,5))
     const conflict = data.bookings.some(b => { if (b.date !== form.date || !b.time || b.status === 'canceled') return false; const other = Number(b.time.slice(0,2)) * 60 + Number(b.time.slice(3,5)); return start < other + (b.durationMinutes || 60) && start + type.durationMinutes > other })
     if (conflict) return toast('That time overlaps another meeting')
-    const booking = { id: uid(), clientId: client.id, client: client.name, sessionTypeId: type.id, type: type.name, date: form.date, time: form.time, durationMinutes: type.durationMinutes, price: type.price, finalPrice: type.price, location: type.location, notes: form.notes, status: 'pending', source: 'manual' }
+    const booking = { id: uid(), clientId: client.id, client: client.name, sessionTypeId: type.id, type: type.name, date: form.date, time: form.time, durationMinutes: type.durationMinutes, price: type.price, finalPrice: type.price, location: type.location || studioAddressNow(), notes: form.notes, status: 'pending', source: 'manual' }
     setData(v => ({ ...v, bookings: [...v.bookings, booking] })); setCreating(false); toast('Meeting created')
   }
   return <div><div className={s.heading}><div><h1>Meetings</h1><p>Booking requests and scheduled meetings in one place.</p></div><button className={s.primaryButton} onClick={() => setCreating(true)}>+ New meeting</button></div>

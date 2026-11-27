@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { T, C } from '../lib/tokens'
 import { pibase } from '../lib/pibase'
 import { Modal } from './UI'
+import { LocationField, studioAddressNow } from './LocationField'
 import { LineItemBuilder, calcTotal } from './LineItemBuilder'
 import ContractBuilder from './ContractBuilder'
 import ContractDocument from './ContractDocument'
@@ -419,7 +420,7 @@ export function SessionModal({ client: clientProp, session, data, setData, toast
     type: session?.type || client?.type || data.sessionTypes?.[0] || 'Web Development',
     date: session?.date || client?.date || '',
     time: session?.time || '',
-    location: session?.location || '',
+    location: session?.location || studioAddressNow(),
     notes: session?.notes || '',
     status: session?.status || 'pending',
   })
@@ -473,7 +474,7 @@ export function SessionModal({ client: clientProp, session, data, setData, toast
         </div>
         <div style={T.formGroup}>
           <label style={T.formLabel}>Location</label>
-          <input style={T.formInput} placeholder="Studio, park, etc." value={form.location} onChange={e => setForm({ ...form, location: e.target.value })} />
+          <LocationField value={form.location} onChange={location => setForm(f => ({ ...f, location }))} />
         </div>
       </div>
       {isEdit && (

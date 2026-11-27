@@ -4,7 +4,7 @@ import '../styles/globals.css'
 import { pibase } from '../lib/pibase'
 import { AppHead, PwaManager } from '../components/AppShell'
 
-const PUBLIC_ROUTES = ['/login', '/contact', '/booking', '/sign', '/invoice', '/quote', '/questionnaire', '/chat']
+const PUBLIC_ROUTES = ['/login', '/contact', '/booking', '/sign', '/invoice', '/quote', '/questionnaire', '/chat', '/proposal']
 
 export default function App({ Component, pageProps }) {
   const router = useRouter()

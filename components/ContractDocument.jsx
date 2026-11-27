@@ -12,10 +12,11 @@ function marked(text, values) {
 /** Formats the stored plain-text agreement without changing its legal wording. */
 export default function ContractDocument({ body, signedBy, signedAt, signatureData, headerImageUrl, studioSignature = null, highlights = [] }) {
   const allLines = String(body || 'No contract body.').replace(/\r\n/g, '\n').split('\n')
-  const titleIndex = allLines.findIndex(line => line.trim() === 'Digital Services Agreement')
-  const lines = allLines.slice(titleIndex >= 0 ? titleIndex : 0)
-  const title = lines[0]?.trim() || 'Digital Services Agreement'
-  const signatureIndex = lines.findIndex(line => line.trim() === 'Signatures')
+  const firstLine = allLines.findIndex(line => line.trim())
+  const lines = allLines.slice(firstLine >= 0 ? firstLine : 0)
+  const title = lines[0]?.trim() || 'Agreement'
+  const signatureIndex = lines.findIndex(line => ['Signatures', 'Firmas'].includes(line.trim()))
+  const es = lines[signatureIndex]?.trim() === 'Firmas'
   const content = lines.slice(1, signatureIndex < 0 ? undefined : signatureIndex)
   const signatures = signatureIndex < 0 ? [] : lines.slice(signatureIndex + 1).map(line => line.trim()).filter(Boolean)
   return <article className="contract-document">
@@ -29,7 +30,7 @@ export default function ContractDocument({ body, signedBy, signedAt, signatureDa
       if (/^\d+\.\d+\s+\S/.test(text)) return <p className="contract-document-clause" key={index}>{marked(text, highlights)}</p>
       return <p className={text.startsWith('THIS AGREEMENT') ? 'contract-document-intro' : ''} key={index}>{marked(text, highlights)}</p>
     })}</div>
-    {!!signatures.length && <section className="contract-document-signatures"><h2>Signatures</h2><div>{[0, 2].map(index => {
+    {!!signatures.length && <section className="contract-document-signatures"><h2>{es ? 'Firmas' : 'Signatures'}</h2><div>{[0, 2].map(index => {
       // Slot 0 is the studio, slot 2 the client.
       const sig = index === 0
         ? studioSignature?.name ? { name: studioSignature.name, at: studioSignature.at, image: studioSignature.data } : null
@@ -39,7 +40,7 @@ export default function ContractDocument({ body, signedBy, signedAt, signatureDa
           : sig ? <div className="contract-signature-typed">{sig.name}</div>
           : <div className="contract-document-signature-line" />}
         <strong>{signatures[index] || ''}</strong>
-        <span>{sig ? `Electronically signed by ${sig.name}${sig.at ? ` on ${sig.at}` : ''}` : signatures[index + 1] || ''}</span>
+        <span>{sig ? es ? `Firmado electrónicamente por ${sig.name}${sig.at ? ` el ${sig.at}` : ''}` : `Electronically signed by ${sig.name}${sig.at ? ` on ${sig.at}` : ''}` : signatures[index + 1] || ''}</span>
       </div>
     })}</div></section>}
   </article>

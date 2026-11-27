@@ -1,7 +1,56 @@
-# EHS Studio Manager — Change Checklist
+# 515 Studio Manager — Change Checklist
+
+(Branch `515studio` of the ehsmanager repo; live at https://manager.515studio.net.)
 
 A running log of what has been fixed or built, newest first. Add a section for
 every round of changes, and keep the "Open / follow-ups" list current.
+
+---
+
+## 2026-11-27 (515 round 1) — Proposals by link, web design contracts, booking page, own deploy
+
+### ⚠️ Before using
+- [x] Database: `pibase-migration-005-proposals.sql` applied to `p_bcb1de3b`
+      (new `proposals` table, owner + grants for the app roles).
+- [x] First proposal added as a **draft**: P-1001 "Propuesta para MP Carpet
+      Cleaning" (from the PDF, converted by hand; source in
+      `docs/proposals/mp-carpet-cleaning.md`).
+- [ ] Deploy with `bash /var/www/515manager/deploy.sh` (new — the old file
+      deployed Ellie's app). The first run uses the old script still in the
+      folder, so run it as `bash /root/work/515manager/deploy.sh` once, or
+      copy the new one over first.
+- [ ] Have a lawyer review both Web Design & Development contracts (EN/ES).
+- [ ] Settings → Business details: add the address and phone; optional
+      booking-page welcome text, Instagram, Facebook.
+
+### Proposals (new page under Workflow)
+- [x] Write a proposal, paste Markdown from Claude, or **Import PDF**
+      (headings, paragraphs, lists come through; tidy tables in Write).
+- [x] Branded public page `/proposal/<link>`: 515 logo, Oswald, red accent,
+      Spanish or English labels, before/after tables become cards on phones.
+- [x] Client accepts at the bottom with name, business, email, phone,
+      address, city, current website, message and an "I accept" box.
+      → client created in **Inquiry** (or matched by email), lead row
+      (source "proposal"), email + push to the studio. Accepts only once.
+- [x] Share window: copy link, Share, Text, WhatsApp, Email, Copy message,
+      Preview (not counted). Shows live "Opened N times" / "Accepted".
+- [x] Accepted proposal → **Create quote** / **Create contract** for the client.
+
+### Contracts
+- [x] Contract type picker: **Web Design & Development (English)**,
+      **Diseño y Desarrollo Web (Español)**, Digital Services. Spanish dates,
+      "Firmas"/"Firmado electrónicamente por" on the signing page.
+
+### From EHS (#3 and #8)
+- [x] Public booking page redesign (logo, welcome text, social, photo cards,
+      month calendar), photo upload for Services (stored in
+      `/var/www/515-media`), booking-page settings.
+- [x] Default location (515 Wood Pl, Linden NJ 07036, or Settings address)
+      with "Another location", in contracts, meetings and services.
+
+### Deploy
+- [x] Own zero-downtime `deploy.sh` (branch `515studio`, PM2 `515manager`),
+      `--rollback`; builds skip Next.js AI-agent prompts.
 
 ---
 
@@ -643,6 +692,8 @@ every round of changes, and keep the "Open / follow-ups" list current.
 ---
 
 ## Open / follow-ups
+- [ ] Proposals: no "decline" button for the client yet; no expiry date.
+- [ ] Next.js 16.4.0 → 16.4.6 security upgrade (same as EHS).
 - [ ] Online payments were tested against a stand-in for Stripe (signed
       webhook events), not a real Stripe account. Make one test payment in
       Stripe test mode before going live.

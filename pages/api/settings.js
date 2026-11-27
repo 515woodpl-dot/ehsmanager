@@ -1,7 +1,7 @@
 import { requireUser } from '../../lib/api-auth'
 import { SECRET_FIELDS, DEFAULT_INTEGRATIONS, NOTIFY_TYPES, canStoreSecrets, saveStudioSecrets, loadStudioConfig, appUrl } from '../../lib/studioConfig'
 
-const BRANDING_FIELDS = ['businessName', 'ownerName', 'studioEmail', 'phone', 'website', 'address', 'signature', 'logo', 'iconBackground']
+const BRANDING_FIELDS = ['businessName', 'ownerName', 'studioEmail', 'phone', 'website', 'address', 'signature', 'logo', 'iconBackground', 'bookingWelcome', 'instagramUrl', 'facebookUrl']
 const EMAIL_RE = /^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/
 const MAX_LOGO = 400 * 1024
 
@@ -45,11 +45,14 @@ export default async function handler(req, res) {
     const next = { ...auth.config.branding }
     for (const field of BRANDING_FIELDS) {
       if (typeof branding[field] !== 'string') continue
-      next[field] = field === 'logo' ? branding[field] : branding[field].trim().slice(0, field === 'signature' || field === 'address' ? 500 : 200)
+      next[field] = field === 'logo' ? branding[field] : branding[field].trim().slice(0, field === 'bookingWelcome' ? 1200 : field === 'signature' || field === 'address' ? 500 : 200)
     }
     if (!next.businessName) return res.status(400).json({ error: 'Business name is required' })
     if (!/^#[0-9a-f]{6}$/i.test(next.iconBackground || '#ffffff')) return res.status(400).json({ error: 'Pick a colour for the app icon background' })
     if (next.studioEmail && !EMAIL_RE.test(next.studioEmail)) return res.status(400).json({ error: 'Enter a valid studio email' })
+    for (const field of ['instagramUrl', 'facebookUrl']) {
+      if (next[field] && !/^https:\/\/([a-z0-9-]+\.)*(instagram|facebook)\.com\//i.test(next[field])) return res.status(400).json({ error: `Enter the full ${field === 'instagramUrl' ? 'Instagram' : 'Facebook'} link, starting with https://` })
+    }
     if (next.logo && (!/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(next.logo) || next.logo.length > MAX_LOGO * 1.4)) {
       return res.status(400).json({ error: 'Logo must be a PNG, JPG or WebP image under 400 KB' })
     }
