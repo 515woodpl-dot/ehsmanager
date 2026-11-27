@@ -5,6 +5,14 @@ every round of changes, and keep the "Open / follow-ups" list current.
 
 ---
 
+## 2026-11-27 (round 12) — Security upgrade
+
+- [x] Next.js 16.4.0 → 16.4.6 (critical advisories, incl. remote code
+      execution in image optimization); `qs` updated. `npm audit`: 0
+      vulnerabilities. Deploy with `bash /var/www/ehsmanager/deploy.sh`.
+
+---
+
 ## 2026-11-26 (round 11) — Booking page to replace Pixieset, service links
 
 ### ⚠️ Before using
@@ -764,7 +772,6 @@ every round of changes, and keep the "Open / follow-ups" list current.
       existing endpoint (alongside `payment_intent.succeeded`).
 - [ ] Refunds given outside Stripe (cash, Zelle) can't be recorded yet.
 - [ ] Editing an invoice's tax after it's been paid changes past tax figures.
-- [ ] Upgrade Next.js 16.4.0 → 16.4.6 (security fix); test the build first.
 - [ ] Confirm NJ sales-tax treatment of session fees / digital files with an
       accountant (rate is editable in Finances → Tax settings).
 - [ ] Stripe fees are only captured for payments made after this release.
