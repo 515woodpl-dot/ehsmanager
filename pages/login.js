@@ -44,7 +44,7 @@ export default function Login() {
   return (
     <>
       <Head>
-        <title>EHS Studio Manager</title>
+        <title>515Studio Manager</title>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Serif+Display&display=swap" rel="stylesheet" />
@@ -54,9 +54,9 @@ export default function Login() {
 
           {/* Logo */}
           <div style={{ textAlign: 'center', marginBottom: 40 }}>
-            <div style={{ fontFamily: "'DM Serif Display', Georgia, serif", fontSize: 28, color: C.text, letterSpacing: '-0.5px' }}>EHS Studio</div>
-            <div style={{ fontFamily: "'DM Serif Display', Georgia, serif", fontSize: 28, color: C.text, letterSpacing: '-0.5px', marginTop: -4 }}>Manager</div>
-            <div style={{ fontSize: 12, color: C.faint, marginTop: 6, letterSpacing: '0.08em', textTransform: 'uppercase' }}>Photography CRM</div>
+            <img src="/515-logo.png" alt="515Studio" style={{ height: 84, width: 'auto', display: 'block', margin: '0 auto 14px' }} />
+            <div style={{ fontFamily: "'DM Serif Display', Georgia, serif", fontSize: 24, color: C.text, letterSpacing: '-0.5px' }}>515Studio Manager</div>
+            <div style={{ fontSize: 12, color: C.faint, marginTop: 6, letterSpacing: '0.08em', textTransform: 'uppercase' }}>Leads &amp; Clients</div>
           </div>
 
           {/* Card */}
@@ -87,13 +87,13 @@ export default function Login() {
             {tab === 'signup' && (
               <div style={T.formGroup}>
                 <label style={T.formLabel}>Full name</label>
-                <input style={T.formInput} placeholder="Ellie Heartstrings" value={name} onChange={e => setName(e.target.value)} onKeyDown={handleKey} autoFocus />
+                <input style={T.formInput} placeholder="515Studio" value={name} onChange={e => setName(e.target.value)} onKeyDown={handleKey} autoFocus />
               </div>
             )}
 
             <div style={T.formGroup}>
               <label style={T.formLabel}>Email</label>
-              <input style={T.formInput} type="email" placeholder="ellie@example.com" value={email} onChange={e => setEmail(e.target.value)} onKeyDown={handleKey} autoFocus={tab === 'login'} />
+              <input style={T.formInput} type="email" placeholder="you@515studio.net" value={email} onChange={e => setEmail(e.target.value)} onKeyDown={handleKey} autoFocus={tab === 'login'} />
             </div>
 
             <div style={{ ...T.formGroup, marginBottom: 24 }}>
@@ -110,7 +110,7 @@ export default function Login() {
           </div>
 
           <div style={{ textAlign: 'center', marginTop: 20, fontSize: 12, color: C.faint }}>
-            Ellie&apos;s Heartstrings Photography
+            515Studio Manager
           </div>
         </div>
       </div>

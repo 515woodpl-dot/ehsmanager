@@ -50,11 +50,11 @@ function buildFields(c, data) {
   const today = new Date().toISOString().slice(0, 10)
   return {
     fields: {
-      contractTitle: 'Portrait Photography Services Agreement',
+      contractTitle: 'Digital Services Agreement',
       effectiveDate: today,
       clientName: c?.name || '',
       clientEmail: c?.email || '',
-      sessionType: booking?.type || c?.type || 'Portrait',
+      sessionType: booking?.type || c?.type || 'Web Development',
       sessionDate: booking?.date || c?.date || '',
       sessionTime: booking?.time || '',
       location: booking?.location || '',
@@ -62,8 +62,8 @@ function buildFields(c, data) {
       retainerPct: '50',
       remainingDueDate: invoice?.due || 'Proof Delivery Date',
       governingState: 'New Jersey',
-      photographerEmail: 'hello@elliesheartstrings.com',
-      photographerCity: 'Linden, NJ',
+      photographerEmail: 'hello@515studio.net',
+      photographerCity: 'New Jersey',
       headerImageUrl: sessionType?.imageUrl || '',
     },
     sources: { booking, invoice },
@@ -100,7 +100,7 @@ export default function ContractBuilder({ client, contract = null, data, onSave,
     const bits = ['contact details']
     if (sources.booking) {
       const d = sources.booking.date ? new Date(sources.booking.date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : null
-      bits.push(d ? `session on ${d}` : 'session details')
+      bits.push(d ? `meeting on ${d}` : 'meeting details')
     }
     if (sources.invoice) bits.push(`fee from invoice ${sources.invoice.number || sources.invoice.id}`)
     return `Auto-filled ${bits.join(' · ')}`
@@ -128,7 +128,7 @@ export default function ContractBuilder({ client, contract = null, data, onSave,
     effectiveDate: fmtD(fields.effectiveDate),
     clientName: fields.clientName || '[Client Name]',
     clientEmail: fields.clientEmail || '[Client Email]',
-    sessionType: fields.sessionType || '[Session Type]',
+    sessionType: fields.sessionType || '[Service]',
     sessionDate: fmtD(fields.sessionDate),
     sessionTime: fmtT(fields.sessionTime),
     location: fields.location || '[Location]',
@@ -136,8 +136,8 @@ export default function ContractBuilder({ client, contract = null, data, onSave,
     retainerAmount: totalFee > 0 ? money(retainerAmt) : '[Retainer]',
     remainingAmount: totalFee > 0 ? money(remainingAmt) : '[Remaining]',
     remainingDueDate: fmtD(fields.remainingDueDate),
-    photographerEmail: fields.photographerEmail || '[Photographer Email]',
-    photographerCity: fields.photographerCity || '[Photographer City]',
+    photographerEmail: fields.photographerEmail || '[515Studio Email]',
+    photographerCity: fields.photographerCity || '[515Studio City]',
     governingState: fields.governingState || '[Governing State]',
   }), [fields, totalFee, retainerAmt, remainingAmt])
 
@@ -150,7 +150,7 @@ export default function ContractBuilder({ client, contract = null, data, onSave,
       return
     }
     if (!activeClient || !fields.clientName.trim() || !fields.clientEmail.trim() || !fields.sessionDate || !fields.sessionTime || !fields.location.trim() || !fields.remainingDueDate || !Number.isFinite(totalFee) || totalFee <= 0 || !Number.isFinite(retainerPct) || retainerPct < 0 || retainerPct > 100) {
-      alert('Select a client and complete the client, session, and payment details before saving.')
+      alert('Select a client and complete the client, meeting, and payment details before saving.')
       setTab('fields')
       return
     }
@@ -205,7 +205,7 @@ export default function ContractBuilder({ client, contract = null, data, onSave,
               <div style={{ fontSize: 12, color: C.green, marginTop: 8, fontWeight: 500 }}>{fillSummary}</div>
             )}
             {selectedClientId && !sources.booking && (
-              <div style={{ fontSize: 11.5, color: C.faint, marginTop: 4 }}>No booking found — enter session date, time and location below.</div>
+              <div style={{ fontSize: 11.5, color: C.faint, marginTop: 4 }}>No booking found — enter meeting date, time and location below.</div>
             )}
             {selectedClientId && !sources.invoice && (
               <div style={{ fontSize: 11.5, color: C.faint, marginTop: 2 }}>No invoice found — enter the total fee below.</div>
@@ -216,27 +216,27 @@ export default function ContractBuilder({ client, contract = null, data, onSave,
           <Field label="Contract title">
             <input style={inp} value={fields.contractTitle} onChange={e => set('contractTitle', e.target.value)} />
           </Field>
-          <Field label="Contract header image URL" hint="Optional · auto-filled from the booked session type. Use any HTTPS image or leave blank.">
+          <Field label="Contract header image URL" hint="Optional · auto-filled from the booked service. Use any HTTPS image or leave blank.">
             <div style={{ display: 'flex', gap: 8 }}>
               <input style={inp} type="url" placeholder="https://…" value={fields.headerImageUrl || ''} onChange={e => set('headerImageUrl', e.target.value)} />
               {!!fields.headerImageUrl && <button type="button" style={T.btn} onClick={() => set('headerImageUrl', '')}>Remove</button>}
             </div>
           </Field>
 
-          <Section title="Session details">
+          <Section title="Project details">
             <div style={row2} className="form-row-2">
               <Field label="Effective date">
                 <input style={inp} type="date" value={fields.effectiveDate} onChange={e => set('effectiveDate', e.target.value)} />
               </Field>
-              <Field label="Session type">
+              <Field label="Service">
                 <input style={inp} value={fields.sessionType} onChange={e => set('sessionType', e.target.value)} />
               </Field>
             </div>
             <div style={row2} className="form-row-2">
-              <Field label="Session date">
+              <Field label="Project start date">
                 <input style={inp} type="date" value={fields.sessionDate} onChange={e => set('sessionDate', e.target.value)} />
               </Field>
-              <Field label="Session time">
+              <Field label="Kickoff time">
                 <input style={inp} type="time" value={fields.sessionTime} onChange={e => set('sessionTime', e.target.value)} />
               </Field>
             </div>
@@ -281,14 +281,14 @@ export default function ContractBuilder({ client, contract = null, data, onSave,
 
           <Section title="Terms and contact">
             <div style={row2} className="form-row-2">
-              <Field label="Photographer email">
+              <Field label="515Studio email">
                 <input style={inp} value={fields.photographerEmail} onChange={e => set('photographerEmail', e.target.value)} />
               </Field>
               <Field label="Governing state">
                 <input style={inp} value={fields.governingState} onChange={e => set('governingState', e.target.value)} />
               </Field>
             </div>
-            <Field label="Photographer city">
+            <Field label="515Studio city">
               <input style={inp} value={fields.photographerCity} onChange={e => set('photographerCity', e.target.value)} />
             </Field>
           </Section>

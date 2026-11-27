@@ -31,7 +31,7 @@ export default function ContactFormSettings({ data, setData, toast }) {
     setForm({ ...form, checkboxOptions: form.checkboxOptions.filter((_, i) => i !== idx) })
   }
 
-  const publicUrl = typeof window !== 'undefined' ? window.location.origin + '/contact' : 'https://manager.elliesheartstrings.com/contact'
+  const publicUrl = typeof window !== 'undefined' ? window.location.origin + '/contact' : 'https://manager.515studio.net/contact'
 
   return (
     <div>
@@ -113,7 +113,7 @@ export default function ContactFormSettings({ data, setData, toast }) {
 
           {/* Checkbox options */}
           <div style={T.formGroup}>
-            <label style={T.formLabel}>Session type checkboxes</label>
+            <label style={T.formLabel}>Service checkboxes</label>
             <div style={{ marginBottom: 10 }}>
               {(form.checkboxOptions || []).map((opt, i) => (
                 <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0', borderBottom: `1px solid ${C.border}` }}>

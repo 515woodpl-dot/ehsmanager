@@ -21,8 +21,8 @@ function parseCSV(text) {
       name: obj.name || obj['full name'] || obj.fullname || obj.client || '',
       email: obj.email || obj['email address'] || '',
       phone: obj.phone || obj['phone number'] || obj.mobile || '',
-      type: obj.type || obj['session type'] || 'Family',
-      date: obj.date || obj['session date'] || '',
+      type: obj.type || obj['service'] || 'Web Development',
+      date: obj.date || obj['meeting date'] || '',
       notes: obj.notes || obj.note || '',
       status: obj.status || 'inquiry',
       archived: false,
@@ -40,10 +40,10 @@ export default function Clients({ data, setData, toast, sessionTypes }) {
   const [importPreview, setImportPreview] = useState([])
   const [importError, setImportError] = useState('')
   const fileRef = useRef()
-  const blank = { name: '', email: '', phone: '', type: sessionTypes?.[0] || 'Family', date: '', notes: '' }
+  const blank = { name: '', email: '', phone: '', type: sessionTypes?.[0] || 'Web Development', date: '', notes: '' }
   const [form, setForm] = useState(blank)
 
-  const types = sessionTypes || ['Family', 'Maternity', 'Newborn', 'Portrait']
+  const types = sessionTypes || ['Strategy', 'Web Development', 'Digital Marketing', 'SEO Services']
 
   const filtered = data.clients.filter(c => {
     if (c.archived) return false
@@ -140,7 +140,7 @@ export default function Clients({ data, setData, toast, sessionTypes }) {
               <Badge type={c.status} label={(data.stages || []).find(s => s.id === c.status)?.label || c.status} />
             </div>
             <div className="client-card-bottom">
-              <div className="client-card-meta">{c.type || 'No session type'} · {fmtDate(c.date)}</div>
+              <div className="client-card-meta">{c.type || 'No service'} · {fmtDate(c.date)}</div>
               <div className="client-card-actions">
                 <button style={{ ...T.btnGhost, padding: '6px 8px' }} onClick={event => { event.stopPropagation(); setEditModal({ ...c }) }} title="Quick edit" aria-label={`Edit ${c.name}`}>
                   <svg width={iconSize} height={iconSize} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -165,7 +165,7 @@ export default function Clients({ data, setData, toast, sessionTypes }) {
           footer={<><button style={T.btn} onClick={() => setAddModal(false)}>Cancel</button><button style={T.btnPrimary} onClick={add}>Add client</button></>}>
           <div style={T.formRow} className="form-row-2">
             <div style={T.formGroup}><label style={T.formLabel}>Full name</label><input style={T.formInput} value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} autoFocus /></div>
-            <div style={T.formGroup}><label style={T.formLabel}>Session type</label>
+            <div style={T.formGroup}><label style={T.formLabel}>Service</label>
               <select style={T.formInput} value={form.type} onChange={e => setForm({ ...form, type: e.target.value })}>
                 {types.map(t => <option key={t}>{t}</option>)}
               </select>
@@ -175,7 +175,7 @@ export default function Clients({ data, setData, toast, sessionTypes }) {
             <div style={T.formGroup}><label style={T.formLabel}>Email</label><input style={T.formInput} type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} /></div>
             <div style={T.formGroup}><label style={T.formLabel}>Phone</label><input style={T.formInput} value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} /></div>
           </div>
-          <div style={T.formGroup}><label style={T.formLabel}>Session date</label><input style={T.formInput} type="date" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} /></div>
+          <div style={T.formGroup}><label style={T.formLabel}>Meeting date</label><input style={T.formInput} type="date" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} /></div>
           <div style={T.formGroup}><label style={T.formLabel}>Notes</label><textarea style={{ ...T.formInput, resize: 'none' }} rows={3} value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} /></div>
         </Modal>
       )}
@@ -197,7 +197,7 @@ export default function Clients({ data, setData, toast, sessionTypes }) {
             <div style={T.formGroup}><label style={T.formLabel}>Phone</label><input style={T.formInput} value={editModal.phone || ''} onChange={e => setEditModal({ ...editModal, phone: e.target.value })} /></div>
           </div>
           <div style={T.formRow} className="form-row-2">
-            <div style={T.formGroup}><label style={T.formLabel}>Session date</label><input style={T.formInput} type="date" value={editModal.date || ''} onChange={e => setEditModal({ ...editModal, date: e.target.value })} /></div>
+            <div style={T.formGroup}><label style={T.formLabel}>Meeting date</label><input style={T.formInput} type="date" value={editModal.date || ''} onChange={e => setEditModal({ ...editModal, date: e.target.value })} /></div>
             <div style={T.formGroup}><label style={T.formLabel}>Type</label>
               <select style={T.formInput} value={editModal.type} onChange={e => setEditModal({ ...editModal, type: e.target.value })}>
                 {types.map(t => <option key={t}>{t}</option>)}

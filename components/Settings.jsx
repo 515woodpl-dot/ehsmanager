@@ -143,7 +143,7 @@ function NotificationsSection({ toast, integrations, setIntegrations, saveButton
       {!supported ? (
         <p className="settings-note">This browser can't receive notifications. Try Chrome, Edge, Firefox, or Safari on a Mac{isIOS() ? ', or install the app on your iPhone/iPad first' : ''}.</p>
       ) : iosNeedsInstall ? (
-        <p className="settings-note">On iPhone and iPad, notifications only work in the installed app: tap <strong>Share → Add to Home Screen</strong>, open EHS Studio from your home screen, and come back here.</p>
+        <p className="settings-note">On iPhone and iPad, notifications only work in the installed app: tap <strong>Share → Add to Home Screen</strong>, open 515Studio from your home screen, and come back here.</p>
       ) : !hasWorker ? (
         <p className="settings-note">Notifications work in the live (deployed) app. They can't be turned on in this preview.</p>
       ) : info && (
@@ -179,17 +179,58 @@ function NotificationsSection({ toast, integrations, setIntegrations, saveButton
 }
 
 // Install status and button for the home-screen app.
+function PasswordSection({ toast }) {
+  const [current, setCurrent] = useState('')
+  const [pw, setPw] = useState('')
+  const [pw2, setPw2] = useState('')
+  const [busy, setBusy] = useState(false)
+  const save = async () => {
+    if (!current) return toast('Enter your current password')
+    if (pw.length < 8) return toast('Use at least 8 characters')
+    if (pw !== pw2) return toast('The two passwords do not match')
+    setBusy(true)
+    try {
+      const { data: { session } } = await pibase.auth.getSession()
+      // PIBASE changes passwords with its own endpoint (it verifies the current password).
+      const response = await fetch(`${process.env.NEXT_PUBLIC_PIBASE_URL}/auth/v1/user/password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', apikey: process.env.NEXT_PUBLIC_PIBASE_ANON_KEY, Authorization: `Bearer ${session?.access_token || ''}` },
+        body: JSON.stringify({ current_password: current, new_password: pw }),
+      })
+      const text = await response.text()
+      let body = {}
+      try { body = text ? JSON.parse(text) : {} } catch { /* non-JSON error body */ }
+      if (!response.ok) throw new Error(body.message || body.error || body.msg || text.trim() || `Could not change password (${response.status})`)
+      setCurrent(''); setPw(''); setPw2('')
+      toast('Password changed')
+    } catch (e) {
+      toast(e.message || 'Could not change password')
+    }
+    setBusy(false)
+  }
+  return (
+    <Section title="Password" subtitle="Change the password you use to log in to this manager.">
+      <div style={{ display: 'grid', gap: 10, maxWidth: 360 }}>
+        <input style={T.formInput} type="password" autoComplete="current-password" placeholder="Current password" value={current} onChange={e => setCurrent(e.target.value)} />
+        <input style={T.formInput} type="password" autoComplete="new-password" placeholder="New password (8+ characters)" value={pw} onChange={e => setPw(e.target.value)} />
+        <input style={T.formInput} type="password" autoComplete="new-password" placeholder="Repeat new password" value={pw2} onChange={e => setPw2(e.target.value)} />
+        <div><button type="button" style={T.btnPrimary} disabled={busy || !pw} onClick={save}>{busy ? 'Saving…' : 'Change password'}</button></div>
+      </div>
+    </Section>
+  )
+}
+
 function InstallSection({ toast }) {
   const [, rerender] = useState(0)
   const [installed, setInstalled] = useState(false)
   useEffect(() => { setInstalled(isStandalone()); return subscribe(() => rerender(n => n + 1)) }, [])
   const ios = typeof navigator !== 'undefined' && isIOS()
   return (
-    <Section title="App" subtitle="Install EHS Studio on your phone, tablet or computer to open it from your home screen, full-screen, like a regular app." status={installed ? true : undefined}>
+    <Section title="App" subtitle="Install 515Studio on your phone, tablet or computer to open it from your home screen, full-screen, like a regular app." status={installed ? true : undefined}>
       {installed ? (
         <p style={{ fontSize: 13.5, color: C.muted, margin: 0 }}>You're using the installed app. 🎉</p>
       ) : canPromptInstall() ? (
-        <button style={T.btnPrimary} onClick={async () => { if (await promptInstall() === 'accepted') toast('Installing EHS Studio…') }}>Install app</button>
+        <button style={T.btnPrimary} onClick={async () => { if (await promptInstall() === 'accepted') toast('Installing 515Studio…') }}>Install app</button>
       ) : ios ? (
         <p style={{ fontSize: 13.5, color: C.muted, margin: 0 }}>In Safari, tap <strong>Share</strong> and choose <strong>Add to Home Screen</strong>.</p>
       ) : (
@@ -298,7 +339,7 @@ export default function Settings({ toast = () => {} }) {
           <Field label="Address">{b('address')}</Field>
         </div>
         <Field label="Email signature" hint="Ends every email. Leave blank for “Warmly, [your first name]”.">
-          <textarea style={{ ...T.formInput, resize: 'vertical' }} rows={3} value={branding.signature || ''} onChange={e => setBranding({ ...branding, signature: e.target.value })} placeholder={`Warmly,\n${branding.ownerName || 'Ellie'}`} />
+          <textarea style={{ ...T.formInput, resize: 'vertical' }} rows={3} value={branding.signature || ''} onChange={e => setBranding({ ...branding, signature: e.target.value })} placeholder={`Warmly,\n${branding.ownerName || 'The 515Studio team'}`} />
         </Field>
         <div style={{ display: 'flex', justifyContent: 'flex-end' }}>{saveButton('branding', { branding })}</div>
       </Section>
@@ -349,6 +390,7 @@ export default function Settings({ toast = () => {} }) {
       <NotificationsSection toast={toast} integrations={integrations} setIntegrations={setIntegrations} saveButton={saveButton} />
 
       <InstallSection toast={toast} />
+      <PasswordSection toast={toast} />
 
       <p style={{ fontSize: 12, color: C.faint, marginTop: 4 }}>Keys are encrypted on the server and never shown again after saving — only their last 4 characters.</p>
     </div>

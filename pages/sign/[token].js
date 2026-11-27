@@ -55,8 +55,8 @@ export default function SignContractPage({ token, contract }) {
       </Head>
       <main className="sign-page">
         <section className="sign-card">
-          <p className="sign-eyebrow">Ellie's Heartstrings Photography</p>
-          <h1>{contract.type || 'Photography Agreement'}</h1>
+          <p className="sign-eyebrow">515Studio</p>
+          <h1>{contract.type || 'Services Agreement'}</h1>
           <div className="sign-meta">
             <span>{contract.client}</span>
             <span>{contract.sent ? `Sent ${contract.sent}` : 'Ready for review'}</span>

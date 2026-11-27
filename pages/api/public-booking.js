@@ -22,12 +22,12 @@ export default async function handler(req, res) {
     if (req.method === 'POST' && req.body?.action === 'quote') {
       const slug = clean(req.body.slug, 120), date = clean(req.body.date, 10)
       const code = clean(req.body.code, 40).toUpperCase()
-      if (!slug || !validDate(date) || !code) return res.status(400).json({ error: 'Choose a session, date and code' })
+      if (!slug || !validDate(date) || !code) return res.status(400).json({ error: 'Choose a meeting, date and code' })
       const [{ data: type }, { data: discount }] = await Promise.all([
         db.from('session_catalog').select('price').eq('user_id', ownerId).eq('slug', slug).eq('public', true).single(),
         db.from('discount_codes').select('*').eq('user_id', ownerId).eq('code', code).single(),
       ])
-      if (!type) return res.status(404).json({ error: 'Session type not found' })
+      if (!type) return res.status(404).json({ error: 'Service not found' })
       const amount = discountAmount({ ...discount, startsOn: discount?.starts_on, endsOn: discount?.ends_on, maxUses: discount?.max_uses }, Number(type.price), date)
       if (amount == null) return res.status(400).json({ error: 'Discount code is invalid or expired' })
       return res.status(200).json({ discountAmount: amount, total: Math.max(0, Number(type.price) - amount) })
@@ -41,7 +41,7 @@ export default async function handler(req, res) {
       const sessionTypes = (rows || []).map(publicType)
       const bookingWindow = { noticeDays: availability?.noticeDays ?? 1, horizonDays: availability?.horizonDays ?? 90 }
       if (!slug) return res.status(200).json({ sessionTypes, timezone: availability?.timezone || 'America/New_York', bookingWindow })
-      if (!sessionTypes.length) return res.status(404).json({ error: 'Session type not found' })
+      if (!sessionTypes.length) return res.status(404).json({ error: 'Service not found' })
       if (!date) return res.status(200).json({ sessionType: sessionTypes[0], timezone: availability?.timezone || 'America/New_York', bookingWindow })
       if (!validDate(date)) return res.status(400).json({ error: 'Invalid date' })
       const { data: bookings, error: bookingsError } = await db.from('bookings').select('date,time,duration_minutes,status').eq('user_id', ownerId).eq('date', date)
@@ -53,9 +53,9 @@ export default async function handler(req, res) {
     const safeSlug = clean(slug, 120), safeDate = clean(date, 10), safeTime = clean(time, 5)
     const safeName = clean(name, 120), safeEmail = clean(email, 254).toLowerCase(), safePhone = clean(phone, 40)
     const safeCode = clean(code, 40).toUpperCase()
-    if (!safeSlug || !validDate(safeDate) || !safeTime || !safeName || !/^\S+@\S+\.\S+$/.test(safeEmail)) return res.status(400).json({ error: 'Complete the session, date, time, name and email fields' })
+    if (!safeSlug || !validDate(safeDate) || !safeTime || !safeName || !/^\S+@\S+\.\S+$/.test(safeEmail)) return res.status(400).json({ error: 'Complete the meeting, date, time, name and email fields' })
     const { data: row, error: typeError } = await db.from('session_catalog').select('*').eq('user_id', ownerId).eq('slug', safeSlug).eq('public', true).single()
-    if (typeError || !row) return res.status(404).json({ error: 'Session type not found' })
+    if (typeError || !row) return res.status(404).json({ error: 'Service not found' })
     const type = publicType(row)
     const { data: bookings, error: bookingsError } = await db.from('bookings').select('date,time,duration_minutes,status').eq('user_id', ownerId).eq('date', safeDate)
     if (bookingsError) throw bookingsError
@@ -73,7 +73,7 @@ export default async function handler(req, res) {
       if (bookingError.code === '23505') return res.status(409).json({ error: 'That time was just booked. Choose another.' })
       console.error('[public-booking] reservation failed', bookingError)
       if (/discount|gift card/i.test(bookingError.message || '')) return res.status(409).json({ error: 'That discount is no longer available. Review your total and try again.' })
-      return res.status(500).json({ error: 'Unable to reserve this session right now' })
+      return res.status(500).json({ error: 'Unable to reserve this meeting right now' })
     }
     await notifyStudio(db, ownerId, { type: 'bookings', title: `📅 New booking request from ${safeName}`, body: `${type.name} · ${safeDate} at ${safeTime}`, url: '/?view=sessions', tag: `booking-${bookingId}` })
     return res.status(201).json({ ok: true, bookingId })

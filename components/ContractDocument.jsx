@@ -12,9 +12,9 @@ function marked(text, values) {
 /** Formats the stored plain-text agreement without changing its legal wording. */
 export default function ContractDocument({ body, signedBy, signedAt, signatureData, headerImageUrl, studioSignature = null, highlights = [] }) {
   const allLines = String(body || 'No contract body.').replace(/\r\n/g, '\n').split('\n')
-  const titleIndex = allLines.findIndex(line => line.trim() === 'Portrait Photography Services Agreement')
+  const titleIndex = allLines.findIndex(line => line.trim() === 'Digital Services Agreement')
   const lines = allLines.slice(titleIndex >= 0 ? titleIndex : 0)
-  const title = lines[0]?.trim() || 'Portrait Photography Services Agreement'
+  const title = lines[0]?.trim() || 'Digital Services Agreement'
   const signatureIndex = lines.findIndex(line => line.trim() === 'Signatures')
   const content = lines.slice(1, signatureIndex < 0 ? undefined : signatureIndex)
   const signatures = signatureIndex < 0 ? [] : lines.slice(signatureIndex + 1).map(line => line.trim()).filter(Boolean)

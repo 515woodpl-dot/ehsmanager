@@ -85,8 +85,8 @@ function Sidebar({ active, setActive, unread, open, onClose, user, onSignOut }) 
     { id: 'clients', label: 'Clients' },
   ]
   const nav2 = [
-    { id: 'sessiontypes', label: 'Session Types' },
-    { id: 'sessions', label: 'Sessions' },
+    { id: 'sessiontypes', label: 'Services' },
+    { id: 'sessions', label: 'Meetings' },
     { id: 'calendar', label: 'Calendar' },
     { id: 'discounts', label: 'Discounts' },
     { id: 'invoices', label: 'Invoices' },
@@ -118,9 +118,9 @@ function Sidebar({ active, setActive, unread, open, onClose, user, onSignOut }) 
         {/* Logo */}
         <div style={{ padding: '24px 22px 18px', borderBottom: `1px solid ${C.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <div>
-            <div style={{ fontFamily: "'DM Serif Display', Georgia, serif", fontSize: 17, color: C.text, letterSpacing: '-0.2px', lineHeight: 1.2 }}>EHS Studio</div>
+            <div style={{ fontFamily: "'DM Serif Display', Georgia, serif", fontSize: 17, color: C.text, letterSpacing: '-0.2px', lineHeight: 1.2, display: 'flex', alignItems: 'center', gap: 8 }}><img src="/515-logo.png" alt="" style={{ height: 26, width: 'auto' }} />515Studio</div>
             <div style={{ fontFamily: "'DM Serif Display', Georgia, serif", fontSize: 17, color: C.text, letterSpacing: '-0.2px' }}>Manager</div>
-            <div style={{ fontSize: 10, color: C.faint, marginTop: 3, letterSpacing: '0.06em', textTransform: 'uppercase' }}>Photography CRM</div>
+            <div style={{ fontSize: 10, color: C.faint, marginTop: 3, letterSpacing: '0.06em', textTransform: 'uppercase' }}>Leads &amp; Clients</div>
           </div>
           {/* Mobile close button */}
           <button onClick={onClose} className="mobile-close-btn" style={{ display: 'none', background: 'none', border: 'none', fontSize: 20, color: C.muted, cursor: 'pointer', padding: 4 }}>×</button>
@@ -149,10 +149,10 @@ function Sidebar({ active, setActive, unread, open, onClose, user, onSignOut }) 
         <div style={{ padding: '14px 16px', borderTop: `1px solid ${C.border}` }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 6px', borderRadius: 8 }}>
             <div style={{ width: 30, height: 30, borderRadius: '50%', background: C.text, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 500, flexShrink: 0 }}>
-              {user ? user.email.slice(0,2).toUpperCase() : 'EH'}
+              {user ? user.email.slice(0,2).toUpperCase() : '515'}
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 12, fontWeight: 500, color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user ? user.email : 'Ellie Heartstrings'}</div>
+              <div style={{ fontSize: 12, fontWeight: 500, color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user ? user.email : '515Studio'}</div>
               <button onClick={onSignOut} style={{ background: 'none', border: 'none', padding: 0, fontSize: 11, color: C.faint, cursor: 'pointer', fontFamily: 'inherit' }}>Sign out</button>
             </div>
           </div>
@@ -394,7 +394,7 @@ export default function Home() {
 
   if (!dbReady) {
     return <main style={{ maxWidth: 520, margin: '12vh auto', padding: 24, fontFamily: 'sans-serif' }}>
-      <h1>EHS Studio Manager</h1>
+      <h1>515Studio Manager</h1>
       <p>{typeof navigator !== 'undefined' && !navigator.onLine ? 'You\'re offline. Connect to the internet to load your studio.' : loadError || (authChecked ? 'Sign in to access your studio data.' : 'Loading studio data...')}</p>
       {authChecked && <a href="/login">Go to sign in</a>}
     </main>
@@ -427,7 +427,7 @@ export default function Home() {
   return (
     <>
       <Head>
-        <title>EHS Studio Manager</title>
+        <title>515Studio Manager</title>
       </Head>
 
       <div style={{ display: 'flex', minHeight: '100vh', background: C.bg }}>

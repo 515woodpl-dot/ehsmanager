@@ -183,8 +183,8 @@ function CardModal({ client: clientProp, stages, sessionTypes, data, setData, on
                 <ActionItem icon="?" title="Questionnaire" subtitle="Learn about client needs" onClick={() => setActiveModal('questionnaire')} color={C.purple} />
 
                 <div style={{ height: 8 }} />
-                {sectionLabel('Schedule sessions')}
-                <ActionItem icon="📅" title="Session" subtitle="Invite your client to a session" onClick={() => setActiveModal('session')} />
+                {sectionLabel('Schedule meetings')}
+                <ActionItem icon="📅" title="Meeting" subtitle="Invite your client to a meeting" onClick={() => setActiveModal('session')} />
 
                 <div style={{ height: 8 }} />
                 {sectionLabel('Conversations')}
@@ -211,9 +211,9 @@ function CardModal({ client: clientProp, stages, sessionTypes, data, setData, on
                   {clientQuestionnaires.map(q => <DocCard key={q.id} kind="questionnaire" item={q} onClick={() => open('questionnaire', q)}
                     title={q.title || 'Questionnaire'} subtitle={`${q.questions?.length || 0} question${q.questions?.length === 1 ? '' : 's'}${q.createdAt ? ` · ${q.createdAt}` : ''}`} status={QUESTIONNAIRE_STATUS[q.status] || q.status} />)}
                 </ActivitySection>
-                <ActivitySection title="Sessions" onAdd={() => setActiveModal('session')} empty="No sessions yet">
+                <ActivitySection title="Meetings" onAdd={() => setActiveModal('session')} empty="No meetings yet">
                   {clientBookings.map(b => <DocCard key={b.id} kind="session" item={b} onClick={() => open('session', b)}
-                    title={b.type || 'Session'} subtitle={`${fmtDate(b.date)}${b.time ? ` · ${b.time}` : ''}${b.location ? ` · ${b.location}` : ''}`} status={sessionStatus(b)} />)}
+                    title={b.type || 'Meeting'} subtitle={`${fmtDate(b.date)}${b.time ? ` · ${b.time}` : ''}${b.location ? ` · ${b.location}` : ''}`} status={sessionStatus(b)} />)}
                 </ActivitySection>
                 <ActivitySection title="Messages" onAdd={() => setActiveModal('message')} empty="No messages yet">
                   <button key="chat-link" type="button" style={{ ...T.btnGhost, color: C.blue, padding: '0 0 8px', fontSize: 12 }} onClick={() => copyChatLink(client.id, toast)}>Copy {client.name.split(' ')[0]}'s chat link</button>
@@ -241,7 +241,7 @@ function CardModal({ client: clientProp, stages, sessionTypes, data, setData, on
               <>
                 <div style={T.formRow} className="form-row-2">
                   <div style={T.formGroup}><label style={T.formLabel}>Full name</label><input style={T.formInput} value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} /></div>
-                  <div style={T.formGroup}><label style={T.formLabel}>Session type</label>
+                  <div style={T.formGroup}><label style={T.formLabel}>Service</label>
                     <select style={T.formInput} value={form.type} onChange={e => setForm({ ...form, type: e.target.value })}>
                       {sessionTypes.map(t => <option key={t}>{t}</option>)}
                     </select>
@@ -252,7 +252,7 @@ function CardModal({ client: clientProp, stages, sessionTypes, data, setData, on
                   <div style={T.formGroup}><label style={T.formLabel}>Phone</label><input style={T.formInput} value={form.phone || ''} onChange={e => setForm({ ...form, phone: e.target.value })} /></div>
                 </div>
                 <div style={T.formRow} className="form-row-2">
-                  <div style={T.formGroup}><label style={T.formLabel}>Session date</label><input style={T.formInput} type="date" value={form.date || ''} onChange={e => setForm({ ...form, date: e.target.value })} /></div>
+                  <div style={T.formGroup}><label style={T.formLabel}>Meeting date</label><input style={T.formInput} type="date" value={form.date || ''} onChange={e => setForm({ ...form, date: e.target.value })} /></div>
                   <div style={T.formGroup}><label style={T.formLabel}>Status</label>
                     <select style={T.formInput} value={form.status} onChange={e => setForm({ ...form, status: e.target.value })}>
                       {stages.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
@@ -266,8 +266,8 @@ function CardModal({ client: clientProp, stages, sessionTypes, data, setData, on
                   { label: 'Full name', value: client.name },
                   { label: 'Email', value: client.email || '—' },
                   { label: 'Phone', value: client.phone || '—' },
-                  { label: 'Session type', value: client.type },
-                  { label: 'Session date', value: fmtDate(client.date) },
+                  { label: 'Service', value: client.type },
+                  { label: 'Meeting date', value: fmtDate(client.date) },
                   { label: 'Status', value: stages.find(s => s.id === client.status)?.label || client.status },
                 ].map(f => (
                   <div key={f.label} style={{ display: 'flex', justifyContent: 'space-between', gap: 12, padding: '10px 0', borderBottom: `1px solid ${C.border}` }}>
@@ -322,7 +322,7 @@ function CardModal({ client: clientProp, stages, sessionTypes, data, setData, on
     {openDoc?.kind === 'questionnaire' && <QuestionnaireModal {...modalProps} questionnaire={openDoc.item} onClose={closeDoc} />}
     {openDoc?.kind === 'session' && <SessionModal {...modalProps} session={openDoc.item} onClose={closeDoc} />}
 
-    {confirmDelete && <ConfirmModal danger title="Delete this project?" message={`${client.name}'s project will be removed. Existing invoices, sessions and contracts will remain in your records without a linked client.`} confirmLabel="Delete project" onClose={() => setConfirmDelete(false)} onConfirm={del} />}
+    {confirmDelete && <ConfirmModal danger title="Delete this project?" message={`${client.name}'s project will be removed. Existing invoices, meetings and contracts will remain in your records without a linked client.`} confirmLabel="Delete project" onClose={() => setConfirmDelete(false)} onConfirm={del} />}
     </>
   )
 }
@@ -365,7 +365,7 @@ function StageModal({ stages, onSave, onClose }) {
 
 // ── New Project Modal ─────────────────────────────────────────────
 function NewProjectModal({ stages, sessionTypes, onAdd, onClose, onAddType }) {
-  const [form, setForm] = useState({ name: '', email: '', phone: '', type: sessionTypes[0] || 'Family', date: '', status: stages[0]?.id || 'inquiry', notes: '' })
+  const [form, setForm] = useState({ name: '', email: '', phone: '', type: sessionTypes[0] || 'Web Development', date: '', status: stages[0]?.id || 'inquiry', notes: '' })
   const [customType, setCustomType] = useState('')
   const [addingType, setAddingType] = useState(false)
 
@@ -391,7 +391,7 @@ function NewProjectModal({ stages, sessionTypes, onAdd, onClose, onAddType }) {
       </div>
       <div style={T.formRow} className="form-row-2">
         <div style={T.formGroup}>
-          <label style={T.formLabel}>Session type</label>
+          <label style={T.formLabel}>Service</label>
           {addingType ? (
             <div style={{ display: 'flex', gap: 6 }}>
               <input style={{ ...T.formInput, flex: 1 }} placeholder="Type name..." value={customType} onChange={e => setCustomType(e.target.value)} onKeyDown={e => e.key === 'Enter' && saveCustomType()} autoFocus />
@@ -407,7 +407,7 @@ function NewProjectModal({ stages, sessionTypes, onAdd, onClose, onAddType }) {
             </div>
           )}
         </div>
-        <div style={T.formGroup}><label style={T.formLabel}>Session date</label><input style={T.formInput} type="date" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} /></div>
+        <div style={T.formGroup}><label style={T.formLabel}>Meeting date</label><input style={T.formInput} type="date" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} /></div>
       </div>
       <div style={T.formGroup}><label style={T.formLabel}>Stage</label>
         <select style={T.formInput} value={form.status} onChange={e => setForm({ ...form, status: e.target.value })}>
@@ -588,7 +588,7 @@ export default function Projects({ data, setData, toast }) {
   const addSessionType = (type) => {
     if (data.sessionTypes.includes(type)) return
     setData(d => ({ ...d, sessionTypes: [...d.sessionTypes, type] }))
-    toast('Session type added')
+    toast('Service added')
   }
 
   const saveStages = (newStages) => {

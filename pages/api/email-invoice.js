@@ -46,7 +46,7 @@ export default async function handler(req, res) {
   const label = invoice.number || 'Invoice'
   let viewUrl = null
   try {
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://manager.elliesheartstrings.com'
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://manager.515studio.net'
     viewUrl = new URL(`/invoice/${createInvoiceToken(invoice.id)}`, baseUrl).toString()
   } catch {
     viewUrl = null

@@ -1,7 +1,8 @@
 import { createServiceClient } from '../../lib/pibase'
 import { notifyStudio } from '../../lib/push'
 import { emailWrap, sendStudioEmail } from '../../lib/email'
-import { loadStudioConfig } from '../../lib/studioConfig'
+import { loadStudioConfig, appUrl } from '../../lib/studioConfig'
+import { clientConfirmationEmail } from '../../lib/leadEmails'
 
 const escapeHtml = (value = '') => String(value)
   .replace(/&/g, '&amp;')
@@ -18,7 +19,7 @@ const escapeHtml = (value = '') => String(value)
  *                                             as client + lead row, emails the owner
  *
  * If no studio id is given, falls back to STUDIO_OWNER_USER_ID env var
- * (single-tenant mode — set this to Ellie's user id).
+ * (single-tenant mode — set this to the studio owner's user id).
  */
 export default async function handler(req, res) {
   try {
@@ -55,16 +56,18 @@ export default async function handler(req, res) {
         email: clean(lead.email).toLowerCase(),
         phone: clean(lead.phone),
         interest: Array.isArray(lead.services) ? lead.services.slice(0, 5).map(clean).filter(Boolean).join(', ') : clean(lead.interest),
+        company: clean(lead.company),
         message: typeof lead.message === 'string' ? lead.message.slice(0, 3000).trim() : '',
       }
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(safeLead.email)) return res.status(400).json({ error: 'Enter a valid email address' })
-      if (!safeLead.phone) return res.status(400).json({ error: 'Phone number is required' })
 
       // 1. Save lead row
       const { error: leadErr } = await db.from('leads').insert({
         user_id: studioId,
-        ...safeLead,
-        source: 'contact_form',
+        name: safeLead.name, email: safeLead.email, phone: safeLead.phone || null,
+        interest: safeLead.interest || null,
+        message: [safeLead.company && `Company: ${safeLead.company}`, safeLead.message].filter(Boolean).join('\n\n') || null,
+        source: lead.source === 'website_515studio' ? 'website_515studio' : 'contact_form',
       })
       if (leadErr) {
         console.error('[public-form] lead insert failed', leadErr)
@@ -81,7 +84,7 @@ export default async function handler(req, res) {
           phone: safeLead.phone,
           type: safeLead.interest.split(', ')[0] || null,
           status: 'inquiry',
-          notes: safeLead.message || null,
+          notes: [safeLead.company && `Company: ${safeLead.company}`, safeLead.message].filter(Boolean).join('\n\n') || null,
         })
         if (clientErr) console.error('[public-form] client insert failed', clientErr)
       }
@@ -98,11 +101,12 @@ export default async function handler(req, res) {
               <div class="box-row"><span class="label">Name</span><span class="value">${escapeHtml(safeLead.name)}</span></div>
               <div class="box-row"><span class="label">Email</span><span class="value">${escapeHtml(safeLead.email)}</span></div>
               ${safeLead.phone ? `<div class="box-row"><span class="label">Phone</span><span class="value">${escapeHtml(safeLead.phone)}</span></div>` : ''}
+              ${safeLead.company ? `<div class="box-row"><span class="label">Company</span><span class="value">${escapeHtml(safeLead.company)}</span></div>` : ''}
               ${safeLead.interest ? `<div class="box-row"><span class="label">Interested in</span><span class="value">${escapeHtml(safeLead.interest)}</span></div>` : ''}
               <div class="box-row"><span class="label">Received</span><span class="value">${escapeHtml(fmtDate)}</span></div>
             </div>
             ${safeLead.message ? `<div class="box" style="font-family:Arial,sans-serif;font-size:13px;line-height:1.7;color:#444;"><strong>Message:</strong><br/><br/>${escapeHtml(safeLead.message)}</div>` : ''}
-            <a href="${escapeHtml(process.env.NEXT_PUBLIC_APP_URL || 'https://manager.elliesheartstrings.com')}" class="btn">Open Studio Manager</a>
+            <a href="${escapeHtml(process.env.NEXT_PUBLIC_APP_URL || 'https://manager.515studio.net')}" class="btn">Open Studio Manager</a>
             <p style="margin-top:20px;font-size:13px;color:#9B9B98;">This lead has been added to your client list.</p>
           `, config)
           const result = await sendStudioEmail(config, {
@@ -114,6 +118,22 @@ export default async function handler(req, res) {
           if (result.error) console.error('[public-form] email failed', result.error)
         }
       } catch (e) { console.error('[public-form] email failed', e) }
+
+      // 4. Confirm to the client: "we got your info, we will reach out" (best-effort)
+      try {
+        const config = await loadStudioConfig(db, studioId)
+        const studioEmail = config.branding.studioEmail || 'hello@515studio.net'
+        const result = await sendStudioEmail(config, {
+          to: safeLead.email,
+          replyTo: studioEmail,
+          subject: "We got your info — we'll be in touch soon | 515Studio",
+          html: clientConfirmationEmail({
+            name: safeLead.name, interest: safeLead.interest, company: safeLead.company, message: safeLead.message,
+            logoUrl: 'https://515studio.net/img/515-logo.png', siteUrl: config.branding.website || 'https://515studio.net', replyEmail: studioEmail,
+          }),
+        })
+        if (result.error) console.error('[public-form] client confirmation failed', result.error)
+      } catch (e) { console.error('[public-form] client confirmation failed', e) }
 
       await notifyStudio(db, studioId, { type: 'bookings', title: `💌 New inquiry from ${safeLead.name}`, body: safeLead.interest || safeLead.message || safeLead.email, url: '/?view=clients', tag: `lead-${safeLead.email}` })
       return res.status(200).json({ ok: true })

@@ -51,7 +51,7 @@ export function LineItemBuilder({ value, onChange, catalog = [] }) {
             <div className="line-item-grid">
               <label className="line-item-field line-item-name">
                 <span>Item {index + 1}</span>
-                <input style={{ ...T.formInput, fontSize: 14, fontWeight: 500 }} list={catalog.length ? listId : undefined} placeholder={catalog.length ? 'Type or pick a saved item' : 'e.g. Maternity Signature session'} value={item.name} onChange={e => changeName(item, e.target.value)} />
+                <input style={{ ...T.formInput, fontSize: 14, fontWeight: 500 }} list={catalog.length ? listId : undefined} placeholder={catalog.length ? 'Type or pick a saved item' : 'e.g. Maternity Signature meeting'} value={item.name} onChange={e => changeName(item, e.target.value)} />
               </label>
               <label className="line-item-field">
                 <span>Qty</span>

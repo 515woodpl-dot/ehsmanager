@@ -31,19 +31,19 @@ export default async function handler(req, res) {
   const html = emailWrap(`
     <h1>Session Reminder</h1>
     <p>Hi ${escapeHtml(clientName || 'there')},</p>
-    <p>This is a friendly reminder about your upcoming photography session. We're looking forward to seeing you!</p>
+    <p>This is a friendly reminder about your upcoming meeting. We're looking forward to seeing you!</p>
 
     <div class="box">
-      <div class="box-row"><span class="label">Session type</span><span class="value">${escapeHtml(booking.type || 'Photography Session')}</span></div>
+      <div class="box-row"><span class="label">Service</span><span class="value">${escapeHtml(booking.type || 'Meeting')}</span></div>
       <div class="box-row"><span class="label">Date</span><span class="value">${fmtDate(booking.date)}</span></div>
       ${booking.time ? `<div class="box-row"><span class="label">Time</span><span class="value">${fmtTime(booking.time)}</span></div>` : ''}
       ${booking.location ? `<div class="box-row"><span class="label">Location</span><span class="value">${escapeHtml(booking.location)}</span></div>` : ''}
     </div>
 
     <p><strong>A few things to keep in mind:</strong></p>
-    <p>Please arrive a few minutes early so we have time to get comfortable before we start shooting. Feel free to reach out if you have any questions or need to make changes.</p>
+    <p>Please arrive a few minutes early so we have time to get comfortable before we start. Feel free to reach out if you have any questions or need to make changes.</p>
 
-    ${booking.notes ? `<p><strong>Session notes:</strong> ${escapeHtml(booking.notes)}</p>` : ''}
+    ${booking.notes ? `<p><strong>Meeting notes:</strong> ${escapeHtml(booking.notes)}</p>` : ''}
 
     <p style="margin-top:24px;">See you soon!<br/><strong>${escapeHtml(ownerName)}</strong></p>
   `, auth.config)
