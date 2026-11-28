@@ -13,6 +13,19 @@ const fmtTime = t => { if (!t) return ''; const [h, m] = t.split(':'); const hr 
 const todayLabel = () => new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
 const fmt$ = n => '$' + Number(n || 0).toLocaleString()
 
+// Upcoming sessions for the dashboard: real sessions (not canceled) plus any
+// booked project whose session date is coming up but has no session made for
+// it yet — so a booked client still shows up before a session is created.
+function upcomingSessions(data) {
+  const today = new Date().toLocaleDateString('en-CA')
+  const live = data.bookings.filter(b => b.status !== 'canceled' && b.date && b.date >= today)
+  const fromProjects = data.clients
+    .filter(c => !c.archived && c.status === 'booked' && c.date && c.date >= today)
+    .filter(c => !live.some(b => b.clientId === c.id || (!b.clientId && b.client === c.name)))
+    .map(c => ({ id: `project-${c.id}`, clientId: c.id, client: c.name, date: c.date, time: '', type: c.type, status: 'confirmed', fromProject: true }))
+  return [...live, ...fromProjects].sort((x, y) => `${x.date}${x.time || ''}`.localeCompare(`${y.date}${y.time || ''}`))
+}
+
 function MiniCalendar({ bookings, onOpen }) {
   const now = new Date(), year = now.getFullYear(), month = now.getMonth()
   const first = new Date(year, month, 1).getDay(), days = new Date(year, month + 1, 0).getDate()
@@ -24,7 +37,7 @@ function MiniCalendar({ bookings, onOpen }) {
       {Array(first).fill(null).map((_, index) => <span key={`blank-${index}`} />)}
       {Array.from({ length: days }, (_, index) => index + 1).map(day => { const count = bookings.filter(item => item.date === dateFor(day) && item.status !== 'canceled').length; return <button key={day} className={`${dateFor(day) === new Date().toLocaleDateString('en-CA') ? 'today' : ''} ${count ? 'booked' : ''}`} onClick={onOpen}>{day}{count > 0 && <i>{count}</i>}</button> })}
     </div>
-    <div className="mini-calendar-next">{next ? <><small>Next meeting</small><strong>{next.client}</strong><span>{fmtDate(next.date)} · {fmtTime(next.time)}</span></> : <span>No upcoming meetings</span>}</div>
+    <div className="mini-calendar-next">{next ? <><small>Next meeting</small><strong>{next.client}</strong><span>{fmtDate(next.date)}{next.time ? ` · ${fmtTime(next.time)}` : next.type ? ` · ${next.type}` : ''}</span></> : <span>No upcoming meetings</span>}</div>
   </div>
 }
 
@@ -33,7 +46,8 @@ export function Dashboard({ data, setView, openClientCard }) {
   const totalRevenue = data.invoices.reduce((s, i) => s + i.paid, 0)
   const outstanding = data.invoices.reduce((s, i) => s + (i.amount - i.paid), 0)
   const active = data.clients.filter(c => !c.archived && c.status !== 'done').length
-  const upcoming = data.bookings.filter(b => b.status === 'confirmed').length
+  const upcomingList = upcomingSessions(data)
+  const upcoming = upcomingList.filter(b => b.status === 'confirmed').length
   return (
     <div>
       <div className="dashboard-metric-grid metric-strip">
@@ -74,18 +88,18 @@ export function Dashboard({ data, setView, openClientCard }) {
             <div style={{ fontWeight: 500, fontSize: 14 }}>Upcoming meetings</div>
             <button style={{ ...T.btnGhost, color: C.muted, fontSize: 12 }} onClick={() => setView('calendar')}>Calendar</button>
           </div>
-          {data.bookings.slice(0, 5).map((b, i, arr) => (
+          {upcomingList.slice(0, 5).map((b, i, arr) => (
             <div key={b.id} className="data-row-mobile" onClick={() => { const client = data.clients.find(c => c.id === b.clientId || c.name === b.client); if (client) openClientCard?.(client) }} style={{ ...T.dataRow, borderBottom: i === arr.length - 1 ? 'none' : `1px solid ${C.border}`, cursor: openClientCard ? 'pointer' : 'default' }}>
               <div>
                 <div style={{ fontWeight: 500, fontSize: 13.5 }}>{b.client}</div>
-                <div style={{ fontSize: 12, color: C.muted }}>{fmtDate(b.date)} · {fmtTime(b.time)}</div>
+                <div style={{ fontSize: 12, color: C.muted }}>{fmtDate(b.date)}{b.time ? ` · ${fmtTime(b.time)}` : b.type ? ` · ${b.type}` : ''}</div>
               </div>
-              <Badge type={b.status} label={b.status} />
+              <Badge type={b.fromProject ? 'booked' : b.status} label={b.fromProject ? 'booked' : b.status} />
             </div>
           ))}
-          {data.bookings.length === 0 && <div style={{ textAlign: 'center', padding: '24px 0', color: C.faint, fontSize: 13 }}>No meetings yet</div>}
+          {upcomingList.length === 0 && <div style={{ textAlign: 'center', padding: '24px 0', color: C.faint, fontSize: 13 }}>No upcoming meetings</div>}
         </div>
-        <MiniCalendar bookings={data.bookings} onOpen={() => setView('calendar')} />
+        <MiniCalendar bookings={[...data.bookings, ...upcomingList.filter(b => b.fromProject)]} onOpen={() => setView('calendar')} />
       </div>
     </div>
   )
