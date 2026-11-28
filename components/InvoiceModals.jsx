@@ -56,6 +56,7 @@ export function InvoiceModal({ client: clientProp, invoice, data, setData, toast
   const [due, setDue] = useState(invoice?.due || '')
   const [sendFor, setSendFor] = useState(null) // invoice to email after saving
   const [linkOpen, setLinkOpen] = useState(false)
+  const [payOpen, setPayOpen] = useState(false)
 
   const client = data.clients.find(c => c.id === clientId) || (clientProp?.id === clientId ? clientProp : null)
   const clientName = client?.name || invoice?.client || ''
@@ -90,6 +91,7 @@ export function InvoiceModal({ client: clientProp, invoice, data, setData, toast
     toast(`${invoiceLabel(invoice)} deleted`); onClose()
   }
 
+  if (payOpen && invoice) return <RecordPaymentModal invoice={data.invoices.find(i => i.id === invoice.id) || invoice} setData={setData} toast={toast} onClose={onClose} />
   if (linkOpen && invoice) return <PaymentLinkModal invoice={data.invoices.find(i => i.id === invoice.id) || invoice} client={client} setData={setData} toast={toast} onClose={onClose} />
   if (sendFor) return <SendInvoiceModal invoice={sendFor} client={client} toast={toast} onClose={onClose} justCreated={!isEdit} />
 
@@ -154,6 +156,7 @@ export function InvoiceModal({ client: clientProp, invoice, data, setData, toast
         <div style={{ flex: 1 }} />
         <button style={T.btn} onClick={onClose}>Cancel</button>
         {isEdit && invoice.status !== 'paid' && <button style={T.btn} onClick={() => setLinkOpen(true)}>Payment link</button>}
+        {isEdit && invoice.status !== 'paid' && <button style={{ ...T.btn, color: C.green, borderColor: C.green }} onClick={() => setPayOpen(true)}>Record payment</button>}
         {isEdit && <button style={T.btn} onClick={() => save({ thenSend: true })}>Save &amp; email client</button>}
         <button style={T.btnPrimary} onClick={() => save()}>{isEdit ? 'Save changes' : 'Create invoice'} · {fmt$(total)}</button>
       </div>
