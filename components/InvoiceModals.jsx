@@ -156,6 +156,7 @@ export function InvoiceModal({ client: clientProp, invoice, data, setData, toast
         <button style={T.btn} onClick={onClose}>Cancel</button>
         {isEdit && invoice.status !== 'paid' && <button style={T.btn} onClick={() => setLinkOpen(true)}>Payment link</button>}
         {isEdit && invoice.status !== 'paid' && <button style={{ ...T.btn, color: C.green, borderColor: C.green }} onClick={() => setPayOpen(true)}>Record payment</button>}
+        {isEdit && Number(invoice.paid) > 0 && <button style={T.btn} onClick={() => emailPaymentReceipt({ invoiceId: invoice.id, toast })}>Email receipt</button>}
         {isEdit && <button style={T.btn} onClick={() => save({ thenSend: true })}>Save &amp; email client</button>}
         <button style={T.btnPrimary} onClick={() => save()}>{isEdit ? 'Save changes' : 'Create invoice'} · {fmt$(total)}</button>
       </div>
@@ -249,6 +250,22 @@ export function PaymentPlanEditor({ schedule, total, due, paid = 0, onChange, al
 }
 
 // ── Record a payment received outside the app ─────────────────────
+// Emails the client a receipt for a recorded payment (the latest one when no
+// paymentId). A just-recorded payment may take a moment to save, so retry.
+export async function emailPaymentReceipt({ invoiceId, paymentId = null, toast }) {
+  try {
+    const { data: { session } } = await pibase.auth.getSession()
+    for (let attempt = 0; attempt < 8; attempt++) {
+      const r = await fetch('/api/payment-receipt', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token || ''}` }, body: JSON.stringify({ invoiceId, paymentId }) })
+      const body = await r.json().catch(() => ({}))
+      if (r.ok) { toast(`Receipt emailed to ${body.to}`); return true }
+      if (r.status !== 404) throw new Error(body.error || 'The receipt could not be sent')
+      await new Promise(done => setTimeout(done, 1000))
+    }
+    throw new Error('The payment is still saving — use Email receipt on the invoice in a moment')
+  } catch (e) { toast(e.message); return false }
+}
+
 const PAY_METHODS = [
   { value: 'Cash', desc: 'Payment received in cash' },
   { value: 'Credit Card', desc: 'Card payment taken outside the app' },
@@ -261,6 +278,7 @@ export function RecordPaymentModal({ invoice, setData, toast, onClose }) {
   const balance = Math.max(0, Math.round((invoice.amount - invoice.paid) * 100) / 100)
   const [amount, setAmount] = useState(String(next?.remaining ?? balance))
   const [method, setMethod] = useState(null)
+  const [sendReceipt, setSendReceipt] = useState(true)
   const value = Math.round((parseFloat(amount) || 0) * 100) / 100
   const schedule = paymentSchedule(invoice)
 
@@ -268,9 +286,11 @@ export function RecordPaymentModal({ invoice, setData, toast, onClose }) {
     if (!method) { toast('Select a payment method'); return }
     if (value <= 0) { toast('Enter the amount received'); return }
     if (value > balance) { toast(`That's more than the ${fmt$(balance)} still owed`); return }
-    const updated = applyPayment(invoice, { id: uid(), amount: value, method })
+    const paymentId = uid()
+    const updated = applyPayment(invoice, { id: paymentId, amount: value, method })
     setData(d => ({ ...d, invoices: d.invoices.map(i => i.id === invoice.id ? { ...updated, lineData: { ...(i.lineData || {}), ...updated.lineData } } : i) }))
     toast(updated.status === 'paid' ? `${invoiceLabel(invoice)} paid in full · ${method}` : `${fmt$(value)} recorded · ${fmt$(updated.amount - updated.paid)} still owed`)
+    if (sendReceipt && method !== 'Gift / Complimentary') emailPaymentReceipt({ invoiceId: invoice.id, paymentId, toast })
     onClose()
   }
 
@@ -322,6 +342,12 @@ export function RecordPaymentModal({ invoice, setData, toast, onClose }) {
           </div>
         ))}
       </div>
+      {method !== 'Gift / Complimentary' && (
+        <label style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 14, fontSize: 14, cursor: 'pointer' }}>
+          <input type="checkbox" checked={sendReceipt} onChange={e => setSendReceipt(e.target.checked)} style={{ width: 18, height: 18 }} />
+          Email the client a receipt
+        </label>
+      )}
       <div style={T.modalFooter}>
         <div style={{ flex: 1 }} />
         <button style={T.btn} onClick={onClose}>Cancel</button>
